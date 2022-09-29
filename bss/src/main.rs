@@ -12,13 +12,17 @@ fn main() {
 
     let mut transaction_list: Vec<Transaction> = Vec::new();
 
+    const BLOCK_SIZE: u128 = 1;
+
     utxo.insert(String::from("a"), 50);
     utxo.insert(String::from("b"), 20);
 
-    loop {
-        let mut sender: String = String::new();
-        let mut receiver: String = String::new();
-        let mut units_string: String = String::new();
+    'main: loop {
+        let mut senders: Vec<String> = Vec::new();
+        let mut receivers: Vec<String> = Vec::new();
+        let mut units: Vec<u128> = Vec::new();
+        let mut sender_input = String::new();
+        let mut user_input = String::new();
 
         println!("Current UTXO:");
         for (key, value) in &utxo {
@@ -28,59 +32,93 @@ fn main() {
 
         println!("Current transaction chain:");
         for transaction in &transaction_list {
-            print!("[ {} -> {}, {}] ", transaction.sender, transaction.receiver, transaction.units);
+            for (i, val) in transaction.senders.iter().enumerate() {
+                print!("[");
+                print!("[ {} -> {}, {}]", val, transaction.receivers[i], transaction.units[i]);
+                print!("]");
+            }
         }
         println!();
 
         println!("New transaction");
         println!();
+        
+        'txio: loop {
+            println!("Sender address:");
+            user_input.clear();
+            io::stdin().read_line(&mut sender_input).expect("Failed to read line");
+            senders.push(sender_input.trim().to_string());
+            
+            println!("Receiver address:");
+            user_input.clear();
+            io::stdin().read_line(&mut user_input).expect("Failed to read line");
+            receivers.push(user_input.trim().to_string());
 
-        println!("Sender address:");
-        io::stdin().read_line(&mut sender).expect("Failed to read line");
-        sender = sender.trim().to_string();
-        println!("Receiver address:");
-        io::stdin().read_line(&mut receiver).expect("Failed to read line");
-        receiver = receiver.trim().to_string();
-        println!("Transfer quantity:");
-        io::stdin().read_line(&mut units_string).expect("Failed to read line");
-        println!();
+            println!("Transfer quantity:");
+            user_input.clear();
+            io::stdin().read_line(&mut user_input).expect("Failed to read line");
+            let unit: u128 = match user_input.trim().parse() {
+                Ok(num) => num,
+                Err(_) => return,
+            };
+            units.push(unit);
+            
+            
+            println!("Would you like to add another input -> output? y/n?");
+            user_input.clear();
+            io::stdin().read_line(&mut user_input).expect("Failed to read line");
+            sender_input.clear();
 
+            match user_input.trim() {
+                "y" => continue 'txio,
+                _ => break,
+            }
 
-        let units: u128 = match units_string.trim().parse() {
-            Ok(num) => num,
-            Err(_) => continue,
-        };
-
-        let optional_balance = utxo.get(&sender);
-
-        if optional_balance.is_none() || *optional_balance.unwrap() < units {
-            println!("Invalid transaction");
-            println!();
-            continue
         }
 
-        let balance: u128 = *optional_balance.unwrap();
+        let mut input_sum: HashMap<String, u128> = HashMap::new();
+        for (i, val) in senders.iter().enumerate() {
+            if  input_sum.contains_key(val) {
+                *input_sum.get_mut(val).unwrap() += units[i];
+            }
+            else {
+                input_sum.insert(val.to_string(), units[i]);
+            }
+        }
+
+        for (sender, value) in &input_sum {
+            if !(utxo.contains_key(sender)) || value > utxo.get(sender).unwrap() {
+                println!("Invalid transaction");
+                println!();
+                continue 'main;
+            }
+        }
 
         let transaction: Transaction = Transaction {
-            sender: sender.to_string(),
-            receiver: receiver.to_string(),
-            units: units,
+            senders: senders.clone(),
+            receivers: receivers.clone(),
+            units: units.clone(),
         };
 
         transaction_list.push(transaction);
 
-        let fee: u128 = balance - units;
-
-        utxo.remove(&sender);
-
-        if !utxo.contains_key(&receiver) {
-            utxo.insert(receiver, units);
-        } else {
-            *utxo.get_mut(&receiver).unwrap() += units;
+        // Update UTXO
+        //let fee: u128 = balance - units;
+        for (input, val) in &input_sum {
+            utxo.remove(input);
         }
 
-        println!("Transaction fee: {}", &fee);
-        println!();
+        for (i, r) in receivers.iter().enumerate() {
+            if !utxo.contains_key(r) {
+                utxo.insert(r.to_string(), units[i]);
+            }
+            else {
+                *utxo.get_mut(r).unwrap() += units[i];
+            }
+        }
+
+        // println!("Transaction fee: {}", &fee);
+        // println!();*/
     }
 
 }
