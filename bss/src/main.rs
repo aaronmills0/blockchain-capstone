@@ -28,7 +28,7 @@ fn main() {
     let mut block_id: u128 = 1;
 
     //Runs once for each transaction
-    'main: loop {
+    loop {
         let mut transaction_list: Vec<Transaction> = Vec::new();
         let mut senders: Vec<String> = Vec::new();
         let mut receivers: Vec<String> = Vec::new();
@@ -103,12 +103,17 @@ fn main() {
             }
         }
 
-        //Checks for invalid transactions
+        //Verify validity of transactions
+        let mut trans_sum = 0;
+        let mut utxo_sum = 0;
         for (sender, value) in &input_sum {
             if !(utxo.contains_key(sender)) || value > utxo.get(sender).unwrap() {
                 println!("Invalid transaction");
-                println!();
-                continue 'main;
+                return;
+            }
+            else {
+                trans_sum += value;
+                utxo_sum += utxo.get(sender).unwrap();
             }
         }
 
@@ -121,10 +126,12 @@ fn main() {
         transaction_list.push(transaction);
 
         // Update UTXO
-        //let fee: u128 = balance - units;
+
         for (key, _) in &input_sum {
             utxo.remove(key);
         }
+
+        let fee: u128 = utxo_sum - trans_sum;
 
         for (i, r) in receivers.iter().enumerate() {
             if !utxo.contains_key(r) {
@@ -135,8 +142,8 @@ fn main() {
             }
         }
 
-        // println!("Transaction fee: {}", &fee);
-        // println!();
+        println!("Transaction fee: {}", &fee);
+        println!();
 
         //Create a block when enough transactions have pilled up
         if transaction_list.len() == BLOCK_SIZE.try_into().unwrap() {
