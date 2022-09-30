@@ -10,6 +10,8 @@ fn main() {
     println!("Welcome to the simple transaction chain!");
     println!();
 
+    let mut transaction_list: Vec<Transaction> = Vec::new();
+    
     //Initialize UTXO
     let mut utxo: HashMap<String, u128> = HashMap::new();
     utxo.insert(String::from("a"), 50);
@@ -29,7 +31,6 @@ fn main() {
 
     //Runs once for each transaction
     loop {
-        let mut transaction_list: Vec<Transaction> = Vec::new();
         let mut senders: Vec<String> = Vec::new();
         let mut receivers: Vec<String> = Vec::new();
         let mut units: Vec<u128> = Vec::new();
@@ -162,6 +163,7 @@ fn main() {
                 }
                 print!(" <= Block {}", block.block_id);
             }
+            transaction_list.clear();
             print!("\n");
         }
         
