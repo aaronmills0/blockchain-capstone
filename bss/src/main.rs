@@ -1,8 +1,9 @@
-
 use std::collections::HashMap;
 use std::vec::Vec;
 use std::io;
 mod structs;
+mod hash;
+mod signer_and_verifier;
 use structs::Transaction;
 use structs::Block;
 
@@ -125,6 +126,15 @@ fn main() {
             units: units.clone(),
         };
         transaction_list.push(transaction);
+
+        //Generate transaction hash, sign transaction with private key, verify signed transaction with public key
+        println!()
+        let transaction_hash= hash::hash_as_string(transaction_list.last().unwrap());
+        let (signed_transaction, public_key) = signer_and_verifier::sign(&transaction_hash);
+        println!("The signed transaction is {}:",signed_transaction);
+        println!("The public key for this transaction is {}:", public_key);
+        println!("Does the signed transaction correpsond to public key?: {}", signer_and_verifier::verify(&transaction_hash, &signed_transaction, &public_key));
+        
 
         // Update UTXO
 
