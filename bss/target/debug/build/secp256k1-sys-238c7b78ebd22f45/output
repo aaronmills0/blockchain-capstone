@@ -1,0 +1,226 @@
+TARGET = Some("x86_64-pc-windows-msvc")
+OPT_LEVEL = Some("0")
+HOST = Some("x86_64-pc-windows-msvc")
+CC_x86_64-pc-windows-msvc = None
+CC_x86_64_pc_windows_msvc = None
+HOST_CC = None
+CC = None
+CFLAGS_x86_64-pc-windows-msvc = None
+CFLAGS_x86_64_pc_windows_msvc = None
+HOST_CFLAGS = None
+CFLAGS = None
+CRATE_CC_NO_DEFAULTS = None
+CARGO_CFG_TARGET_FEATURE = Some("fxsr,sse,sse2")
+DEBUG = Some("true")
+CC_x86_64-pc-windows-msvc = None
+CC_x86_64_pc_windows_msvc = None
+HOST_CC = None
+CC = None
+CFLAGS_x86_64-pc-windows-msvc = None
+CFLAGS_x86_64_pc_windows_msvc = None
+HOST_CFLAGS = None
+CFLAGS = None
+CRATE_CC_NO_DEFAULTS = None
+CARGO_CFG_TARGET_FEATURE = Some("fxsr,sse,sse2")
+running: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.33.31629\\bin\\HostX64\\x64\\cl.exe" "-nologo" "-MD" "-Z7" "-Brepro" "-I" "depend/secp256k1/" "-I" "depend/secp256k1/include" "-I" "depend/secp256k1/src" "-W4" "-DSECP256K1_API=" "-DENABLE_MODULE_ECDH=1" "-DENABLE_MODULE_SCHNORRSIG=1" "-DENABLE_MODULE_EXTRAKEYS=1" "-DUSE_NUM_NONE=1" "-DUSE_FIELD_INV_BUILTIN=1" "-DUSE_SCALAR_INV_BUILTIN=1" "-DECMULT_GEN_PREC_BITS=4" "-DECMULT_WINDOW_SIZE=15" "-DUSE_EXTERNAL_DEFAULT_CALLBACKS=1" "-FoC:\\Users\\samia\\Desktop\\SAMI2019\\ecse458D\\blockchain-capstone\\bss\\target\\debug\\build\\secp256k1-sys-238c7b78ebd22f45\\out\\depend/secp256k1/contrib/lax_der_parsing.o" "-c" "depend/secp256k1/contrib/lax_der_parsing.c"
+lax_der_parsing.c
+exit code: 0
+running: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.33.31629\\bin\\HostX64\\x64\\cl.exe" "-nologo" "-MD" "-Z7" "-Brepro" "-I" "depend/secp256k1/" "-I" "depend/secp256k1/include" "-I" "depend/secp256k1/src" "-W4" "-DSECP256K1_API=" "-DENABLE_MODULE_ECDH=1" "-DENABLE_MODULE_SCHNORRSIG=1" "-DENABLE_MODULE_EXTRAKEYS=1" "-DUSE_NUM_NONE=1" "-DUSE_FIELD_INV_BUILTIN=1" "-DUSE_SCALAR_INV_BUILTIN=1" "-DECMULT_GEN_PREC_BITS=4" "-DECMULT_WINDOW_SIZE=15" "-DUSE_EXTERNAL_DEFAULT_CALLBACKS=1" "-FoC:\\Users\\samia\\Desktop\\SAMI2019\\ecse458D\\blockchain-capstone\\bss\\target\\debug\\build\\secp256k1-sys-238c7b78ebd22f45\\out\\depend/secp256k1/src/precomputed_ecmult_gen.o" "-c" "depend/secp256k1/src/precomputed_ecmult_gen.c"
+precomputed_ecmult_gen.c
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\util.h(273): warning C4146: unary minus operator applied to unsigned type, result still unsigned
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\util.h(286): warning C4146: unary minus operator applied to unsigned type, result still unsigned
+exit code: 0
+running: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.33.31629\\bin\\HostX64\\x64\\cl.exe" "-nologo" "-MD" "-Z7" "-Brepro" "-I" "depend/secp256k1/" "-I" "depend/secp256k1/include" "-I" "depend/secp256k1/src" "-W4" "-DSECP256K1_API=" "-DENABLE_MODULE_ECDH=1" "-DENABLE_MODULE_SCHNORRSIG=1" "-DENABLE_MODULE_EXTRAKEYS=1" "-DUSE_NUM_NONE=1" "-DUSE_FIELD_INV_BUILTIN=1" "-DUSE_SCALAR_INV_BUILTIN=1" "-DECMULT_GEN_PREC_BITS=4" "-DECMULT_WINDOW_SIZE=15" "-DUSE_EXTERNAL_DEFAULT_CALLBACKS=1" "-FoC:\\Users\\samia\\Desktop\\SAMI2019\\ecse458D\\blockchain-capstone\\bss\\target\\debug\\build\\secp256k1-sys-238c7b78ebd22f45\\out\\depend/secp256k1/src/precomputed_ecmult.o" "-c" "depend/secp256k1/src/precomputed_ecmult.c"
+precomputed_ecmult.c
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\util.h(273): warning C4146: unary minus operator applied to unsigned type, result still unsigned
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\util.h(286): warning C4146: unary minus operator applied to unsigned type, result still unsigned
+exit code: 0
+running: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.33.31629\\bin\\HostX64\\x64\\cl.exe" "-nologo" "-MD" "-Z7" "-Brepro" "-I" "depend/secp256k1/" "-I" "depend/secp256k1/include" "-I" "depend/secp256k1/src" "-W4" "-DSECP256K1_API=" "-DENABLE_MODULE_ECDH=1" "-DENABLE_MODULE_SCHNORRSIG=1" "-DENABLE_MODULE_EXTRAKEYS=1" "-DUSE_NUM_NONE=1" "-DUSE_FIELD_INV_BUILTIN=1" "-DUSE_SCALAR_INV_BUILTIN=1" "-DECMULT_GEN_PREC_BITS=4" "-DECMULT_WINDOW_SIZE=15" "-DUSE_EXTERNAL_DEFAULT_CALLBACKS=1" "-FoC:\\Users\\samia\\Desktop\\SAMI2019\\ecse458D\\blockchain-capstone\\bss\\target\\debug\\build\\secp256k1-sys-238c7b78ebd22f45\\out\\depend/secp256k1/src/secp256k1.o" "-c" "depend/secp256k1/src/secp256k1.c"
+secp256k1.c
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\util.h(273): warning C4146: unary minus operator applied to unsigned type, result still unsigned
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\util.h(286): warning C4146: unary minus operator applied to unsigned type, result still unsigned
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\assumptions.h(40): warning C4310: cast truncates constant value
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\assumptions.h(41): warning C4310: cast truncates constant value
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\assumptions.h(42): warning C4310: cast truncates constant value
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\assumptions.h(46): warning C4310: cast truncates constant value
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\assumptions.h(47): warning C4310: cast truncates constant value
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\assumptions.h(48): warning C4310: cast truncates constant value
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\assumptions.h(52): warning C4310: cast truncates constant value
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\assumptions.h(53): warning C4310: cast truncates constant value
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\assumptions.h(54): warning C4310: cast truncates constant value
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\assumptions.h(70): warning C4310: cast truncates constant value
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\assumptions.h(71): warning C4310: cast truncates constant value
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\modinv32_impl.h(198): warning C4146: unary minus operator applied to unsigned type, result still unsigned
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\modinv32_impl.h(288): warning C4146: unary minus operator applied to unsigned type, result still unsigned
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\modinv32_impl.h(289): warning C4146: unary minus operator applied to unsigned type, result still unsigned
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\modinv32_impl.h(290): warning C4146: unary minus operator applied to unsigned type, result still unsigned
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\modinv32_impl.h(300): warning C4244: '=': conversion from 'uint32_t' to 'uint16_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\field_10x26_impl.h(803): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\field_10x26_impl.h(1077): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\field_10x26_impl.h(1237): warning C4244: '=': conversion from 'const uint64_t' to 'int32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(135): warning C4244: '=': conversion from 'uint64_t' to 'int', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(184): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(184): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(184): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(185): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(185): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(185): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(186): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(186): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(186): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(187): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(187): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(187): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(188): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(188): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(188): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(189): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(189): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(189): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(190): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(190): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(190): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(191): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(191): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(191): warning C4244: '=': conversion from 'const uint32_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(341): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(344): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(345): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(348): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(349): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(350): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(353): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(354): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(355): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(356): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(359): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(360): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(361): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(362): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(366): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(367): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(368): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(369): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(373): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(374): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(375): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(376): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(380): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(381): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(382): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(383): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(386): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(387): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(388): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(391): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(392): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(395): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(406): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(409): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(410): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(413): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(414): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(415): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(418): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(419): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(420): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(421): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(424): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(425): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(426): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(427): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(431): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(432): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(433): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(437): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(438): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(442): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(468): warning C4244: 'function': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(476): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(478): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(479): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(481): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(482): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(483): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(485): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(486): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(487): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(488): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(490): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(491): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(492): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(493): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(494): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(496): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(497): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(498): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(499): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(500): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(501): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(503): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(504): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(505): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(506): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(507): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(508): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(509): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(511): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(512): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(513): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(514): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(515): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(516): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(517): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(518): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(520): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(521): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(522): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(523): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(524): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(525): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(526): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(528): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(529): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(530): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(531): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(532): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(533): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(535): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(536): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(537): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(538): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(539): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(541): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(542): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(543): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(544): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(546): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(547): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(548): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(550): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(551): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\scalar_8x32_impl.h(553): warning C4244: '=': conversion from 'uint64_t' to 'uint32_t', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\ecmult_impl.h(494): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\ecmult_impl.h(661): warning C4334: '<<': result of 32-bit shift implicitly converted to 64 bits (was 64-bit shift intended?)
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\hash_impl.h(267): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\ecdsa_impl.h(197): warning C4267: '=': conversion from 'size_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\ecdsa_impl.h(199): warning C4267: '=': conversion from 'size_t' to 'unsigned char', possible loss of data
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\ecdsa_impl.h(202): warning C4267: '=': conversion from 'size_t' to 'unsigned char', possible loss of data
+depend/secp256k1/src/secp256k1.c(157): warning C4127: conditional expression is constant
+depend/secp256k1/src/secp256k1.c(176): warning C4127: conditional expression is constant
+depend/secp256k1/src/secp256k1.c(258): warning C4127: conditional expression is constant
+depend/secp256k1/src/secp256k1.c(271): warning C4127: conditional expression is constant
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\modules/schnorrsig/main_impl.h(48): warning C4295: 'bip340_algo': array is too small to include a terminating null character
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\ecmult_impl.h(292) : warning C4706: assignment within conditional expression
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\ecmult_impl.h(296) : warning C4706: assignment within conditional expression
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\ecmult_impl.h(301) : warning C4706: assignment within conditional expression
+C:\Users\samia\.cargo\registry\src\github.com-1ecc6299db9ec823\secp256k1-sys-0.6.0\depend\secp256k1\src\ecmult_impl.h(305) : warning C4706: assignment within conditional expression
+exit code: 0
+AR_x86_64-pc-windows-msvc = None
+AR_x86_64_pc_windows_msvc = None
+HOST_AR = None
+AR = None
+running: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.33.31629\\bin\\HostX64\\x64\\lib.exe" "-out:C:\\Users\\samia\\Desktop\\SAMI2019\\ecse458D\\blockchain-capstone\\bss\\target\\debug\\build\\secp256k1-sys-238c7b78ebd22f45\\out\\libsecp256k1.a" "-nologo" "C:\\Users\\samia\\Desktop\\SAMI2019\\ecse458D\\blockchain-capstone\\bss\\target\\debug\\build\\secp256k1-sys-238c7b78ebd22f45\\out\\depend/secp256k1/contrib/lax_der_parsing.o" "C:\\Users\\samia\\Desktop\\SAMI2019\\ecse458D\\blockchain-capstone\\bss\\target\\debug\\build\\secp256k1-sys-238c7b78ebd22f45\\out\\depend/secp256k1/src/precomputed_ecmult_gen.o" "C:\\Users\\samia\\Desktop\\SAMI2019\\ecse458D\\blockchain-capstone\\bss\\target\\debug\\build\\secp256k1-sys-238c7b78ebd22f45\\out\\depend/secp256k1/src/precomputed_ecmult.o" "C:\\Users\\samia\\Desktop\\SAMI2019\\ecse458D\\blockchain-capstone\\bss\\target\\debug\\build\\secp256k1-sys-238c7b78ebd22f45\\out\\depend/secp256k1/src/secp256k1.o"
+exit code: 0
+cargo:rustc-link-lib=static=secp256k1
+cargo:rustc-link-search=native=C:\Users\samia\Desktop\SAMI2019\ecse458D\blockchain-capstone\bss\target\debug\build\secp256k1-sys-238c7b78ebd22f45\out
