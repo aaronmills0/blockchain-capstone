@@ -128,7 +128,7 @@ fn main() {
         transaction_list.push(transaction);
 
         //Generate transaction hash, sign transaction with private key, verify signed transaction with public key
-        println!()
+        println!();
         let transaction_hash= hash::hash_as_string(transaction_list.last().unwrap());
         let (signed_transaction, public_key) = signer_and_verifier::sign(&transaction_hash);
         println!("The signed transaction is {}:",signed_transaction);

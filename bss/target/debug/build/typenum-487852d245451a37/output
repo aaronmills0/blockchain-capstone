@@ -1,2 +1,0 @@
-cargo:rustc-env=TYPENUM_BUILD_CONSTS=C:\Users\samia\Desktop\SAMI2019\ecse458D\blockchain-capstone\bss\target\debug\build\typenum-487852d245451a37\out\consts.rs
-cargo:rustc-env=TYPENUM_BUILD_OP=C:\Users\samia\Desktop\SAMI2019\ecse458D\blockchain-capstone\bss\target\debug\build\typenum-487852d245451a37\out\op.rs
