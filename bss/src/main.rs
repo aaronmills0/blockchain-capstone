@@ -2,33 +2,41 @@
 use std::collections::HashMap;
 use std::vec::Vec;
 use std::io;
-mod structs;
-use structs::Transaction;
-use structs::Block;
+mod block;
+mod transaction;
+mod merkle;
+mod hash;
+use transaction::Transaction;
+use block::Block;
+use block::BlockHeader;
+use merkle::Merkle;
 
 fn main() {
     println!("Welcome to the simple transaction chain!");
-    println!();
-
-    let mut transaction_list: Vec<Transaction> = Vec::new();
-    
+    println!();   
     //Initialize UTXO
     let mut utxo: HashMap<String, u128> = HashMap::new();
     utxo.insert(String::from("a"), 50);
     utxo.insert(String::from("b"), 20);
 
     //Create/add genesis block
+    let genesis_merkle: Merkle = Merkle { 
+        tree: Vec::from(["0000000000000000000000000000000000000000000000000000000000000000".to_string()])
+    };
     let genesis_block: Block = Block {
-        block_id: 0,
-        transactions: Vec::new(),
+        header: BlockHeader {
+            previous_hash: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+            merkle_root: genesis_merkle.tree.first().unwrap().clone(),
+            nonce: 0,
+        },
+        transactions: genesis_merkle,
     };
     let mut blockchain: Vec<Block> = Vec::new();
     blockchain.push(genesis_block);
 
     //Block creation data
     const BLOCK_SIZE: u128 = 1;
-    let mut block_id: u128 = 1;
-
+    let mut transaction_list: Vec<Transaction> = Vec::new();
     //Runs once for each transaction
     loop {
         let mut senders: Vec<String> = Vec::new();
@@ -41,17 +49,6 @@ fn main() {
         println!("Current UTXO:");
         for (key, value) in &utxo {
             println!("{} : {}", key, value);
-        }
-        println!();
-
-        //Display current transaction chain state
-        println!("Current transaction chain:");
-        for transaction in &transaction_list {
-            for (i, val) in transaction.senders.iter().enumerate() {
-                print!("[");
-                print!("[ {} -> {}, {}]", val, transaction.receivers[i], transaction.units[i]);
-                print!("]");
-            }
         }
         println!();
 
@@ -148,20 +145,24 @@ fn main() {
 
         //Create a block when enough transactions have pilled up
         if transaction_list.len() == BLOCK_SIZE.try_into().unwrap() {
+            let merkle: Merkle = Merkle::create_merkle_tree(&transaction_list);
             let  new_block: Block = Block {
-                block_id: block_id.clone(),
-                transactions: transaction_list.clone(),
+                header: BlockHeader {
+                    previous_hash: hash::hash_as_string(blockchain.last().unwrap()),
+                    merkle_root: merkle.tree.first().unwrap().clone(),
+                    nonce: 0,
+                },
+                transactions: merkle,
             };
             blockchain.push(new_block);
-            block_id += 1;
 
             println!("A block was added to the chain!");
             for block in &blockchain {
-                if block.block_id == 0 {
-                    print!("Block {}", block.block_id);
+                if hash::hash_as_string(block) == "0000000000000000000000000000000000000000000000000000000000000000" {
+                    print!("Block {}", hash::hash_as_string(block));
                     continue;
                 }
-                print!(" <= Block {}", block.block_id);
+                print!(" <= Block {}", hash::hash_as_string(block));
             }
             transaction_list.clear();
             print!("\n");
