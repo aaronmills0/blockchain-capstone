@@ -1,1 +1,1 @@
-C:\Users\samia\Desktop\SAMI2019\ecse458D\blockchain-capstone\bss\target\debug\bss.exe: C:\Users\samia\Desktop\SAMI2019\ecse458D\blockchain-capstone\bss\src\main.rs C:\Users\samia\Desktop\SAMI2019\ecse458D\blockchain-capstone\bss\src\transaction.rs
+C:\Users\samia\Desktop\SAMI2019\ecse458D\blockchain-capstone\bss\target\debug\bss.exe: C:\Users\samia\Desktop\SAMI2019\ecse458D\blockchain-capstone\bss\src\main.rs C:\Users\samia\Desktop\SAMI2019\ecse458D\blockchain-capstone\bss\src\structs.rs
