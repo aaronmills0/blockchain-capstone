@@ -128,13 +128,14 @@ fn main() {
         transaction_list.push(transaction);
 
         //Generate transaction hash, sign transaction with private key, verify signed transaction with public key
-        println!();
+        println!("");
         let transaction_hash= hash::hash_as_string(transaction_list.last().unwrap());
-        let (signed_transaction, public_key) = signer_and_verifier::sign(&transaction_hash);
+        let (secret_key, public_key) = signer_and_verifier::create_keypair();
+        let signed_transaction = signer_and_verifier::sign(&transaction_hash, &secret_key);
         println!("The signed transaction is {}:",signed_transaction);
         println!("The public key for this transaction is {}:", public_key);
-        println!("Does the signed transaction correpsond to public key?: {}", signer_and_verifier::verify(&transaction_hash, &signed_transaction, &public_key));
-        
+        println!("Does the signed transaction correspond to public key?: {}", signer_and_verifier::verify(&transaction_hash, &signed_transaction, &public_key));
+        println!("");
 
         // Update UTXO
 

@@ -12,5 +12,3 @@ rand = { version = "0.8.5"}
 sha2 = "0.10.6"
 secp256k1 = {version = "0.24.0", features = ["rand"]}
 bitcoin = "0.29.1"
-hex = "0.4.3"
-rand_core = "0.6.4"
