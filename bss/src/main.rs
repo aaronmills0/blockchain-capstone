@@ -1,4 +1,3 @@
-
 use std::collections::HashMap;
 use std::vec::Vec;
 use std::io;
@@ -38,7 +37,7 @@ fn main() {
     const BLOCK_SIZE: u128 = 1;
     let mut transaction_list: Vec<Transaction> = Vec::new();
     //Runs once for each transaction
-    loop {
+    'outer: loop {
         let mut senders: Vec<String> = Vec::new();
         let mut receivers: Vec<String> = Vec::new();
         let mut units: Vec<u128> = Vec::new();
@@ -55,7 +54,7 @@ fn main() {
         println!("New transaction");
         println!();
         
-        'txio: loop {
+        'inner: loop {
             //Receive and Proccess user Input-Output-Unit Pairs
             println!("Sender address:");
             user_input.clear();
@@ -83,7 +82,7 @@ fn main() {
             sender_input.clear();
 
             match user_input.trim() {
-                "y" => continue 'txio,
+                "y" => continue 'inner,
                 _ => break,
             }
 
@@ -107,7 +106,7 @@ fn main() {
         for (sender, value) in &input_sum {
             if !(utxo.contains_key(sender)) || value > utxo.get(sender).unwrap() {
                 println!("Invalid transaction");
-                return;
+                continue 'outer;
             }
             else {
                 trans_sum += value;
@@ -158,7 +157,7 @@ fn main() {
 
             println!("A block was added to the chain!");
             for block in &blockchain {
-                if hash::hash_as_string(block) == "0000000000000000000000000000000000000000000000000000000000000000" {
+                if hash::hash_as_string(&block.header.merkle_root) == hash::hash_as_string(&"0000000000000000000000000000000000000000000000000000000000000000") {
                     print!("Block {}", hash::hash_as_string(block));
                     continue;
                 }
