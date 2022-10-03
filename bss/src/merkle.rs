@@ -1,7 +1,7 @@
 use serde::Serialize;
 
-use crate::transaction::Transaction;
 use crate::hash::hash_as_string;
+use crate::transaction::Transaction;
 use std::collections::VecDeque;
 
 #[derive(Serialize)]
@@ -13,16 +13,16 @@ impl Merkle {
     /**
      * Creates a merkle tree from a list of transactions
      * Uses a queue and a stack to create a merkle tree in array representation
-     * 
+     *
      * Logic:
-     * 
+     *
      * Build one layer of the tree at a time in a bottom-up apprach
      * The queue stores the (pairs of) hashes that have yet to be hashed into their parents
-     * 
+     *
      * The stack is filled after a pair of hashes have been hashed to form their parent
      * We use the stack to reverse the set of hashes for a given and obtain the correct ordering
      * for our array implementation
-     * 
+     *
      * Elements are entered into the merkle tree in reverse order to prevent inefficent insertion
      * into the front of a vector. Instead, the vector is reversed after the construction of the
      * reversed array is complete
@@ -38,7 +38,7 @@ impl Merkle {
         }
 
         while queue.len() > 1 {
-            // If the queue has an odd number of hashes 
+            // If the queue has an odd number of hashes
             if queue.len() % 2 == 1 {
                 // Make sure there are an even number of hashes
                 let last_hash: String = queue.back().unwrap().clone();
@@ -46,7 +46,7 @@ impl Merkle {
             }
 
             // Remove two at a time and hash their concatenation to form a new hash
-            for _ in 1..=queue.len()/2 {
+            for _ in 1..=queue.len() / 2 {
                 let first_hash: String = queue.pop_front().unwrap();
                 let second_hash: String = queue.pop_front().unwrap();
 
@@ -63,9 +63,7 @@ impl Merkle {
         }
         merkle_tree.push(queue.pop_front().unwrap());
         merkle_tree.reverse();
-        let merkle: Merkle = Merkle {
-            tree: merkle_tree,
-        };
+        let merkle: Merkle = Merkle { tree: merkle_tree };
         return merkle;
     }
 }
@@ -89,7 +87,7 @@ mod tests {
 
         let h0: String = hash_as_string(&tx0);
         let h1: String = hash_as_string(&tx1);
-        let root_hash: String = hash_as_string(&format!("{}{}",h0, h1));
+        let root_hash: String = hash_as_string(&format!("{}{}", h0, h1));
 
         let transactions: Vec<Transaction> = Vec::from([tx0, tx1]);
         let merkle: Merkle = Merkle::create_merkle_tree(&transactions);
@@ -121,7 +119,7 @@ mod tests {
         let h0: String = hash_as_string(&tx0);
         let h1: String = hash_as_string(&tx1);
         let h2: String = hash_as_string(&tx2);
-        let h01: String = hash_as_string(&format!("{}{}",h0, h1));
+        let h01: String = hash_as_string(&format!("{}{}", h0, h1));
         let h22: String = hash_as_string(&format!("{}{}", h2, h2));
         let root_hash: String = hash_as_string(&format!("{}{}", h01, h22));
 
