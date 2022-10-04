@@ -17,8 +17,7 @@ impl Merkle {
      * Logic:
      * 
      * Build one layer of the tree at a time in a bottom-up apprach
-     * The queue stores the (pairs of) hashes that have yet to be hashed into 
-     * their parents
+     * The queue stores the (pairs of) hashes that have yet to be hashed into their parents
      * 
      * The stack is filled after a pair of hashes have been hashed to form their parent
      * We use the stack to reverse the set of hashes for a given and obtain the correct ordering
@@ -40,7 +39,7 @@ impl Merkle {
 
         while queue.len() > 1 {
             // If the queue has an odd number of hashes 
-            if queue.len() %2 == 1 {
+            if queue.len() % 2 == 1 {
                 // Make sure there are an even number of hashes
                 let last_hash: String = queue.back().unwrap().clone();
                 queue.push_back(last_hash);
