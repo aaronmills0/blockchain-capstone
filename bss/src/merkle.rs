@@ -26,6 +26,25 @@ impl Merkle {
      * Elements are entered into the merkle tree in reverse order to prevent inefficent insertion
      * into the front of a vector. Instead, the vector is reversed after the construction of the
      * reversed array is complete
+     * 
+     * We start by loading the queue with the hashes of all the transactions.
+
+     * The queue represents a level in the tree bottom-up
+
+     * for each level in the tree (while the queue.size > 1 i.e not at the root yet):
+
+     *  Ensure that we have an even number of hashes
+
+     *  Then for each pair of hashes we:
+
+     *      pop them from the queue
+
+     *      put the hash of their concatenation into the queue
+
+     *      push them onto the stack
+
+     *  Unload the stack into the merkle tree vector
+     * Reverse the merkle tree vector because we interted everything in reverse for efficiency reasons
      */
     pub fn create_merkle_tree(transactions: &Vec<Transaction>) -> Merkle {
         let mut merkle_tree: Vec<String> = Vec::new();
