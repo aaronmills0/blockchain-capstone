@@ -42,6 +42,7 @@ fn main() {
         let mut senders: Vec<String> = Vec::new();
         let mut receivers: Vec<String> = Vec::new();
         let mut units: Vec<u128> = Vec::new();
+        let mut transaction_signatures: Vec<String> = Vec::new();
         let mut sender_input = String::new();
         let mut user_input = String::new();
 
@@ -75,6 +76,13 @@ fn main() {
                 Err(_) => return,
             };
             units.push(unit);
+            
+            let transaction_hash: String= hash::hash_as_string(senders.last().unwrap());
+            let (secret_key, public_key) = signer_and_verifier::create_keypair();
+            let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
+            let signed_transaction: String = signature_of_sender.to_string();
+            transaction_signatures.push(signed_transaction);
+            println!("Signed transaction is {}", signature_of_sender.to_string());
             
             
             println!("Would you like to add another input -> output? y/n?");
@@ -120,18 +128,12 @@ fn main() {
             senders: senders.clone(),
             receivers: receivers.clone(),
             units: units.clone(),
+            transaction_signatures: transaction_signatures.clone(),
         };
+
         transaction_list.push(transaction);
 
-        //Generate transaction hash, sign transaction with private key, verify signed transaction with public key
-        println!("");
-        let transaction_hash= hash::hash_as_string(transaction_list.last().unwrap());
-        let (secret_key, public_key) = signer_and_verifier::create_keypair();
-        let signed_transaction = signer_and_verifier::sign(&transaction_hash, &secret_key);
-        println!("The signed transaction is {}:",signed_transaction);
-        println!("The public key for this transaction is {}:", public_key);
-        println!("Does the signed transaction correspond to public key?: {}", signer_and_verifier::verify(&transaction_hash, &signed_transaction, &public_key));
-        println!("");
+        
 
         // Update UTXO
 

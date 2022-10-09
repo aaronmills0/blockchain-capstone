@@ -8,4 +8,6 @@ pub struct Transaction {
     pub receivers: Vec<String>,
     //pub receiver: String,
     pub units: Vec<u128>,
+    //pub units: u128
+    pub transaction_signatures: Vec<String>,
 }

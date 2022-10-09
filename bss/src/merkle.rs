@@ -2,6 +2,7 @@ use serde::Serialize;
 
 use crate::transaction::Transaction;
 use crate::hash::hash_as_string;
+use crate::signer_and_verifier;
 use std::collections::VecDeque;
 
 #[derive(Serialize)]
@@ -76,15 +77,34 @@ mod tests {
 
     #[test]
     fn test_create_merkle_tree_even_number_of_transactions() {
+
+        let transaction_hash: String= hash_as_string([String::from("a")].last().unwrap());
+        let secret_key = signer_and_verifier::create_keypair().0;
+        let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
+        let signed_transaction1: String = signature_of_sender.to_string();
+
         let tx0: Transaction = Transaction {
             senders: Vec::from([String::from("a")]),
             receivers: Vec::from([String::from("x"), String::from("y")]),
             units: Vec::from([20, 30]),
+            transaction_signatures: Vec::from([signed_transaction1]),
         };
+
+        let transaction_hash: String= hash_as_string([String::from("x")].last().unwrap());
+        let secret_key = signer_and_verifier::create_keypair().0;
+        let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
+        let signed_transaction2: String = signature_of_sender.to_string();
+
+        let transaction_hash: String= hash_as_string([String::from("y")].last().unwrap());
+        let secret_key = signer_and_verifier::create_keypair().0;
+        let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
+        let signed_transaction3: String = signature_of_sender.to_string();
+
         let tx1: Transaction = Transaction {
             senders: Vec::from([String::from("x"), String::from("y")]),
             receivers: Vec::from([String::from("a")]),
             units: Vec::from([50]),
+            transaction_signatures: Vec::from([signed_transaction2, signed_transaction3]),
         };
 
         let h0: String = hash_as_string(&tx0);
@@ -102,20 +122,57 @@ mod tests {
 
     #[test]
     fn test_create_merkle_tree_odd_number_of_transactions() {
+        let transaction_hash: String= hash_as_string([String::from("a")].last().unwrap());
+        let secret_key = signer_and_verifier::create_keypair().0;
+        let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
+        let signed_transaction1: String = signature_of_sender.to_string();
+
+        let secret_key = signer_and_verifier::create_keypair().0;
+        let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
+        let signed_transaction2: String = signature_of_sender.to_string();
+
         let tx0: Transaction = Transaction {
             senders: Vec::from([String::from("a")]),
             receivers: Vec::from([String::from("x"), String::from("y")]),
             units: Vec::from([20, 30]),
+            transaction_signatures: Vec::from([signed_transaction1, signed_transaction2]),
         };
+
+        let transaction_hash: String= hash_as_string([String::from("x")].last().unwrap());
+        let secret_key = signer_and_verifier::create_keypair().0;
+        let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
+        let signed_transaction3: String = signature_of_sender.to_string();
+
+        let transaction_hash: String= hash_as_string([String::from("y")].last().unwrap());
+        let secret_key = signer_and_verifier::create_keypair().0;
+        let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
+        let signed_transaction4: String = signature_of_sender.to_string();
+
         let tx1: Transaction = Transaction {
             senders: Vec::from([String::from("x"), String::from("y")]),
             receivers: Vec::from([String::from("a")]),
             units: Vec::from([50]),
+            transaction_signatures: Vec::from([signed_transaction3, signed_transaction4]),
         };
+
+        let transaction_hash: String= hash_as_string([String::from("a")].last().unwrap());
+        let secret_key = signer_and_verifier::create_keypair().0;
+        let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
+        let signed_transaction5: String = signature_of_sender.to_string();
+
+        let secret_key = signer_and_verifier::create_keypair().0;
+        let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
+        let signed_transaction6: String = signature_of_sender.to_string();
+
+        let secret_key = signer_and_verifier::create_keypair().0;
+        let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
+        let signed_transaction7: String = signature_of_sender.to_string();
+
         let tx2: Transaction = Transaction {
             senders: Vec::from([String::from("a")]),
             receivers: Vec::from([String::from("n"), String::from("m"), String::from("l")]),
             units: Vec::from([5, 35, 10]),
+            transaction_signatures: Vec::from([signed_transaction5, signed_transaction6, signed_transaction7]),
         };
 
         let h0: String = hash_as_string(&tx0);
