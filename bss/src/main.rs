@@ -72,7 +72,7 @@ fn display_utxo(utxo: &HashMap<String, u128>) {
     println!();
 }
 
-fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>) {
+fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>, Vec<String>) {
     println!("New transaction:\n");
 
     let mut senders: Vec<String> = Vec::new();
@@ -134,7 +134,7 @@ fn update_transaction(
     senders: &Vec<String>,
     receivers: &Vec<String>,
     units: &Vec<u128>,
-    transaction_signatures: Vec<String>,
+    transaction_signatures: &Vec<String>,
     transaction_list: &mut Vec<Transaction>,
     utxo: &mut HashMap<String, u128>,
 ) -> bool {
@@ -163,6 +163,7 @@ fn update_transaction(
         senders: senders.clone(),
         receivers: receivers.clone(),
         units: units.clone(),
+        transaction_signatures: transaction_signatures.clone(),
     };
     transaction_list.push(transaction);
 
