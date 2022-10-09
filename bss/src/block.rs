@@ -1,5 +1,6 @@
 use crate::merkle::Merkle;
-use serde::{Serialize};
+use serde::Serialize;
+
 #[derive(Serialize)]
 pub struct Block {
     pub header: BlockHeader,
