@@ -19,18 +19,25 @@ fn main() {
     println!("Welcome to the simple transaction chain!\n");
     let (mut blockchain, mut transaction_list, mut utxo) = initialize();
 
+    println!("For list of supported commands, enter help");
     loop {
-        display_utxo(&utxo);
-        let (senders, receivers, units) = add_transaction();
-        if !update_transaction(
-            &senders,
-            &receivers,
-            &units,
-            &mut transaction_list,
-            &mut utxo,
-        ) {
+
+        //Handles user commands
+        if !interpreter(&mut utxo, &mut transaction_list, &mut blockchain){
             continue;
         }
+
+        //display_utxo(&utxo);
+        // let (senders, receivers, units) = add_transaction();
+        // if !update_transaction(
+        //     &senders,
+        //     &receivers,
+        //     &units,
+        //     &mut transaction_list,
+        //     &mut utxo,
+        // ) {
+        //     continue;
+        // }
 
         if transaction_list.len() == BLOCK_SIZE.try_into().unwrap() {
             create_block(&mut blockchain, &mut transaction_list);
@@ -69,6 +76,82 @@ fn display_utxo(utxo: &HashMap<String, u128>) {
         println!("{} : {}", key, value);
     }
     println!();
+}
+fn display_transactions(transaction_list: &mut Vec<Transaction>){
+    println!("Current transaction chain:");
+    for transaction in transaction_list {
+        for (i, val) in transaction.senders.iter().enumerate() {
+            print!("[");
+            print!("[ {} -> {}, {}]", val, transaction.receivers[i], transaction.units[i]);
+            print!("]");
+        }
+    }
+    println!();
+}
+
+fn display_blocks(blockchain: &mut Vec<Block>){
+    println!("Current Blockchain!");
+    for block in blockchain {
+        if hash::hash_as_string(&block.header.merkle_root)
+            == hash::hash_as_string(
+                &"0000000000000000000000000000000000000000000000000000000000000000",
+            )
+        {
+            print!("Block {}", hash::hash_as_string(block));
+            continue;
+        }
+        print!(" <= Block {}", hash::hash_as_string(block));
+    }
+    println!();
+}
+
+fn display_commands(){
+    println!("-> log: Displays the current state of the UTXO, Pending Transactions,
+    and the Blocks");
+    println!("-> add transaction: Allows the user to add a specific transaction manually")
+}
+
+fn interpreter(
+    utxo: &mut HashMap<String, u128>,
+    transaction_list: &mut Vec<Transaction>,
+    blockchain: &mut Vec<Block>,
+    ) -> bool{
+
+    let mut command = String::new();
+    
+
+    io::stdin()
+        .read_line(&mut command)
+        .expect("Failed to read line");
+    
+    
+    if command.trim() == "add transaction"{
+        let (senders, receivers, units) = add_transaction();
+        if !update_transaction(
+            &senders,
+            &receivers,
+            &units,
+            transaction_list,
+            utxo,
+        ) {
+            return false;
+        }
+        return true
+    }
+    else if command.trim() == "log" {
+        display_utxo(utxo);
+        display_transactions(transaction_list);
+        display_blocks(blockchain);
+        return true
+
+    }
+    else if command.trim() == "help" {
+        display_commands();
+        return true
+    }
+    else {
+        return false
+    }
 }
 
 fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>) {
