@@ -23,7 +23,7 @@ pub struct BlockHeader {
 
 impl Block {
     /**
-     * Take the receiver object as input
+     * Take the receiver object and initial utxo as input
      * Sample from an exponential distribution with a provided mean (in seconds).
      * Whatever we extract from the sample, we multiply by the multiplier to get the number of second until a block is created by the generator.
      *
@@ -52,14 +52,11 @@ impl Block {
         // Create genesis block
         // Create the merkle tree for the genesis block
         let genesis_merkle: Merkle = Merkle {
-            tree: Vec::from([
-                "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
-            ]),
+            tree: Vec::from(["0".repeat(64).to_string()]),
         };
         let genesis_block: Block = Block {
             header: BlockHeader {
-                previous_hash: "0000000000000000000000000000000000000000000000000000000000000000"
-                    .to_string(),
+                previous_hash: "0".repeat(64).to_string(),
                 merkle_root: genesis_merkle.tree.first().unwrap().clone(),
                 nonce: 0,
             },
@@ -118,9 +115,12 @@ impl Block {
             for sender in transaction.senders.iter() {
                 // If the uxto doesn't contain the sender: invalid transaction
                 if !utxo_updated.contains_key(sender) {
+                    println!(
+                        "Invalid transaction! The utxo does not contain the address {sender}."
+                    );
                     continue 'transactionloop;
                 }
-                // Otherwise, increment the total balance by the sender's balance and remove the sender from the utxo (the sender has a balance of 0)
+                // Otherwise, increment the total balance by the sender's balance
                 balance += utxo_updated.get(sender).unwrap();
             }
 
@@ -131,7 +131,8 @@ impl Block {
 
             // If we do not have the balance to fulfill this transaction, return false.
             if transfer_quantity > balance {
-                continue 'transactionloop;
+                println!("Invalid transaction! The total available balance cannot support this transaction.");
+                continue;
             }
 
             // Since the transaction is valid, we remove all senders from the utxo
@@ -159,15 +160,12 @@ impl Block {
     pub fn print_blockchain(blockchain: &Vec<Block>) {
         for block in blockchain {
             if hash::hash_as_string(&block.header.merkle_root)
-                == hash::hash_as_string(
-                    &"0000000000000000000000000000000000000000000000000000000000000000",
-                )
+                == hash::hash_as_string(&("0".repeat(64)))
             {
                 print!("Block {}", hash::hash_as_string(&block.header));
                 continue;
             }
-            print!(" <= Block {}", hash::hash_as_string(&block.header));
-            println!();
+            println!(" <= Block {}", hash::hash_as_string(&block.header));
         }
     }
 }

@@ -45,6 +45,21 @@ impl Merkle {
 
      *  Unload the stack into the merkle tree vector
      * Reverse the merkle tree vector because we interted everything in reverse for efficiency reasons
+     * 
+     *  Let h_i be the hash of transaction Txi
+     * 
+     *  Let h_ij be the hash of the concatenation of the hashes of transactions Txi and Txj
+     * 
+     *  Then, for a transaction list: Tx0, Tx1, Tx2, Tx3, Tx4 we expect the following tree
+     * 
+     *                          h_01234444
+     *                      /                \
+     *                h_0123                  h_4444
+     *              /        \              /        \
+     *          h_01          h_23      h_44          h_44
+     *         /    \        /    \    /    \        
+     *       h_0     h_1   h_2    h_3 h_4   h_4
+     * 
      */
     pub fn create_merkle_tree(transactions: &Vec<Transaction>) -> Merkle {
         let mut merkle_tree: Vec<String> = Vec::new();
