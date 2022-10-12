@@ -60,6 +60,8 @@ impl Merkle {
      *         /    \        /    \    /    \        
      *       h_0     h_1   h_2    h_3 h_4   h_4
      * 
+     *  h_01234444 is the merkle root of this tree
+     * 
      */
     pub fn create_merkle_tree(transactions: &Vec<Transaction>) -> Merkle {
         let mut merkle_tree: Vec<String> = Vec::new();
