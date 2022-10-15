@@ -186,6 +186,7 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>, String) {
         signature_of_sender.to_string()
     );
 
+<<<<<<< HEAD
     loop {
         println!("Please Enter a Receiver Unit Pair as Follows, 'a 10':");
         user_input.clear();
@@ -194,6 +195,8 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>, String) {
             .expect("Failed to read line");
         let split = user_input.split_whitespace(); //Tokenize by whitespace
 
+=======
+>>>>>>> 4e66106 (merged origin/main into shell_enhancements)
         //Check 2 tokens were entered
         let s2 = split.clone();
         if s2.count() != 2 {
