@@ -1,10 +1,12 @@
+use crate::utxo::UTXO;
+
 use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
 use rand::Rng;
-use rand_distr::{Distribution, Exp};
+use rand_distr::{Alphanumeric, Distribution, Exp};
 use serde::Serialize;
-use std::collections::HashMap;
-use std::sync::mpsc::Sender;
+use std::collections::HashSet;
+use std::sync::mpsc::{Receiver, Sender};
 use std::vec::Vec;
 use std::{thread, time};
 
@@ -25,19 +27,16 @@ impl Transaction {
      *
      * The transaction list created is constantly transmitted so that the block generator can receive it
      */
-    pub fn generate_transactions(
-        max_num_senders: usize,
+    pub fn transaction_generator(
         max_num_receivers: usize,
         mean_transaction_rate: f64,
         multiplier: u64,
-        transmitter: Sender<Vec<Transaction>>,
-        utxo: HashMap<String, u128>,
+        transmitter: Sender<Transaction>,
+        receiver: Receiver<UTXO>,
+        mut utxo: UTXO,
     ) {
-        if max_num_receivers <= 0 || max_num_receivers > utxo.len() {
-            panic!("Invalid input. The max number of receivers must be larger than zero and no larger than {} but was {}", utxo.len(), max_num_receivers);
-        }
-        if max_num_senders <= 0 {
-            panic!("Invalid input. The max number of senders must be larger than zero and no larger than {} but was {}", utxo.len(), max_num_senders);
+        if max_num_receivers <= 0 {
+            panic!("Invalid input. The max number of receivers must be larger than zero and no larger than {} but was {}", utxo.map.len(), max_num_receivers);
         }
         if mean_transaction_rate <= 0.0 {
             panic!("Invalid input. A non-positive mean for transaction rate is invalid for an exponential distribution but the mean was {}", mean_transaction_rate);
@@ -49,8 +48,7 @@ impl Transaction {
         let mut sample: f64;
         let mut normalized: f64;
         let mut transaction_rate: time::Duration;
-
-        let transactions: &mut Vec<Transaction> = &mut Vec::new();
+        let mut verified_utxo = utxo.clone();
         loop {
             sample = exp.sample(&mut rng);
             // For an exponential distribution (with lambda > 0), the values range from (0, lambda].
@@ -61,84 +59,106 @@ impl Transaction {
             // Sleep to mimic the time between creation of transactions
             thread::sleep(transaction_rate);
 
-            transactions.push(Self::create_transaction(
-                &utxo,
-                &mut rng,
-                max_num_senders,
-                max_num_receivers,
-            ));
-            transmitter.send(transactions.to_vec()).unwrap();
+            let transaction = Self::create_transaction(&utxo, &mut rng, max_num_receivers);
+            utxo.update(&transaction);
+            transmitter.send(transaction).unwrap();
+            println!("Transaction sent");
+
+            let new_utxo = receiver.try_recv();
+            if new_utxo.is_ok() {
+                verified_utxo = new_utxo.unwrap();
+            }
         }
     }
 
     fn create_transaction(
-        utxo: &HashMap<String, u128>,
+        utxo: &UTXO,
         rng: &mut ThreadRng,
-        max_num_senders: usize,
         max_num_receivers: usize,
     ) -> Transaction {
         let mut address_list: Vec<String> = Vec::new();
-        for (address, _) in utxo {
+        for (address, _) in utxo.map.iter() {
             address_list.push(address.to_string());
         }
 
-        let num_senders: usize = rng.gen_range(1..=max_num_senders);
+        let num_senders: usize = rng.gen_range(1..=utxo.map.len());
         let num_receivers: usize = rng.gen_range(1..=max_num_receivers);
 
         let senders: Vec<String> = address_list
             .choose_multiple(rng, num_senders)
             .cloned()
             .collect();
-        let receivers: Vec<String> = address_list
-            .choose_multiple(rng, num_receivers)
-            .cloned()
-            .collect();
+
+        let mut receivers_set: HashSet<String> = HashSet::new();
+        let mut counter: usize = 0;
+        while counter < num_receivers {
+            let s: String = rng
+                .sample_iter(&Alphanumeric)
+                .take(10)
+                .map(char::from)
+                .collect();
+            if receivers_set.contains(&s) {
+                continue;
+            }
+            counter += 1;
+            receivers_set.insert(s);
+        }
 
         let mut total_balance: u128 = 0;
         for sender in &senders {
-            total_balance += utxo.get(sender).unwrap();
+            total_balance += utxo.map.get(sender).unwrap();
         }
 
         let mut units: Vec<u128> = Vec::new();
         let mut unit_sum: u128 = 0;
+        let mut value_sum: u128 = 0;
         for _ in 0..num_receivers {
-            let new_unit = rng.gen_range(1..=total_balance);
-            unit_sum += new_unit;
-            units.push(new_unit);
+            let new_value = rng.gen_range(1..=100);
+            value_sum += new_value;
+            units.push(new_value);
         }
         for unit in units.iter_mut() {
-            *unit *= total_balance / unit_sum;
+            *unit *= total_balance / value_sum;
+            unit_sum += *unit;
         }
+        units[0] += total_balance - unit_sum;
+        println!(
+            "Transaction created with {} senders and {} receivers",
+            num_senders, num_receivers
+        );
 
         return Transaction {
             senders: senders.clone(),
-            receivers: receivers.clone(),
+            receivers: Vec::from_iter(receivers_set),
             units: units.clone(),
         };
     }
 }
 
 mod tests {
-    use super::*;
+    use crate::{transaction::Transaction, utxo::UTXO};
+
+    use rand::rngs::ThreadRng;
+    use std::collections::HashMap;
 
     #[test]
     fn create_transaction_valid() {
-        let mut utxo: HashMap<String, u128> = HashMap::new();
-        utxo.insert(String::from("a"), 50);
-        utxo.insert(String::from("b"), 20);
-        utxo.insert(String::from("c"), 10);
-        utxo.insert(String::from("d"), 30);
-        utxo.insert(String::from("e"), 80);
-        utxo.insert(String::from("f"), 40);
+        let mut utxo: UTXO = UTXO {
+            map: HashMap::new(),
+        };
+        utxo.map.insert(String::from("a"), 50);
+        utxo.map.insert(String::from("b"), 20);
+        utxo.map.insert(String::from("c"), 10);
+        utxo.map.insert(String::from("d"), 30);
+        utxo.map.insert(String::from("e"), 80);
+        utxo.map.insert(String::from("f"), 40);
 
         let mut rng: ThreadRng = rand::thread_rng();
-        let max_num_senders: usize = 3;
         let max_num_receivers: usize = 4;
 
-        let transaction =
-            Transaction::create_transaction(&utxo, &mut rng, max_num_senders, max_num_receivers);
+        let transaction = Transaction::create_transaction(&utxo, &mut rng, max_num_receivers);
 
-        assert!(transaction.senders.len() > 0 && transaction.senders.len() <= max_num_senders);
+        assert!(transaction.senders.len() > 0 && transaction.senders.len() <= utxo.map.len());
         assert!(
             transaction.receivers.len() > 0 && transaction.receivers.len() <= max_num_receivers
         );

@@ -1,11 +1,13 @@
-use crate::hash;
 use crate::merkle::Merkle;
 use crate::transaction::Transaction;
+use crate::utxo::UTXO;
+use crate::{hash, simulation};
+
 use rand::rngs::ThreadRng;
 use rand_distr::{Distribution, Exp};
 use serde::Serialize;
 use std::collections::HashMap;
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, Sender};
 use std::{thread, time};
 
 #[derive(Serialize)]
@@ -35,8 +37,9 @@ impl Block {
      * tx.send(transactions);  
      */
     pub fn block_generator(
-        receiver: Receiver<Vec<Transaction>>,
-        mut utxo: HashMap<String, u128>,
+        receiver: Receiver<Transaction>,
+        transmitter: Sender<UTXO>,
+        mut utxo: UTXO,
         mean: f64,
         multiplier: u64,
     ) {
@@ -66,9 +69,16 @@ impl Block {
         let mut blockchain: Vec<Block> = Vec::new();
         blockchain.push(genesis_block);
         let mut block: Block;
+        let mut counter: u128;
         let mut merkle: Merkle;
-        let mut transactions: Vec<Transaction>;
+        let mut transactions: Vec<Transaction> = Vec::new();
         loop {
+            counter = 0;
+            while counter < simulation::BLOCK_SIZE {
+                transactions.push(receiver.recv().unwrap());
+                counter += 1;
+            }
+
             sample = exp.sample(&mut rng);
             // For an exponential distribution (with lambda > 0), the values range from (0, lambda].
             // Since mean = 1/lambda, multiply the sample by the mean to normalize.
@@ -78,7 +88,6 @@ impl Block {
             // Sleep to mimic the 'mining' time
             thread::sleep(mining_time);
             // Create a new block
-            transactions = receiver.recv().unwrap();
             (transactions, utxo) = Block::verify_and_update(transactions, utxo);
             if transactions.len() == 0 {
                 continue;
@@ -94,6 +103,9 @@ impl Block {
             };
             blockchain.push(block);
             Block::print_blockchain(&blockchain);
+            transmitter.send(utxo.clone()).unwrap();
+
+            transactions.clear();
         }
     }
 
@@ -103,58 +115,19 @@ impl Block {
      */
     pub fn verify_and_update(
         transactions: Vec<Transaction>,
-        utxo: HashMap<String, u128>,
-    ) -> (Vec<Transaction>, HashMap<String, u128>) {
-        let mut balance: u128; // Sum for total quantity available to be transferred
-        let mut transfer_quantity: u128; // Sum for total quantity requested to be transferred
-        let mut utxo_updated = utxo.clone();
+        utxo: UTXO,
+    ) -> (Vec<Transaction>, UTXO) {
+        let mut utxo_copy = utxo.clone();
         let mut transactions_valid: Vec<Transaction> = Vec::new();
-        'transactionloop: for transaction in transactions {
-            balance = 0;
-            transfer_quantity = 0;
-            for sender in transaction.senders.iter() {
-                // If the uxto doesn't contain the sender: invalid transaction
-                if !utxo_updated.contains_key(sender) {
-                    println!(
-                        "Invalid transaction! The utxo does not contain the address {sender}."
-                    );
-                    continue 'transactionloop;
-                }
-                // Otherwise, increment the total balance by the sender's balance
-                balance += utxo_updated.get(sender).unwrap();
-            }
-
-            // Obtain the total amount that is requested to be transferred
-            for quantity in transaction.units.iter() {
-                transfer_quantity += *quantity;
-            }
-
-            // If we do not have the balance to fulfill this transaction, return false.
-            if transfer_quantity > balance {
-                println!("Invalid transaction! The total available balance cannot support this transaction.");
+        for transaction in transactions {
+            if !utxo_copy.verify_transaction(&transaction) {
                 continue;
             }
+            utxo_copy.update(&transaction);
 
-            // Since the transaction is valid, we remove all senders from the utxo
-            for sender in transaction.senders.iter() {
-                utxo_updated.remove(sender);
-            }
-
-            // Iterate through the transfer quantity - receiver pairs
-            for (quantity, receiver) in transaction.units.iter().zip(transaction.receivers.iter()) {
-                // If the receiver address is not present in the utxo, create a new entry with the corresponding quantity
-                if !utxo_updated.contains_key(receiver) {
-                    utxo_updated.insert(receiver.to_string(), *quantity);
-                } else {
-                    // Otherwise, increment the receiver's balance by the quantity
-                    *utxo_updated.get_mut(receiver).unwrap() += *quantity;
-                }
-            }
-
-            // Transaction is valid. Add it to our 'valid' list
             transactions_valid.push(transaction);
         }
-        return (transactions_valid, utxo_updated);
+        return (transactions_valid, utxo_copy);
     }
 
     pub fn print_blockchain(blockchain: &Vec<Block>) {
@@ -162,7 +135,7 @@ impl Block {
             if hash::hash_as_string(&block.header.merkle_root)
                 == hash::hash_as_string(&("0".repeat(64)))
             {
-                print!("Block {}", hash::hash_as_string(&block.header));
+                println!("Block {}", hash::hash_as_string(&block.header));
                 continue;
             }
             println!(" <= Block {}", hash::hash_as_string(&block.header));
@@ -171,7 +144,7 @@ impl Block {
 }
 
 mod tests {
-    use super::{Block, HashMap, Transaction};
+    use super::{Block, HashMap, Transaction, UTXO};
 
     #[test]
     fn test_verify_and_update_valid_transactions() {
@@ -186,13 +159,15 @@ mod tests {
             units: Vec::from([50]),
         };
         let mut transactions: Vec<Transaction> = Vec::from([tx0, tx1]);
-        let mut utxo: HashMap<String, u128> = HashMap::new();
-        utxo.insert(String::from("a"), 50);
+        let mut utxo: UTXO = UTXO {
+            map: HashMap::new(),
+        };
+        utxo.map.insert(String::from("a"), 50);
         (transactions, utxo) = Block::verify_and_update(transactions, utxo);
 
         assert_eq!(2, transactions.len());
-        assert_eq!(1, utxo.len());
-        assert_eq!(50, *utxo.get(&String::from("b")).unwrap());
+        assert_eq!(1, utxo.map.len());
+        assert_eq!(50, *utxo.map.get(&String::from("b")).unwrap());
     }
 
     #[test]
@@ -213,13 +188,15 @@ mod tests {
             units: Vec::from([20, 20, 20]),
         };
         let mut transactions: Vec<Transaction> = Vec::from([tx0, tx1, tx2]);
-        let mut utxo: HashMap<String, u128> = HashMap::new();
-        utxo.insert(String::from("a"), 50);
+        let mut utxo: UTXO = UTXO {
+            map: HashMap::new(),
+        };
+        utxo.map.insert(String::from("a"), 50);
         (transactions, utxo) = Block::verify_and_update(transactions, utxo);
 
         assert_eq!(2, transactions.len());
-        assert_eq!(1, utxo.len());
-        assert_eq!(50, *utxo.get(&String::from("b")).unwrap());
+        assert_eq!(1, utxo.map.len());
+        assert_eq!(50, *utxo.map.get(&String::from("b")).unwrap());
     }
 
     #[test]
@@ -245,14 +222,16 @@ mod tests {
             units: Vec::from([20, 20, 10]),
         };
         let mut transactions: Vec<Transaction> = Vec::from([tx0, tx1, tx2]);
-        let mut utxo: HashMap<String, u128> = HashMap::new();
-        utxo.insert(String::from("a"), 50);
+        let mut utxo: UTXO = UTXO {
+            map: HashMap::new(),
+        };
+        utxo.map.insert(String::from("a"), 50);
         (transactions, utxo) = Block::verify_and_update(transactions, utxo);
 
         assert_eq!(2, transactions.len());
-        assert_eq!(3, utxo.len());
-        assert_eq!(5, *utxo.get(&String::from("b")).unwrap());
-        assert_eq!(15, *utxo.get(&String::from("c")).unwrap());
-        assert_eq!(20, *utxo.get(&String::from("d")).unwrap());
+        assert_eq!(3, utxo.map.len());
+        assert_eq!(5, *utxo.map.get(&String::from("b")).unwrap());
+        assert_eq!(15, *utxo.map.get(&String::from("c")).unwrap());
+        assert_eq!(20, *utxo.map.get(&String::from("d")).unwrap());
     }
 }

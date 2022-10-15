@@ -5,8 +5,10 @@ mod hash;
 mod merkle;
 use merkle::Merkle;
 mod signer_and_verifier;
+mod simulation;
 mod transaction;
 use transaction::Transaction;
+mod utxo;
 
 use std::collections::HashMap;
 use std::io;
