@@ -72,13 +72,12 @@ fn display_utxo(utxo: &HashMap<String, u128>) {
     println!();
 }
 
-fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>, Vec<String>) {
+fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>, String) {
     println!("New transaction:\n");
 
     let mut senders: Vec<String> = Vec::new();
     let mut receivers: Vec<String> = Vec::new();
     let mut units: Vec<u128> = Vec::new();
-    let mut transaction_signatures: Vec<String> = Vec::new();
     let mut user_input = String::new();
 
     //Receive and Proccess user Input-Output-Unit Pairs
@@ -101,8 +100,7 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>, Vec<String>) {
     let transaction_hash: String= hash::hash_as_string(&transaction_senders);
     let (secret_key, public_key) = signer_and_verifier::create_keypair();
     let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
-    let signed_transaction: String = signature_of_sender.to_string();
-    transaction_signatures.push(signed_transaction);
+    let transaction_signatures= signature_of_sender.to_string();
     println!("Signature of transaction is {}", signature_of_sender.to_string());
 
     loop{
@@ -155,7 +153,7 @@ fn update_transaction(
     senders: &Vec<String>,
     receivers: &Vec<String>,
     units: &Vec<u128>,
-    transaction_signatures: &Vec<String>,
+    transaction_signatures: &String,
     transaction_list: &mut Vec<Transaction>,
     utxo: &mut HashMap<String, u128>,
 ) -> bool {
@@ -180,7 +178,7 @@ fn update_transaction(
         senders: senders.clone(),
         receivers: receivers.clone(),
         units: units.clone(),
-        transaction_signatures: transaction_signatures.clone(),
+        transaction_signatures: transaction_signatures.to_string(),
     };
     transaction_list.push(transaction);
     
