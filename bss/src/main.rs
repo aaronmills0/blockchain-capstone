@@ -107,10 +107,9 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>) {
             continue;
         }
 
-        let mut i = 0;
-        for s in split{ //Note next_chunk() not yet functional so for loop is needed
+        for (i, s) in split.enumerate(){ //Note next_chunk() not yet functional so for loop is needed
             if i % 2 == 0{
-                if receivers.contains(&s.trim().to_string()){
+                if !receivers.contains(&s.trim().to_string()){
                     receivers.push(s.trim().to_string());
                 }
             }
@@ -121,7 +120,6 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>) {
                 };
                 units.push(unit);
             }
-            i += 1;
         }
         println!("Would you like to add another receiver-unit pair? [y/n]:");
         user_input.clear();
