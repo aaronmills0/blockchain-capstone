@@ -27,7 +27,7 @@ fn main() {
             &receivers,
             &units,
             &mut transaction_list,
-            &mut utxo,
+            &mut utxo
         ) {
             continue;
         }
@@ -78,35 +78,50 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>) {
     let mut receivers: Vec<String> = Vec::new();
     let mut units: Vec<u128> = Vec::new();
     let mut user_input = String::new();
-    loop {
-        //Receive and Proccess user Input-Output-Unit Pairs
-        println!("Sender address:");
+
+    //Receive and Proccess user Input-Output-Unit Pairs
+    println!("Please Enter the Senders as Follows, 'a b c ...':");
+    user_input.clear();
+    io::stdin()
+        .read_line(&mut user_input)
+        .expect("Failed to read line");
+    
+    let split = user_input.split_whitespace(); //Tokenize by whitespace
+    for s in split{
+        if !senders.contains(&s.trim().to_string()){
+            senders.push(s.trim().to_string());
+        }
+    }
+
+    loop{
+        println!("Please Enter a Receiver Unit Pair as Follows, 'a 10':");
         user_input.clear();
         io::stdin()
             .read_line(&mut user_input)
             .expect("Failed to read line");
-        senders.push(user_input.trim().to_string());
+        let split = user_input.split_whitespace(); //Tokenize by whitespace
 
-        println!("Receiver address:");
-        user_input.clear();
-        io::stdin()
-            .read_line(&mut user_input)
-            .expect("Failed to read line");
-        receivers.push(user_input.trim().to_string());
+        //Check 2 tokens were entered
+        let s2 = split.clone();
+        if s2.count() != 2{
+            continue;
+        }
 
-        println!("Transfer quantity:");
-        user_input.clear();
-        io::stdin()
-            .read_line(&mut user_input)
-            .expect("Failed to read line");
-        let unit: u128 = match user_input.trim().parse() {
-            Ok(num) => num,
-            Err(_) => process::exit(1),
-        };
-        units.push(unit);
-        println!();
-
-        println!("Would you like to add another input -> output? [y/n]:");
+        for (i, s) in split.enumerate(){ //Note next_chunk() not yet functional so for loop is needed
+            if i % 2 == 0{
+                if !receivers.contains(&s.trim().to_string()){
+                    receivers.push(s.trim().to_string());
+                }
+            }
+            else{
+                let unit: u128 = match s.trim().parse() {
+                    Ok(num) => num,
+                    Err(_) => process::exit(1),
+                };
+                units.push(unit);
+            }
+        }
+        println!("Would you like to add another receiver-unit pair? [y/n]:");
         user_input.clear();
         io::stdin()
             .read_line(&mut user_input)
@@ -128,25 +143,21 @@ fn update_transaction(
     transaction_list: &mut Vec<Transaction>,
     utxo: &mut HashMap<String, u128>,
 ) -> bool {
-    let mut input_sum: HashMap<String, u128> = HashMap::new();
-    for (i, val) in senders.iter().enumerate() {
-        if input_sum.contains_key(val) {
-            *input_sum.get_mut(val).unwrap() += (*units)[i];
-        } else {
-            input_sum.insert(val.to_string(), (*units)[i]);
-        }
-    }
 
-    let mut trans_sum = 0;
-    let mut utxo_sum = 0;
-    for (sender, value) in &input_sum {
-        if !(utxo.contains_key(sender)) || value > utxo.get(sender).unwrap() {
+    let u_sum: u128 = units.iter().sum();
+    let mut s_sum: u128 = 0;
+    for s in senders{
+        if !(utxo.contains_key(s)){
             println!("Invalid transaction!\n");
             return false;
-        } else {
-            trans_sum += value;
-            utxo_sum += utxo.get(sender).unwrap();
         }
+        else{
+            s_sum += utxo.get(s).unwrap();
+        }
+    }
+    if u_sum > s_sum{
+        println!("Invalid transaction!\n");
+        return false;
     }
 
     let transaction: Transaction = Transaction {
@@ -168,7 +179,7 @@ fn update_transaction(
         signer_and_verifier::verify(&transaction_hash, &signed_transaction, &public_key)
     );
 
-    for (key, _) in &input_sum {
+    for key in senders {
         utxo.remove(key);
     }
 
@@ -180,7 +191,7 @@ fn update_transaction(
         }
     }
 
-    let fee: u128 = utxo_sum - trans_sum;
+    let fee: u128 = s_sum - u_sum;
     println!("Transaction fee: {}\n", &fee);
     return true;
 }
