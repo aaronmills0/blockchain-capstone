@@ -175,13 +175,6 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>) {
             .expect("Failed to read line");
         let split = user_input.split_whitespace(); //Tokenize by whitespace
 
-        println!("Transfer quantity:");
-        user_input.clear();
-        io::stdin()
-            .read_line(&mut user_input)
-            .expect("Failed to read line");
-        let split = user_input.split_whitespace(); //Tokenize by whitespace
-
         //Check 2 tokens were entered
         let s2 = split.clone();
         if s2.count() != 2{
