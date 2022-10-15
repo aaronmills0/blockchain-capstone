@@ -108,7 +108,7 @@ fn display_blocks(blockchain: &mut Vec<Block>){
 }
 
 fn display_commands(){
-    println!("-> log: Displays the current state of the UTXO, Pending Transactions,
+    println!("-> status: Displays the current state of the UTXO, Pending Transactions,
     and the Blocks");
     println!("-> add transaction: Allows the user to add a specific transaction manually")
 }
@@ -138,21 +138,24 @@ fn interpreter(
         ) {
             return false;
         }
-        return true
+        return true;
     }
-    else if command.trim() == "log" {
+    else if command.trim() == "status" {
         display_utxo(utxo);
         display_transactions(transaction_list);
         display_blocks(blockchain);
-        return true
+        return true;
 
     }
     else if command.trim() == "help" {
         display_commands();
-        return true
+        return true;
+    }
+    else if command.trim() == "start sim"{
+        return true;
     }
     else {
-        return false
+        return false;
     }
 }
 
