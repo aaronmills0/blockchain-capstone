@@ -88,7 +88,9 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>) {
     
     let split = user_input.split_whitespace(); //Tokenize by whitespace
     for s in split{
-        senders.push(s.trim().to_string());
+        if !senders.contains(&s.trim().to_string()){
+            senders.push(s.trim().to_string());
+        }
     }
 
     loop{
@@ -108,7 +110,9 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>) {
         let mut i = 0;
         for s in split{ //Note next_chunk() not yet functional so for loop is needed
             if i % 2 == 0{
-                receivers.push(s.trim().to_string());
+                if receivers.contains(&s.trim().to_string()){
+                    receivers.push(s.trim().to_string());
+                }
             }
             else{
                 let unit: u128 = match s.trim().parse() {
