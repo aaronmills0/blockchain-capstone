@@ -27,18 +27,6 @@ fn main() {
             continue;
         }
 
-        //display_utxo(&utxo);
-        // let (senders, receivers, units) = add_transaction();
-        // if !update_transaction(
-        //     &senders,
-        //     &receivers,
-        //     &units,
-        //     &mut transaction_list,
-        //     &mut utxo,
-        // ) {
-        //     continue;
-        // }
-
         if transaction_list.len() == BLOCK_SIZE.try_into().unwrap() {
             create_block(&mut blockchain, &mut transaction_list);
         }
