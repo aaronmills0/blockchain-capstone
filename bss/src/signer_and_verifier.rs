@@ -3,6 +3,7 @@ use secp256k1::hashes::sha256;
 use secp256k1::rand::rngs::OsRng;
 use secp256k1::{Message, Secp256k1};
 use secp256k1::{PublicKey, SecretKey};
+use crate::hash::hash_as_string;
 
 //We sign a message and return its signed hash + the public key that was generated
 pub fn sign(message: &str, secret_key: &SecretKey) -> Signature {
@@ -25,4 +26,18 @@ pub fn create_keypair() -> (SecretKey, secp256k1::PublicKey) {
     let secp = Secp256k1::new();
     let (secret_key, public_key) = secp.generate_keypair(&mut OsRng);
     return (secret_key, public_key);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_verify_signature() {
+        let transaction_hash: String= hash_as_string([String::from("a")].last().unwrap());
+        let (secret_key, public_key) = create_keypair();
+        let signature_of_sender = sign(&transaction_hash, &secret_key);
+
+        assert_eq!(true, verify(&transaction_hash, &signature_of_sender, &public_key));
+    }
 }

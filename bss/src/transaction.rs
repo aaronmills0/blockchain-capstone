@@ -6,4 +6,5 @@ pub struct Transaction {
     pub senders: Vec<String>,
     pub receivers: Vec<String>,
     pub units: Vec<u128>,
+    pub transaction_signatures: Vec<String>,
 }
