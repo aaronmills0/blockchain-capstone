@@ -1,3 +1,5 @@
+use crate::hash;
+use crate::signer_and_verifier;
 use crate::utxo::UTXO;
 
 use rand::rngs::ThreadRng;
@@ -15,6 +17,7 @@ pub struct Transaction {
     pub senders: Vec<String>,
     pub receivers: Vec<String>,
     pub units: Vec<u128>,
+    pub transaction_signature: String,
 }
 
 impl Transaction {
@@ -62,7 +65,6 @@ impl Transaction {
             let transaction = Self::create_transaction(&utxo, &mut rng, max_num_receivers);
             utxo.update(&transaction);
             transmitter.send(transaction).unwrap();
-            println!("Transaction sent");
 
             let new_utxo = receiver.try_recv();
             if new_utxo.is_ok() {
@@ -122,15 +124,26 @@ impl Transaction {
             unit_sum += *unit;
         }
         units[0] += total_balance - unit_sum;
-        println!(
-            "Transaction created with {} senders and {} receivers",
-            num_senders, num_receivers
-        );
 
+        let mut transaction_senders = String::new();
+        for s in &senders {
+            transaction_senders.push_str(&s);
+        }
+        let transaction_hash: String = hash::hash_as_string(&transaction_senders);
+        let (secret_key, public_key) = signer_and_verifier::create_keypair();
+        let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
+        let transaction_signature = signature_of_sender.to_string();
+        let verified =
+            signer_and_verifier::verify(&transaction_hash, &signature_of_sender, &public_key);
+        println!(
+            "\nTransaction created with {} senders and {} receivers.\n\tOwner public key: {}. \n\tTransaction signature: {}. \n\tSignature verified: {}",
+            num_senders, num_receivers, public_key, transaction_signature, verified
+        );
         return Transaction {
-            senders: senders.clone(),
+            senders: senders,
             receivers: Vec::from_iter(receivers_set),
-            units: units.clone(),
+            units: units,
+            transaction_signature: transaction_signature,
         };
     }
 }

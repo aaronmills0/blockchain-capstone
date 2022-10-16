@@ -135,7 +135,7 @@ impl Block {
             if hash::hash_as_string(&block.header.merkle_root)
                 == hash::hash_as_string(&("0".repeat(64)))
             {
-                println!("Block {}", hash::hash_as_string(&block.header));
+                println!("\nBlock {}", hash::hash_as_string(&block.header));
                 continue;
             }
             println!(" <= Block {}", hash::hash_as_string(&block.header));
@@ -152,11 +152,13 @@ mod tests {
             senders: Vec::from([String::from("a")]),
             receivers: Vec::from([String::from("x"), String::from("y")]),
             units: Vec::from([20, 30]),
+            transaction_signature: String::from("aklsdfjaklladsflajks"),
         };
         let tx1: Transaction = Transaction {
             senders: Vec::from([String::from("x"), String::from("y")]),
             receivers: Vec::from([String::from("b")]),
             units: Vec::from([50]),
+            transaction_signature: String::from("aklsdfjaklladsflajks"),
         };
         let mut transactions: Vec<Transaction> = Vec::from([tx0, tx1]);
         let mut utxo: UTXO = UTXO {
@@ -176,16 +178,19 @@ mod tests {
             senders: Vec::from([String::from("a")]),
             receivers: Vec::from([String::from("x"), String::from("y")]),
             units: Vec::from([20, 30]),
+            transaction_signature: String::from("aklsdfjaklladsflajks"),
         };
         let tx1: Transaction = Transaction {
             senders: Vec::from([String::from("x"), String::from("y")]),
             receivers: Vec::from([String::from("b")]),
             units: Vec::from([50]),
+            transaction_signature: String::from("aklsdfjaklladsflajks"),
         };
         let tx2: Transaction = Transaction {
             senders: Vec::from([String::from("b")]),
             receivers: Vec::from([String::from("p"), String::from("q"), String::from("r")]),
             units: Vec::from([20, 20, 20]),
+            transaction_signature: String::from("aklsdfjaklladsflajks"),
         };
         let mut transactions: Vec<Transaction> = Vec::from([tx0, tx1, tx2]);
         let mut utxo: UTXO = UTXO {
@@ -205,11 +210,13 @@ mod tests {
             senders: Vec::from([String::from("a")]),
             receivers: Vec::from([String::from("x"), String::from("y")]),
             units: Vec::from([20, 30]),
+            transaction_signature: String::from("aklsdfjaklladsflajks"),
         };
         let tx1: Transaction = Transaction {
             senders: Vec::from([String::from("x"), String::from("y")]),
             receivers: Vec::from([String::from("b"), String::from("c"), String::from("d")]),
             units: Vec::from([5, 15, 20]),
+            transaction_signature: String::from("aklsdfjaklladsflajks"),
         };
         let tx2: Transaction = Transaction {
             senders: Vec::from([
@@ -220,6 +227,7 @@ mod tests {
             ]),
             receivers: Vec::from([String::from("p"), String::from("q"), String::from("r")]),
             units: Vec::from([20, 20, 10]),
+            transaction_signature: String::from("aklsdfjaklladsflajks"),
         };
         let mut transactions: Vec<Transaction> = Vec::from([tx0, tx1, tx2]);
         let mut utxo: UTXO = UTXO {
