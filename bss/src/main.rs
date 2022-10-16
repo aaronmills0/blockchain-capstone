@@ -21,13 +21,14 @@ fn main() {
 
     loop {
         display_utxo(&utxo);
-        let (senders, receivers, units) = add_transaction();
+        let (senders, receivers, units, transaction_signatures) = add_transaction();
         if !update_transaction(
             &senders,
             &receivers,
             &units,
+            &transaction_signatures,
             &mut transaction_list,
-            &mut utxo
+            &mut utxo,
         ) {
             continue;
         }
@@ -71,7 +72,7 @@ fn display_utxo(utxo: &HashMap<String, u128>) {
     println!();
 }
 
-fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>) {
+fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>, String) {
     println!("New transaction:\n");
 
     let mut senders: Vec<String> = Vec::new();
@@ -92,6 +93,17 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>) {
             senders.push(s.trim().to_string());
         }
     }
+
+    let mut transaction_senders=String::new().to_owned();
+    for s in &senders{
+        transaction_senders.push_str(&s);
+    }
+    println!("The concatenation of all senders for this owner is {}",transaction_senders);
+    let transaction_hash: String= hash::hash_as_string(&transaction_senders);
+    let (secret_key, public_key) = signer_and_verifier::create_keypair();
+    let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
+    let transaction_signatures= signature_of_sender.to_string();
+    println!("Signature of transaction is {}", signature_of_sender.to_string());
 
     loop{
         println!("Please Enter a Receiver Unit Pair as Follows, 'a 10':");
@@ -121,6 +133,9 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>) {
                 units.push(unit);
             }
         }
+
+
+
         println!("Would you like to add another receiver-unit pair? [y/n]:");
         user_input.clear();
         io::stdin()
@@ -133,13 +148,14 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>) {
         }
     }
 
-    return (senders, receivers, units);
+    return (senders, receivers, units, transaction_signatures);
 }
 
 fn update_transaction(
     senders: &Vec<String>,
     receivers: &Vec<String>,
     units: &Vec<u128>,
+    transaction_signatures: &String,
     transaction_list: &mut Vec<Transaction>,
     utxo: &mut HashMap<String, u128>,
 ) -> bool {
@@ -164,21 +180,10 @@ fn update_transaction(
         senders: senders.clone(),
         receivers: receivers.clone(),
         units: units.clone(),
+        transaction_signatures: transaction_signatures.to_string(),
     };
     transaction_list.push(transaction);
-
-    //Generate transaction hash, sign transaction with private key, verify signed transaction with public key
-    println!();
-    let transaction_hash = hash::hash_as_string(transaction_list.last().unwrap());
-    let (secret_key, public_key) = signer_and_verifier::create_keypair();
-    let signed_transaction = signer_and_verifier::sign(&transaction_hash, &secret_key);
-    println!("The signed transaction is {}:", signed_transaction);
-    println!("The public key for this transaction is {}:", public_key);
-    println!(
-        "Does the signed transaction correspond to public key?: {}\n",
-        signer_and_verifier::verify(&transaction_hash, &signed_transaction, &public_key)
-    );
-
+    
     for key in senders {
         utxo.remove(key);
     }

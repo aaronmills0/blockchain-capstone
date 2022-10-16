@@ -78,11 +78,13 @@ mod tests {
             senders: Vec::from([String::from("a")]),
             receivers: Vec::from([String::from("x"), String::from("y")]),
             units: Vec::from([20, 30]),
+            transaction_signatures: String::from("lalala"),
         };
         let tx1: Transaction = Transaction {
             senders: Vec::from([String::from("x"), String::from("y")]),
             receivers: Vec::from([String::from("a")]),
             units: Vec::from([50]),
+            transaction_signatures: String::from("lalala"),
         };
 
         let h0: String = hash_as_string(&tx0);
@@ -104,16 +106,19 @@ mod tests {
             senders: Vec::from([String::from("a")]),
             receivers: Vec::from([String::from("x"), String::from("y")]),
             units: Vec::from([20, 30]),
+            transaction_signatures: String::from("lalala"),
         };
         let tx1: Transaction = Transaction {
             senders: Vec::from([String::from("x"), String::from("y")]),
             receivers: Vec::from([String::from("a")]),
             units: Vec::from([50]),
+            transaction_signatures: String::from("lalala"),
         };
         let tx2: Transaction = Transaction {
             senders: Vec::from([String::from("a")]),
             receivers: Vec::from([String::from("n"), String::from("m"), String::from("l")]),
             units: Vec::from([5, 35, 10]),
+            transaction_signatures: String::from("lalala"),
         };
 
         let h0: String = hash_as_string(&tx0);
