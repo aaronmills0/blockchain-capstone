@@ -11,22 +11,58 @@ pub struct Merkle {
 
 impl Merkle {
     /**
-     * Creates a merkle tree from a list of transactions
-     * Uses a queue and a stack to create a merkle tree in array representation
-     *
-     * Logic:
-     *
-     * Build one layer of the tree at a time in a bottom-up apprach
-     * The queue stores the (pairs of) hashes that have yet to be hashed into their parents
-     *
-     * The stack is filled after a pair of hashes have been hashed to form their parent
-     * We use the stack to reverse the set of hashes for a given and obtain the correct ordering
-     * for our array implementation
-     *
-     * Elements are entered into the merkle tree in reverse order to prevent inefficent insertion
-     * into the front of a vector. Instead, the vector is reversed after the construction of the
-     * reversed array is complete
-     */
+    * Creates a merkle tree from a list of transactions
+    * Uses a queue and a stack to create a merkle tree in array representation
+    *
+    * Logic:
+    *
+    * Build one layer of the tree at a time in a bottom-up apprach
+    * The queue stores the (pairs of) hashes that have yet to be hashed into their parents
+    *
+    * The stack is filled after a pair of hashes have been hashed to form their parent
+    * We use the stack to reverse the set of hashes for a given and obtain the correct ordering
+    * for our array implementation
+    *
+    * Elements are entered into the merkle tree in reverse order to prevent inefficent insertion
+    * into the front of a vector. Instead, the vector is reversed after the construction of the
+    * reversed array is complete
+    *
+    * We start by loading the queue with the hashes of all the transactions.
+
+    * The queue represents a level in the tree bottom-up
+
+    * for each level in the tree (while the queue.size > 1 i.e not at the root yet):
+
+    *  Ensure that we have an even number of hashes
+
+    *  Then for each pair of hashes we:
+
+    *      pop them from the queue
+
+    *      put the hash of their concatenation into the queue
+
+    *      push them onto the stack
+
+    *  Unload the stack into the merkle tree vector
+    * Reverse the merkle tree vector because we interted everything in reverse for efficiency reasons
+    *
+    *  Let h_i be the hash of transaction Txi
+    *
+    *  Let h_ij be the hash of the concatenation of the hashes of transactions Txi and Txj
+    *
+    *  Then, for a transaction list: Tx0, Tx1, Tx2, Tx3, Tx4 we expect the following tree
+    *
+    *                          h_01234444
+    *                      /                \
+    *                h_0123                  h_4444
+    *              /        \              /        \
+    *          h_01          h_23      h_44          h_44
+    *         /    \        /    \    /    \
+    *       h_0     h_1   h_2    h_3 h_4   h_4
+    *
+    *  h_01234444 is the merkle root of this tree
+    *
+    */
     pub fn create_merkle_tree(transactions: &Vec<Transaction>) -> Merkle {
         let mut merkle_tree: Vec<String> = Vec::new();
         let mut queue: VecDeque<String> = VecDeque::new();
@@ -78,13 +114,13 @@ mod tests {
             senders: Vec::from([String::from("a")]),
             receivers: Vec::from([String::from("x"), String::from("y")]),
             units: Vec::from([20, 30]),
-            transaction_signatures: String::from("lalala"),
+            transaction_signature: String::from("aklsdfjaklladsflajks"),
         };
         let tx1: Transaction = Transaction {
             senders: Vec::from([String::from("x"), String::from("y")]),
             receivers: Vec::from([String::from("a")]),
             units: Vec::from([50]),
-            transaction_signatures: String::from("lalala"),
+            transaction_signature: String::from("aklsdfjaklladsflajks"),
         };
 
         let h0: String = hash_as_string(&tx0);
@@ -106,19 +142,19 @@ mod tests {
             senders: Vec::from([String::from("a")]),
             receivers: Vec::from([String::from("x"), String::from("y")]),
             units: Vec::from([20, 30]),
-            transaction_signatures: String::from("lalala"),
+            transaction_signature: String::from("aklsdfjaklladsflajks"),
         };
         let tx1: Transaction = Transaction {
             senders: Vec::from([String::from("x"), String::from("y")]),
             receivers: Vec::from([String::from("a")]),
             units: Vec::from([50]),
-            transaction_signatures: String::from("lalala"),
+            transaction_signature: String::from("aklsdfjaklladsflajks"),
         };
         let tx2: Transaction = Transaction {
             senders: Vec::from([String::from("a")]),
             receivers: Vec::from([String::from("n"), String::from("m"), String::from("l")]),
             units: Vec::from([5, 35, 10]),
-            transaction_signatures: String::from("lalala"),
+            transaction_signature: String::from("aklsdfjaklladsflajks"),
         };
 
         let h0: String = hash_as_string(&tx0);

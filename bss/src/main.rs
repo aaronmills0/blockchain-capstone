@@ -5,8 +5,10 @@ mod hash;
 mod merkle;
 use merkle::Merkle;
 mod signer_and_verifier;
+mod simulation;
 mod transaction;
 use transaction::Transaction;
+mod utxo;
 
 use std::collections::HashMap;
 use std::io;
@@ -86,26 +88,32 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>, String) {
     io::stdin()
         .read_line(&mut user_input)
         .expect("Failed to read line");
-    
+
     let split = user_input.split_whitespace(); //Tokenize by whitespace
-    for s in split{
-        if !senders.contains(&s.trim().to_string()){
+    for s in split {
+        if !senders.contains(&s.trim().to_string()) {
             senders.push(s.trim().to_string());
         }
     }
 
-    let mut transaction_senders=String::new().to_owned();
-    for s in &senders{
+    let mut transaction_senders = String::new().to_owned();
+    for s in &senders {
         transaction_senders.push_str(&s);
     }
-    println!("The concatenation of all senders for this owner is {}",transaction_senders);
-    let transaction_hash: String= hash::hash_as_string(&transaction_senders);
+    println!(
+        "The concatenation of all senders for this owner is {}",
+        transaction_senders
+    );
+    let transaction_hash: String = hash::hash_as_string(&transaction_senders);
     let (secret_key, public_key) = signer_and_verifier::create_keypair();
     let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
-    let transaction_signatures= signature_of_sender.to_string();
-    println!("Signature of transaction is {}", signature_of_sender.to_string());
+    let transaction_signatures = signature_of_sender.to_string();
+    println!(
+        "Signature of transaction is {}",
+        signature_of_sender.to_string()
+    );
 
-    loop{
+    loop {
         println!("Please Enter a Receiver Unit Pair as Follows, 'a 10':");
         user_input.clear();
         io::stdin()
@@ -115,17 +123,17 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>, String) {
 
         //Check 2 tokens were entered
         let s2 = split.clone();
-        if s2.count() != 2{
+        if s2.count() != 2 {
             continue;
         }
 
-        for (i, s) in split.enumerate(){ //Note next_chunk() not yet functional so for loop is needed
-            if i % 2 == 0{
-                if !receivers.contains(&s.trim().to_string()){
+        for (i, s) in split.enumerate() {
+            //Note next_chunk() not yet functional so for loop is needed
+            if i % 2 == 0 {
+                if !receivers.contains(&s.trim().to_string()) {
                     receivers.push(s.trim().to_string());
                 }
-            }
-            else{
+            } else {
                 let unit: u128 = match s.trim().parse() {
                     Ok(num) => num,
                     Err(_) => process::exit(1),
@@ -133,9 +141,6 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>, String) {
                 units.push(unit);
             }
         }
-
-
-
         println!("Would you like to add another receiver-unit pair? [y/n]:");
         user_input.clear();
         io::stdin()
@@ -155,23 +160,25 @@ fn update_transaction(
     senders: &Vec<String>,
     receivers: &Vec<String>,
     units: &Vec<u128>,
-    transaction_signatures: &String,
+    transaction_signature: &String,
     transaction_list: &mut Vec<Transaction>,
     utxo: &mut HashMap<String, u128>,
 ) -> bool {
-
     let u_sum: u128 = units.iter().sum();
     let mut s_sum: u128 = 0;
-    for s in senders{
-        if !(utxo.contains_key(s)){
+    for s in senders {
+        if !(utxo.contains_key(s)) {
             println!("Invalid transaction!\n");
             return false;
-        }
-        else{
+        } else {
             s_sum += utxo.get(s).unwrap();
         }
     }
     if u_sum > s_sum{
+        println!("Invalid transaction!\n");
+        return false;
+    }
+    if u_sum > s_sum {
         println!("Invalid transaction!\n");
         return false;
     }
@@ -180,10 +187,9 @@ fn update_transaction(
         senders: senders.clone(),
         receivers: receivers.clone(),
         units: units.clone(),
-        transaction_signatures: transaction_signatures.to_string(),
+        transaction_signature: transaction_signature.to_string(),
     };
     transaction_list.push(transaction);
-    
     for key in senders {
         utxo.remove(key);
     }
