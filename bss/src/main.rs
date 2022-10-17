@@ -141,7 +141,6 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>, String) {
                 units.push(unit);
             }
         }
-
         println!("Would you like to add another receiver-unit pair? [y/n]:");
         user_input.clear();
         io::stdin()
@@ -175,6 +174,10 @@ fn update_transaction(
             s_sum += utxo.get(s).unwrap();
         }
     }
+    if u_sum > s_sum{
+        println!("Invalid transaction!\n");
+        return false;
+    }
     if u_sum > s_sum {
         println!("Invalid transaction!\n");
         return false;
@@ -187,7 +190,6 @@ fn update_transaction(
         transaction_signature: transaction_signature.to_string(),
     };
     transaction_list.push(transaction);
-
     for key in senders {
         utxo.remove(key);
     }
