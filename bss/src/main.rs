@@ -8,10 +8,7 @@ mod signer_and_verifier;
 mod simulation;
 mod transaction;
 use transaction::Transaction;
-<<<<<<< HEAD
 mod utxo;
-=======
->>>>>>> 4ad0d26a93334db3ee67e619a6e93aa60d3366e9
 mod shell;
 use shell::interpreter;
 
@@ -62,15 +59,6 @@ fn initialize() -> (Vec<Block>, Vec<Transaction>, HashMap<String, u128>) {
     return (blockchain, transaction_list, utxo);
 }
 
-<<<<<<< HEAD
-fn display_commands(){
-    println!("-> status: Displays the current state of the UTXO, Pending Transactions,
-    and the Blocks");
-    println!("-> add transaction: Allows the user to add a specific transaction manually")
-}
-
-=======
->>>>>>> 4ad0d26a93334db3ee67e619a6e93aa60d3366e9
 fn create_block(blockchain: &mut Vec<Block>, transaction_list: &mut Vec<Transaction>) {
     let merkle: Merkle = Merkle::create_merkle_tree(&transaction_list);
     let new_block: Block = Block {
