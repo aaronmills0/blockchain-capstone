@@ -12,7 +12,7 @@ static TRANSACTION_MEAN: f64 = 1.0;
 static TRANSACTION_MULTIPLIER: u64 = 1;
 
 #[allow(dead_code)] // To prevent warning for unused functions
-pub fn start() {
+pub fn start() -> bool{
     let mut utxo: UTXO = UTXO {
         map: HashMap::new(),
     };
@@ -36,7 +36,7 @@ pub fn start() {
     let block_handle = thread::spawn(|| {
         Block::block_generator(rx, ty, utxo_copy, BLOCK_MEAN, BLOCK_MULTIPLIER);
     });
-    loop {}
+    return true;
 }
 
 //Uncomment to run the simulation

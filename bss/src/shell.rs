@@ -2,12 +2,13 @@ use crate::transaction::Transaction;
 use crate::block::Block;
 use crate::signer_and_verifier;
 use crate::hash;
+use crate::simulation::start;
 
 use std::collections::HashMap;
 use std::io;
 use std::process;
 use std::vec::Vec;
-
+static mut sim_status: bool = false;
 pub fn interpreter(
     utxo: &mut HashMap<String, u128>,
     transaction_list: &mut Vec<Transaction>,
@@ -48,7 +49,18 @@ pub fn interpreter(
         return true;
     }
     else if command.trim() == "start sim"{
-        return true;
+        unsafe{
+        if !sim_status {
+            start();
+            sim_status = true;
+            return true;
+        }
+        else{
+            println!();
+            println!("Simulation has already begun!");
+            println!();
+            return false
+        }}
     }
     else {
         return false;
@@ -237,5 +249,6 @@ fn display_blocks(blockchain: &mut Vec<Block>){
 fn display_commands(){
     println!("-> status: Displays the current state of the UTXO, Pending Transactions,
     and the Blocks");
-    println!("-> add transaction: Allows the user to add a specific transaction manually")
+    println!("-> add transaction: Allows the user to add a specific transaction manually");
+    println!("--> start sim: Allows the user to begin the simple 3 node blockchain simulation");
 }
