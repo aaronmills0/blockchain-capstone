@@ -11,6 +11,8 @@ use transaction::Transaction;
 mod utxo;
 mod shell;
 use shell::interpreter;
+use log::{info, trace, warn};
+use log4rs;
 
 use std::collections::HashMap;
 use std::vec::Vec;
@@ -18,7 +20,12 @@ use std::vec::Vec;
 const BLOCK_SIZE: u128 = 1;
 
 fn main() {
-    println!("Welcome to the simple transaction chain!\n");
+    let cwd = std::env::current_dir().unwrap();
+    let mut cwd_string=cwd.into_os_string().into_string().unwrap();
+    cwd_string.push_str("\\src\\logging_config.yaml");
+    log4rs::init_file(cwd_string, Default::default()).unwrap();
+
+    trace!("Welcome to the simple transaction chain!\n");
     let (mut blockchain, mut transaction_list, mut utxo) = initialize();
 
     println!("For list of supported commands, enter help");
@@ -28,7 +35,7 @@ fn main() {
             continue;
         }
 
-        if transaction_list.len() == BLOCK_SIZE.try_into().unwrap() {
+        if transaction_list.len() == (TryInto::<usize>::try_into(BLOCK_SIZE)).unwrap() {
             create_block(&mut blockchain, &mut transaction_list);
         }
     }
@@ -71,7 +78,7 @@ fn create_block(blockchain: &mut Vec<Block>, transaction_list: &mut Vec<Transact
     };
     blockchain.push(new_block);
 
-    println!("A block was added to the chain!");
+    info!("A block was added to the chain!");
     for block in blockchain {
         if hash::hash_as_string(&block.header.merkle_root)
             == hash::hash_as_string(

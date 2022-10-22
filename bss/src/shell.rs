@@ -8,7 +8,13 @@ use std::collections::HashMap;
 use std::io;
 use std::process;
 use std::vec::Vec;
+use std::fs;
 static mut sim_status: bool = false;
+use log::{info, trace, warn};
+use log4rs;
+use std::{fs::{File, create_dir}, path::Path};
+use chrono::prelude::*;
+
 pub fn interpreter(
     utxo: &mut HashMap<String, u128>,
     transaction_list: &mut Vec<Transaction>,
@@ -24,6 +30,7 @@ pub fn interpreter(
     
     
     if command.trim() == "add transaction"{
+        info!("The user entered 'add transaction'");
         let (senders, receivers, units, transaction_signatures) = add_transaction();
         if !update_transaction(
             &senders,
@@ -38,6 +45,7 @@ pub fn interpreter(
         return true;
     }
     else if command.trim() == "status" {
+        info!("The user entered 'status'");
         display_utxo(utxo);
         display_transactions(transaction_list);
         display_blocks(blockchain);
@@ -45,10 +53,12 @@ pub fn interpreter(
 
     }
     else if command.trim() == "help" {
+        info!("The user entered 'help'");
         display_commands();
         return true;
     }
     else if command.trim() == "start sim"{
+        info!("The user entered 'start sim'");
         unsafe{
         if !sim_status {
             start();
@@ -61,6 +71,34 @@ pub fn interpreter(
             println!();
             return false
         }}
+    }
+    else if command.trim() == "exit" {
+        info!("The user entered 'exit'");
+        let cwd = std::env::current_dir().unwrap();
+        let cwdFrom = std::env::current_dir().unwrap();
+        let cwdTo = std::env::current_dir().unwrap();
+        let cwdLog = std::env::current_dir().unwrap();
+        let mut dirpath=cwd.into_os_string().into_string().unwrap();
+        let mut dirpathFrom=cwdFrom.into_os_string().into_string().unwrap();
+        let mut dirpathTo=cwdTo.into_os_string().into_string().unwrap();
+        let mut dirpathLog=cwdLog.into_os_string().into_string().unwrap();
+
+        dirpath.push_str("/log");
+        dirpathFrom.push_str("\\log\\my.log");
+        dirpathTo.push_str("\\log\\");
+        dirpathLog.push_str("\\log\\my.log");
+        
+        
+        let dir_path=Path::new(&dirpath);
+        let n1=Local::now().format("%Y-%m-%d-%H-%M-%S").to_string();
+        let filename1:&str=&format!("sam{}.log",n1);
+        dirpathTo.push_str(filename1);
+        let file_path=dir_path.join(filename1);
+        let file=File::create(file_path);
+        let copied= fs::copy(dirpathFrom, dirpathTo);
+        let log_file = File::create(&dirpathLog).unwrap();
+
+        process::exit(0x0);
     }
     else {
         return false;
@@ -93,7 +131,7 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>, String) {
     for s in &senders {
         transaction_senders.push_str(&s);
     }
-    println!(
+    info!(
         "The concatenation of all senders for this owner is {}",
         transaction_senders
     );
@@ -101,7 +139,7 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>, String) {
     let (secret_key, public_key) = signer_and_verifier::create_keypair();
     let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
     let transaction_signatures = signature_of_sender.to_string();
-    println!(
+    info!(
         "Signature of transaction is {}",
         signature_of_sender.to_string()
     );
@@ -112,6 +150,7 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>, String) {
         io::stdin()
             .read_line(&mut user_input)
             .expect("Failed to read line");
+        info!("The receiver unit pair is: {}",user_input);
         let split = user_input.split_whitespace(); //Tokenize by whitespace
 
         //Check 2 tokens were entered
@@ -141,7 +180,7 @@ fn add_transaction() -> (Vec<String>, Vec<String>, Vec<u128>, String) {
             .expect("Failed to read line");
 
         match user_input.trim() {
-            "y" => {}
+            "y" => info!("The user has decided to add another receiver-unit pair"),
             _ => break,
         }
     }
@@ -162,7 +201,7 @@ fn update_transaction(
     let mut s_sum: u128 = 0;
     for s in senders{
         if !(utxo.contains_key(s)){
-            println!("Invalid transaction!\n");
+            warn!("Invalid transaction!\n");
             return false;
         }
         else{
@@ -170,7 +209,7 @@ fn update_transaction(
         }
     }
     if u_sum > s_sum{
-        println!("Invalid transaction!\n");
+        warn!("Invalid transaction!\n");
         return false;
     }
 
@@ -187,9 +226,9 @@ fn update_transaction(
     let transaction_hash = hash::hash_as_string(transaction_list.last().unwrap());
     let (secret_key, public_key) = signer_and_verifier::create_keypair();
     let signed_transaction = signer_and_verifier::sign(&transaction_hash, &secret_key);
-    println!("The signed transaction is {}:", signed_transaction);
-    println!("The public key for this transaction is {}:", public_key);
-    println!(
+    info!("The signed transaction is {}:", signed_transaction);
+    info!("The public key for this transaction is {}:", public_key);
+    info!(
         "Does the signed transaction correspond to public key?: {}\n",
         signer_and_verifier::verify(&transaction_hash, &signed_transaction, &public_key)
     );
@@ -207,7 +246,7 @@ fn update_transaction(
     }
 
     let fee: u128 = s_sum - u_sum;
-    println!("Transaction fee: {}\n", &fee);
+    info!("Transaction fee: {}\n", &fee);
     return true;
 }
 
@@ -251,4 +290,5 @@ fn display_commands(){
     and the Blocks");
     println!("-> add transaction: Allows the user to add a specific transaction manually");
     println!("--> start sim: Allows the user to begin the simple 3 node blockchain simulation");
+    println!("--> exit");
 }
