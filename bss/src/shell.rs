@@ -16,7 +16,7 @@ pub fn shell(){
         "help" | "Help" | "HELP" => {
             display_commands();
         }
-        "sim start" | "Sim Start" | "Simulation Start | simulation start" | "SIM START" => unsafe {
+        "sim start" | "Sim Start" | "SIM START" => unsafe {
             if !SIM_STATUS {
                 start();
                 SIM_STATUS = true;
