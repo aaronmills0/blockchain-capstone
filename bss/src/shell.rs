@@ -9,12 +9,6 @@ use log::{info, trace, warn};
 use log4rs;
 use std::{fs::{File, create_dir}, path::Path};
 use chrono::prelude::*;
-
-pub fn interpreter(
-    utxo: &mut HashMap<String, u128>,
-    transaction_list: &mut Vec<Transaction>,
-    blockchain: &mut Vec<Block>,
-    ) -> bool{
 use std::process::exit;
 
 static mut SIM_STATUS: bool = false;
@@ -28,10 +22,12 @@ pub fn shell() -> bool {
 
     match command.trim() {
         "help" | "Help" | "HELP" => {
+            info!("The user selected help");
             display_commands();
             return true;
         }
         "sim start" | "Sim Start" | "Simulation Start | simulation start" | "SIM START" => unsafe {
+            info!("The user selected simulation start");
             if !SIM_STATUS {
                 start();
                 SIM_STATUS = true;
@@ -44,15 +40,15 @@ pub fn shell() -> bool {
             }
         },
         "exit" | "Exit" | "EXIT" => {
-            info!("The user entered 'exit'");
+            info!("The user selected exit");
             let cwd = std::env::current_dir().unwrap();
             let cwdFrom = std::env::current_dir().unwrap();
             let cwdTo = std::env::current_dir().unwrap();
             let cwdLog = std::env::current_dir().unwrap();
-            let mut dirpath=cwd.into_os_string().into_string().unwrap();
-            let mut dirpathFrom=cwdFrom.into_os_string().into_string().unwrap();
-            let mut dirpathTo=cwdTo.into_os_string().into_string().unwrap();
-            let mut dirpathLog=cwdLog.into_os_string().into_string().unwrap();
+            let mut dirpath = cwd.into_os_string().into_string().unwrap();
+            let mut dirpathFrom = cwdFrom.into_os_string().into_string().unwrap();
+            let mut dirpathTo = cwdTo.into_os_string().into_string().unwrap();
+            let mut dirpathLog = cwdLog.into_os_string().into_string().unwrap();
 
             dirpath.push_str("/log");
             dirpathFrom.push_str("\\log\\my.log");
@@ -64,16 +60,16 @@ pub fn shell() -> bool {
             let n1=Local::now().format("%Y-%m-%d-%H-%M-%S").to_string();
             let filename1:&str=&format!("sam{}.log",n1);
             dirpathTo.push_str(filename1);
-            let file_path=dir_path.join(filename1);
-            let file=File::create(file_path);
-            let copied= fs::copy(dirpathFrom, dirpathTo);
+            let file_path = dir_path.join(filename1);
+            let file = File::create(file_path);
+            let copied = fs::copy(dirpathFrom, dirpathTo);
             let log_file = File::create(&dirpathLog).unwrap();
             
             exit_program();
             return true;
         }
         _ => {
-            println!("Invalid Command");
+            warn!("Invalid Command");
             return false;
         }
     }

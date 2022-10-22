@@ -1,5 +1,5 @@
 use crate::hash;
-use crate::signer_and_verifier;
+use crate::sign_and_verify;
 use crate::utxo::UTXO;
 
 use rand::rngs::ThreadRng;
@@ -11,6 +11,7 @@ use std::collections::HashSet;
 use std::sync::mpsc::{Receiver, Sender};
 use std::vec::Vec;
 use std::{thread, time};
+use log::{info, warn};
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Transaction {
@@ -39,10 +40,10 @@ impl Transaction {
         mut utxo: UTXO,
     ) {
         if max_num_receivers <= 0 {
-            panic!("Invalid input. The max number of receivers must be larger than zero and no larger than {} but was {}", utxo.map.len(), max_num_receivers);
+            warn!("Invalid input. The max number of receivers must be larger than zero and no larger than {} but was {}", utxo.map.len(), max_num_receivers);
         }
         if mean_transaction_rate <= 0.0 {
-            panic!("Invalid input. A non-positive mean for transaction rate is invalid for an exponential distribution but the mean was {}", mean_transaction_rate);
+            warn!("Invalid input. A non-positive mean for transaction rate is invalid for an exponential distribution but the mean was {}", mean_transaction_rate);
         }
 
         let lambda: f64 = 1.0 / mean_transaction_rate;
@@ -130,12 +131,12 @@ impl Transaction {
             transaction_senders.push_str(&s);
         }
         let transaction_hash: String = hash::hash_as_string(&transaction_senders);
-        let (secret_key, public_key) = signer_and_verifier::create_keypair();
-        let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
+        let (secret_key, public_key) = sign_and_verify::create_keypair();
+        let signature_of_sender = sign_and_verify::sign(&transaction_hash, &secret_key);
         let transaction_signature = signature_of_sender.to_string();
         let verified =
-            signer_and_verifier::verify(&transaction_hash, &signature_of_sender, &public_key);
-        println!(
+            sign_and_verify::verify(&transaction_hash, &signature_of_sender, &public_key);
+        info!(
             "\nTransaction created with {} senders and {} receivers.\n\tOwner public key: {}. \n\tTransaction signature: {}. \n\tSignature verified: {}",
             num_senders, num_receivers, public_key, transaction_signature, verified
         );

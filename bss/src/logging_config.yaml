@@ -13,3 +13,4 @@ root:
   appenders:
     - my_stdout
     - my_file_logger
+    
