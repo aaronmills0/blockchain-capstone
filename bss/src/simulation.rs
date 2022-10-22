@@ -1,7 +1,11 @@
+use bitcoin::blockdata::block;
+
 use crate::block::Block;
 use crate::transaction::Transaction;
 use crate::utxo::UTXO;
 
+use std::sync::mpsc::Receiver;
+use std::thread::JoinHandle;
 use std::{collections::HashMap, sync::mpsc, thread};
 
 static BLOCK_MEAN: f64 = 1.0;
@@ -12,7 +16,7 @@ static TRANSACTION_MEAN: f64 = 1.0;
 static TRANSACTION_MULTIPLIER: u64 = 1;
 
 #[allow(dead_code)] // To prevent warning for unused functions
-pub fn start() -> bool{
+pub fn start() {
     let mut utxo: UTXO = UTXO {
         map: HashMap::new(),
     };
@@ -36,7 +40,6 @@ pub fn start() -> bool{
     let block_handle = thread::spawn(|| {
         Block::block_generator(rx, ty, utxo_copy, BLOCK_MEAN, BLOCK_MULTIPLIER);
     });
-    return true;
 }
 
 //Uncomment to run the simulation
