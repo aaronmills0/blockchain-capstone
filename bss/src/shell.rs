@@ -5,7 +5,7 @@ use std::process::exit;
 
 static mut SIM_STATUS: bool = false;
 
-pub fn shell() -> bool {
+pub fn shell(){
     let mut command = String::new();
 
     io::stdin()
@@ -15,27 +15,22 @@ pub fn shell() -> bool {
     match command.trim() {
         "help" | "Help" | "HELP" => {
             display_commands();
-            return true;
         }
         "sim start" | "Sim Start" | "Simulation Start | simulation start" | "SIM START" => unsafe {
             if !SIM_STATUS {
                 start();
                 SIM_STATUS = true;
-                return true;
             } else {
                 println!();
-                println!("Simulation has already begun!");
+                println!("\nSimulation has already begun!\n");
                 println!();
-                return false;
             }
         },
         "exit" | "Exit" | "EXIT" => {
             exit_program();
-            return true;
         }
         _ => {
             println!("Invalid Command");
-            return false;
         }
     }
 }

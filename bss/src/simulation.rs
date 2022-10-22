@@ -1,11 +1,7 @@
-use bitcoin::blockdata::block;
-
 use crate::block::Block;
 use crate::transaction::Transaction;
 use crate::utxo::UTXO;
 
-use std::sync::mpsc::Receiver;
-use std::thread::JoinHandle;
 use std::{collections::HashMap, sync::mpsc, thread};
 
 static BLOCK_MEAN: f64 = 1.0;
