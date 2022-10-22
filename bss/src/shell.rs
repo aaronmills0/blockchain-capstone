@@ -5,7 +5,7 @@ use std::process::exit;
 
 static mut SIM_STATUS: bool = false;
 
-pub fn interpreter() -> bool {
+pub fn shell() -> bool {
     let mut command = String::new();
 
     io::stdin()
@@ -31,9 +31,12 @@ pub fn interpreter() -> bool {
         },
         "exit" | "Exit" | "EXIT" => {
             exit_program();
+            return true;
+        }
+        _ => {
+            println!("Invalid Command");
             return false;
         }
-        _ => return false,
     }
 }
 
