@@ -4,7 +4,6 @@ use std::io;
 use std::process;
 use std::vec::Vec;
 use std::fs;
-static mut sim_status: bool = false;
 use log::{info, trace, warn};
 use log4rs;
 use std::{fs::{File, create_dir}, path::Path};
