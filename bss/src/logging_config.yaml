@@ -1,0 +1,16 @@
+appenders:
+  my_stdout:
+    kind: console
+    encoder:
+      pattern: "{h({d(%Y-%m-%d %H:%M:%S)(local)} - {l}: {m}{n})}"
+  my_file_logger:
+    kind: file
+    path: "log//my.log"
+    encoder:
+      pattern: "{d(%Y-%m-%d %H:%M:%S)(local)} - {h({l})}: {m}{n}"
+root:
+  level: trace
+  appenders:
+    - my_stdout
+    - my_file_logger
+    

@@ -1,5 +1,6 @@
 use crate::transaction::Transaction;
 use std::collections::HashMap;
+use log::{warn};
 
 #[derive(Clone)]
 pub struct UTXO {
@@ -13,7 +14,7 @@ impl UTXO {
         for sender in transaction.senders.iter() {
             // If the uxto doesn't contain the sender: invalid transaction
             if !self.map.contains_key(sender) {
-                println!("Invalid transaction! The utxo does not contain the address {sender}.");
+                warn!("Invalid transaction! The utxo does not contain the address {sender}.");
                 return false;
             }
             // Otherwise, increment the total balance by the sender's balance
@@ -27,7 +28,7 @@ impl UTXO {
 
         // If we do not have the balance to fulfill this transaction, return false.
         if transfer_quantity > balance {
-            println!(
+            warn!(
                 "Invalid transaction! The total available balance cannot support this transaction."
             );
             return false;
