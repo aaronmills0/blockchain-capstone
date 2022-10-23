@@ -36,7 +36,6 @@ pub fn start() {
     let block_handle = thread::spawn(|| {
         Block::block_generator(rx, ty, utxo_copy, BLOCK_MEAN, BLOCK_MULTIPLIER);
     });
-    loop {}
 }
 
 //Uncomment to run the simulation
