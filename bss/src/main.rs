@@ -20,8 +20,6 @@ fn main() {
 
     println!("For list of supported commands, enter help");
     loop {
-        if !shell() {
-            continue;
-        }
+        shell();
     }
 }
