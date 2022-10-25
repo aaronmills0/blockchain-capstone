@@ -178,3 +178,20 @@ mod tests {
         assert_eq!(transaction.receivers.len(), transaction.units.len());
     }
 }
+
+pub struct Input {
+    pub prev_output: Outpoint,
+    pub script_length: u32,
+    pub script: String
+}
+
+pub struct Outpoint {
+    pub txhash: String,
+    pub output_index: u32
+}
+
+pub struct txoutput {
+    pub value: u32,
+    pub script_length: u32,
+    pub script: String
+}
