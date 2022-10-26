@@ -1,5 +1,7 @@
 use crate::hash;
-use crate::signer_and_verifier;
+use crate::sign_and_verify;
+use crate::sign_and_verify::sign;
+use crate::sign_and_verify::{PrivateKey, PublicKey, Signature, Verifier};
 use crate::utxo::UTXO;
 
 use rand::rngs::ThreadRng;
@@ -7,18 +9,31 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 use rand_distr::{Alphanumeric, Distribution, Exp};
 use serde::Serialize;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::sync::mpsc::{Receiver, Sender};
 use std::vec::Vec;
 use std::{thread, time};
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Serialize)]
 pub struct Transaction {
-    pub senders: Vec<String>,
-    pub receivers: Vec<String>,
-    pub units: Vec<u128>,
-    pub transaction_signature: String,
+    pub tx_inputs: Vec<TxIn>,
+    pub txin_count: u32,
+    pub tx_outputs: Vec<TxOut>,
+    pub txout_count: u32,
 }
+
+/**
+ * Steps in creating a new transaction.
+ * The receiving wallet must have a private-public key pair generated before the transaction can take place
+ * The public key is then cryptographically hashed and provided to the spending wallet.
+ * The spending wallet creates a new transactions with input(s) and output(s), and broadcasts it.
+ * For the receiver to spend this transaction (with a new transaction),
+ * they must create a transaction with input(s) that refers to output(s) by its transaction identifier (txid) and output number.
+ * He then creates the SignatureScript that satisfies the PubKeyScript made by the original spender.
+ * The signature script contains the following: Full Public Key, Signature that combines certain transaction data with the private key of the original receiver.
+ * The transaction data that is signed to form the signature includes the txid and output index of the previous transaction, the previous outputs public key script, the new public key script, and the value for the next recipient
+ */
 
 impl Transaction {
     /**
@@ -31,39 +46,52 @@ impl Transaction {
      * The transaction list created is constantly transmitted so that the block generator can receive it
      */
     pub fn transaction_generator(
-        max_num_receivers: usize,
-        mean_transaction_rate: f64,
-        multiplier: u64,
+        max_num_outputs: usize,
+        mean_transaction_rate: f32,
+        multiplier: u32,
         transmitter: Sender<Transaction>,
         receiver: Receiver<UTXO>,
         mut utxo: UTXO,
+        mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)>,
     ) {
-        if max_num_receivers <= 0 {
-            panic!("Invalid input. The max number of receivers must be larger than zero and no larger than {} but was {}", utxo.map.len(), max_num_receivers);
+        if max_num_outputs <= 0 {
+            panic!("Invalid input. The max number of receivers must be larger than zero and no larger than {} but was {}", utxo.len(), max_num_outputs);
         }
         if mean_transaction_rate <= 0.0 {
             panic!("Invalid input. A non-positive mean for transaction rate is invalid for an exponential distribution but the mean was {}", mean_transaction_rate);
         }
 
-        let lambda: f64 = 1.0 / mean_transaction_rate;
-        let exp: Exp<f64> = Exp::new(lambda).unwrap();
+        let lambda: f32 = 1.0 / mean_transaction_rate;
+        let exp: Exp<f32> = Exp::new(lambda).unwrap();
         let mut rng: ThreadRng = rand::thread_rng();
-        let mut sample: f64;
-        let mut normalized: f64;
+        let mut sample: f32;
+        let mut normalized: f32;
         let mut transaction_rate: time::Duration;
         let mut verified_utxo = utxo.clone();
+        println!("Original UTXO:");
+        for (key, value) in &utxo.0 {
+            println!("{:#?}: {:#?}", key, value);
+        }
+        let mut transaction_counter = 0;
         loop {
             sample = exp.sample(&mut rng);
             // For an exponential distribution (with lambda > 0), the values range from (0, lambda].
             // Since mean = 1 / lambda, multiply the sample by the mean to normalize.
             normalized = sample * mean_transaction_rate;
             // Get the time between transactions generated as a duration
-            transaction_rate = time::Duration::from_secs(multiplier * normalized as u64);
+            transaction_rate = time::Duration::from_secs((multiplier * normalized as u32) as u64);
             // Sleep to mimic the time between creation of transactions
             thread::sleep(transaction_rate);
 
-            let transaction = Self::create_transaction(&utxo, &mut rng, max_num_receivers);
+            let transaction =
+                Self::create_transaction(&utxo, &mut key_map, &mut rng, max_num_outputs);
+            transaction_counter += 1;
+            println!("{} Transactions Created", transaction_counter);
             utxo.update(&transaction);
+            println!("Updated UTXO");
+            for (key, value) in &utxo.0 {
+                println!("{:#?}: {:#?}", key, value);
+            }
             transmitter.send(transaction).unwrap();
 
             let new_utxo = receiver.try_recv();
@@ -75,123 +103,154 @@ impl Transaction {
 
     fn create_transaction(
         utxo: &UTXO,
+        key_map: &mut HashMap<Outpoint, (PrivateKey, PublicKey)>,
         rng: &mut ThreadRng,
-        max_num_receivers: usize,
+        max_num_outputs: usize,
     ) -> Transaction {
-        let mut address_list: Vec<String> = Vec::new();
-        for (address, _) in utxo.map.iter() {
-            address_list.push(address.to_string());
+        let mut unspent_txos: Vec<Outpoint> = Vec::new();
+        for (utxo_key, _) in utxo.iter() {
+            unspent_txos.push(utxo_key.clone());
         }
 
-        let num_senders: usize = rng.gen_range(1..=utxo.map.len());
-        let num_receivers: usize = rng.gen_range(1..=max_num_receivers);
+        let num_inputs: usize = rng.gen_range(1..=utxo.len());
+        let num_outputs: usize = rng.gen_range(1..=max_num_outputs);
 
-        let senders: Vec<String> = address_list
-            .choose_multiple(rng, num_senders)
+        let utxo_keys: Vec<Outpoint> = unspent_txos
+            .choose_multiple(rng, num_inputs)
             .cloned()
             .collect();
 
-        let mut receivers_set: HashSet<String> = HashSet::new();
-        let mut counter: usize = 0;
-        while counter < num_receivers {
-            let s: String = rng
-                .sample_iter(&Alphanumeric)
-                .take(10)
-                .map(char::from)
-                .collect();
-            if receivers_set.contains(&s) {
-                continue;
-            }
-            counter += 1;
-            receivers_set.insert(s);
+        let mut available_balance: u32 = 0;
+        for key in &utxo_keys {
+            available_balance += utxo.get(key).unwrap().value;
         }
 
-        let mut total_balance: u128 = 0;
-        for sender in &senders {
-            total_balance += utxo.map.get(sender).unwrap();
+        let mut output_values: Vec<u32> = Vec::new();
+        let mut output_values_sum: u32 = 0;
+        let mut total_generated_value: u32 = 0;
+        for _ in 0..num_outputs {
+            let generated_value = rng.gen_range(1..=100);
+            total_generated_value += generated_value;
+            output_values.push(generated_value);
+        }
+        let fraction = available_balance / total_generated_value;
+        for value in output_values.iter_mut() {
+            *value *= fraction;
+            output_values_sum += *value;
+        }
+        output_values[0] += available_balance - output_values_sum;
+
+        let mut tx_inputs: Vec<TxIn> = Vec::new();
+        let mut tx_outputs: Vec<TxOut> = Vec::new();
+        let mut outpoint: Outpoint;
+        let mut sig_script: SignatureScript;
+        let mut new_private_key: PrivateKey;
+        let mut new_public_key: PublicKey;
+        let mut old_private_key: PrivateKey;
+        let mut old_public_key: PublicKey;
+        let mut message: String;
+        let mut value: u32;
+        let mut pk_hash: String;
+        let mut pk_script: PublicKeyScript;
+        for i in 0..num_inputs {
+            outpoint = utxo_keys[i].clone();
+
+            (old_private_key, old_public_key) = key_map[&outpoint].clone();
+
+            message = String::from(&outpoint.txid)
+                + &outpoint.index.to_string()
+                + &utxo[&outpoint].pk_script.public_key_hash;
+
+            sig_script = SignatureScript {
+                signature: sign_and_verify::sign(&message, &old_private_key),
+                full_public_key: old_public_key,
+            };
+
+            key_map.remove(&outpoint); // Remove the old key pair
+
+            tx_inputs.push(TxIn {
+                outpoint: outpoint,
+                sig_script: sig_script,
+            });
         }
 
-        let mut units: Vec<u128> = Vec::new();
-        let mut unit_sum: u128 = 0;
-        let mut value_sum: u128 = 0;
-        for _ in 0..num_receivers {
-            let new_value = rng.gen_range(1..=100);
-            value_sum += new_value;
-            units.push(new_value);
-        }
-        for unit in units.iter_mut() {
-            *unit *= total_balance / value_sum;
-            unit_sum += *unit;
-        }
-        units[0] += total_balance - unit_sum;
+        let mut key_vec: Vec<(PrivateKey, PublicKey)> = Vec::new();
+        for j in 0..num_outputs {
+            (new_private_key, new_public_key) = sign_and_verify::create_keypair();
 
-        let mut transaction_senders = String::new();
-        for s in &senders {
-            transaction_senders.push_str(&s);
+            pk_script = PublicKeyScript {
+                public_key_hash: hash::hash_as_string(&new_public_key),
+                verifier: Verifier {},
+            };
+
+            key_vec.push((new_private_key, new_public_key));
+
+            tx_outputs.push(TxOut {
+                value: output_values[j],
+                pk_script: pk_script,
+            });
         }
-        let transaction_hash: String = hash::hash_as_string(&transaction_senders);
-        let (secret_key, public_key) = signer_and_verifier::create_keypair();
-        let signature_of_sender = signer_and_verifier::sign(&transaction_hash, &secret_key);
-        let transaction_signature = signature_of_sender.to_string();
-        let verified =
-            signer_and_verifier::verify(&transaction_hash, &signature_of_sender, &public_key);
+
         println!(
-            "\nTransaction created with {} senders and {} receivers.\n\tOwner public key: {}. \n\tTransaction signature: {}. \n\tSignature verified: {}",
-            num_senders, num_receivers, public_key, transaction_signature, verified
+            "Transaction created with {} inputs and {} outputs.",
+            num_inputs, num_outputs
         );
-        return Transaction {
-            senders: senders,
-            receivers: Vec::from_iter(receivers_set),
-            units: units,
-            transaction_signature: transaction_signature,
+        let transaction = Transaction {
+            tx_inputs: tx_inputs,
+            txin_count: num_inputs as u32,
+            tx_outputs: tx_outputs,
+            txout_count: num_outputs as u32,
         };
+
+        let txid: String = hash::hash_as_string(&transaction);
+
+        // Update the key_map
+
+        for k in 0..num_outputs {
+            outpoint = Outpoint {
+                txid: txid.clone(),
+                index: k as u32,
+            };
+            key_map.insert(outpoint, key_vec[k].clone());
+        }
+
+        return transaction;
     }
 }
 
-mod tests {
-    use crate::{transaction::Transaction, utxo::UTXO};
-
-    use rand::rngs::ThreadRng;
-    use std::collections::HashMap;
-
-    #[test]
-    fn create_transaction_valid() {
-        let mut utxo: UTXO = UTXO {
-            map: HashMap::new(),
-        };
-        utxo.map.insert(String::from("a"), 50);
-        utxo.map.insert(String::from("b"), 20);
-        utxo.map.insert(String::from("c"), 10);
-        utxo.map.insert(String::from("d"), 30);
-        utxo.map.insert(String::from("e"), 80);
-        utxo.map.insert(String::from("f"), 40);
-
-        let mut rng: ThreadRng = rand::thread_rng();
-        let max_num_receivers: usize = 4;
-
-        let transaction = Transaction::create_transaction(&utxo, &mut rng, max_num_receivers);
-
-        assert!(transaction.senders.len() > 0 && transaction.senders.len() <= utxo.map.len());
-        assert!(
-            transaction.receivers.len() > 0 && transaction.receivers.len() <= max_num_receivers
-        );
-        assert_eq!(transaction.receivers.len(), transaction.units.len());
-    }
+#[derive(Clone, Serialize)]
+pub struct TxIn {
+    pub outpoint: Outpoint,
+    pub sig_script: SignatureScript,
 }
 
-pub struct Input {
-    pub prev_output: Outpoint,
-    pub script_length: u32,
-    pub script: String
+#[derive(Clone, Serialize)]
+pub struct SignatureScript {
+    pub signature: Signature,
+    pub full_public_key: PublicKey,
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Debug)]
 pub struct Outpoint {
-    pub txhash: String,
-    pub output_index: u32
+    pub txid: String,
+    pub index: u32,
 }
 
-pub struct txoutput {
+impl Hash for Outpoint {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.txid.hash(state);
+        self.index.hash(state);
+    }
+}
+
+#[derive(Clone, Serialize, Debug)]
+pub struct TxOut {
     pub value: u32,
-    pub script_length: u32,
-    pub script: String
+    pub pk_script: PublicKeyScript,
+}
+
+#[derive(Clone, Serialize, Debug)]
+pub struct PublicKeyScript {
+    pub public_key_hash: String,
+    pub verifier: Verifier,
 }

@@ -2,7 +2,7 @@ mod block;
 mod hash;
 mod merkle;
 mod shell;
-mod signer_and_verifier;
+mod sign_and_verify;
 mod simulation;
 mod transaction;
 mod utxo;

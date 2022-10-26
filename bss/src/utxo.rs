@@ -1,55 +1,123 @@
-use crate::transaction::Transaction;
+use crate::hash::hash_as_string;
+use crate::sign_and_verify::sign;
+use crate::sign_and_verify::{PublicKey, Signature};
+use crate::transaction::{Outpoint, Transaction, TxIn, TxOut};
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 
+/**
+ * The UTXO is a map containing the Unspent Transaction (X) Outputs.
+ *
+ * The key to this map comes from the Outpoint (see transactions.rs),
+ * and is formed from the concatenation (or some other function that yields a unique key)
+ * between the transaction identifier (txid) and the output number.
+ *
+ * The value (TxOut) is the unspent output containing the unspent value and
+ * the public key script, which is used to verify the arguments (pushed onto the stack)
+ * in the transaction input.
+ */
 #[derive(Clone)]
-pub struct UTXO {
-    pub map: HashMap<String, u128>,
+pub struct UTXO(pub HashMap<Outpoint, TxOut>);
+
+impl Deref for UTXO {
+    type Target = HashMap<Outpoint, TxOut>;
+    fn deref(&self) -> &HashMap<Outpoint, TxOut> {
+        return &self.0;
+    }
+}
+
+impl DerefMut for UTXO {
+    fn deref_mut(&mut self) -> &mut HashMap<Outpoint, TxOut> {
+        return &mut self.0;
+    }
 }
 
 impl UTXO {
+    /**
+     * Requirements for transaction verification
+     * 1. Transaction must be unspent (i.e. no double spending and must exist in the utxo).
+     * Check that its 'previous' output exists in the utxo and remove it from the utxo copy
+     * (we would like to be able to revert)
+     * 2. The new transaction outputs value (sum) cannot exceed the previous transaction outputs (sum)
+     * 3. We must ensure that the transaction verifies to true.
+     */
     pub fn verify_transaction(&self, transaction: &Transaction) -> bool {
-        let mut balance: u128 = 0;
-        let mut transfer_quantity: u128 = 0;
-        for sender in transaction.senders.iter() {
-            // If the uxto doesn't contain the sender: invalid transaction
-            if !self.map.contains_key(sender) {
-                println!("Invalid transaction! The utxo does not contain the address {sender}.");
+        let mut utxo: UTXO = self.clone();
+        // Note: If values are u32, then their sum can potentially overflow when summed. We should consider increasing the balances to u64
+        let mut incoming_balance: u32 = 0;
+        let mut outgoing_balance: u32 = 0;
+        let mut tx_out: TxOut;
+        let mut in_out_pairs: Vec<(TxIn, TxOut)> = Vec::new();
+        for tx_in in transaction.tx_inputs.iter() {
+            // If the uxto doesn't contain the output associated with this input: invalid transaction
+            if !utxo.contains_key(&tx_in.outpoint) {
+                println!(
+                    "Invalid transaction! UTXO does not contain unspent output. {:#?}",
+                    &tx_in.outpoint
+                );
                 return false;
             }
-            // Otherwise, increment the total balance by the sender's balance
-            balance += self.map.get(sender).unwrap();
+            // Get the transaction output, add its value to the incoming balance
+            // Store the TxIn, TxOut pair in in_out_pairs for verification later
+            // Remove the output from the uxto copy.
+            tx_out = utxo.get(&tx_in.outpoint).unwrap().clone();
+            incoming_balance += tx_out.value;
+            utxo.remove(&tx_in.outpoint);
+            in_out_pairs.push((tx_in.clone(), tx_out));
         }
+        // At this point, double spending and existance of unspent transaction output has been verified (1.)
 
         // Obtain the total amount that is requested to be transferred
-        for quantity in transaction.units.iter() {
-            transfer_quantity += *quantity;
+        for new_tx_out in transaction.tx_outputs.iter() {
+            outgoing_balance += new_tx_out.value;
         }
 
         // If we do not have the balance to fulfill this transaction, return false.
-        if transfer_quantity > balance {
+        if outgoing_balance > incoming_balance {
             println!(
-                "Invalid transaction! The total available balance cannot support this transaction."
+                "Invalid transaction! The total available balance cannot support this transaction. {} > {}", &outgoing_balance, &incoming_balance
             );
             return false;
+        }
+
+        // At this point, incoming_balance being lesser than or equal to outgoing_balance has been verified (2.)
+        let mut signature: &Signature;
+        let mut public_key: &PublicKey;
+        // message concatenates txid, output index of the previous transaction, old public key script, new public key script, and the value for the next recipient
+        // For now, a message contains the txid, output index of the previous transaction, old public key hash
+        let mut message: String;
+        for (tx_in, tx_out) in in_out_pairs.iter() {
+            signature = &tx_in.sig_script.signature;
+            public_key = &tx_in.sig_script.full_public_key;
+            message = String::from(&tx_in.outpoint.txid)
+                + &tx_in.outpoint.index.to_string()
+                + &tx_out.pk_script.public_key_hash;
+            if !(tx_out
+                .pk_script
+                .verifier
+                .verify(&message, &signature, &public_key))
+            {
+                return false;
+            }
         }
 
         return true;
     }
 
     pub fn update(&mut self, transaction: &Transaction) {
-        for sender in transaction.senders.iter() {
-            self.map.remove(sender);
+        let mut key: String;
+        for tx_in in transaction.tx_inputs.iter() {
+            self.remove(&tx_in.outpoint);
         }
 
+        let txid: String = hash_as_string(transaction);
         // Iterate through the transfer quantity - receiver pairs
-        for (quantity, receiver) in transaction.units.iter().zip(transaction.receivers.iter()) {
-            // If the receiver address is not present in the utxo, create a new entry with the corresponding quantity
-            if !self.map.contains_key(receiver) {
-                self.map.insert(receiver.to_string(), *quantity);
-            } else {
-                // Otherwise, increment the receiver's balance by the quantity
-                *self.map.get_mut(receiver).unwrap() += *quantity;
-            }
+        for (i, tx_out) in transaction.tx_outputs.iter().enumerate() {
+            let outpoint: Outpoint = Outpoint {
+                txid: txid.clone(),
+                index: (i as u32),
+            };
+            self.insert(outpoint, tx_out.clone());
         }
     }
 }
