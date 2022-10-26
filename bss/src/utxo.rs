@@ -4,6 +4,7 @@ use crate::sign_and_verify::{PublicKey, Signature};
 use crate::transaction::{Outpoint, Transaction, TxIn, TxOut};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
+use log::{warn};
 
 /**
  * The UTXO is a map containing the Unspent Transaction (X) Outputs.
@@ -55,6 +56,10 @@ impl UTXO {
                     "Invalid transaction! UTXO does not contain unspent output. {:#?}",
                     &tx_in.outpoint
                 );
+                warn!(
+                    "Invalid transaction! UTXO does not contain unspent output. {:#?}",
+                    &tx_in.outpoint
+                );
                 return false;
             }
             // Get the transaction output, add its value to the incoming balance
@@ -76,6 +81,9 @@ impl UTXO {
         if outgoing_balance > incoming_balance {
             println!(
                 "Invalid transaction! The total available balance cannot support this transaction. {} > {}", &outgoing_balance, &incoming_balance
+            );
+            warn!(
+                "Invalid transaction! The total available balance cannot support this transaction."
             );
             return false;
         }

@@ -14,6 +14,7 @@ use std::hash::{Hash, Hasher};
 use std::sync::mpsc::{Receiver, Sender};
 use std::vec::Vec;
 use std::{thread, time};
+use log::{info, warn};
 
 #[derive(Clone, Serialize)]
 pub struct Transaction {
@@ -56,9 +57,10 @@ impl Transaction {
     ) {
         if max_num_outputs <= 0 {
             panic!("Invalid input. The max number of receivers must be larger than zero and no larger than {} but was {}", utxo.len(), max_num_outputs);
+            warn!("Invalid input. The max number of receivers must be larger than zero and no larger than {} but was {}", utxo.len(), max_num_outputs);
         }
         if mean_transaction_rate <= 0.0 {
-            panic!("Invalid input. A non-positive mean for transaction rate is invalid for an exponential distribution but the mean was {}", mean_transaction_rate);
+            warn!("Invalid input. A non-positive mean for transaction rate is invalid for an exponential distribution but the mean was {}", mean_transaction_rate);
         }
 
         let lambda: f32 = 1.0 / mean_transaction_rate;
@@ -190,7 +192,6 @@ impl Transaction {
                 pk_script: pk_script,
             });
         }
-
         println!(
             "Transaction created with {} inputs and {} outputs.",
             num_inputs, num_outputs
