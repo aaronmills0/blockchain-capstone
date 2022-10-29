@@ -3,6 +3,7 @@ use crate::transaction::Transaction;
 use crate::utxo::UTXO;
 use crate::{hash, simulation};
 
+use log::{info, warn};
 use rand::rngs::ThreadRng;
 use rand_distr::{Distribution, Exp};
 use serde::Serialize;
@@ -135,10 +136,10 @@ impl Block {
             if hash::hash_as_string(&block.header.merkle_root)
                 == hash::hash_as_string(&("0".repeat(64)))
             {
-                println!("\nBlock {}", hash::hash_as_string(&block.header));
+                info!("\nBlock {}", hash::hash_as_string(&block.header));
                 continue;
             }
-            println!(" <= Block {}", hash::hash_as_string(&block.header));
+            info!(" <= Block {}", hash::hash_as_string(&block.header));
         }
     }
 }

@@ -4,6 +4,7 @@ use crate::sign_and_verify::sign;
 use crate::sign_and_verify::{PrivateKey, PublicKey, Signature, Verifier};
 use crate::utxo::UTXO;
 
+use log::{info, warn};
 use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -14,7 +15,6 @@ use std::hash::{Hash, Hasher};
 use std::sync::mpsc::{Receiver, Sender};
 use std::vec::Vec;
 use std::{thread, time};
-use log::{info, warn};
 
 #[derive(Clone, Serialize)]
 pub struct Transaction {
@@ -56,7 +56,6 @@ impl Transaction {
         mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)>,
     ) {
         if max_num_outputs <= 0 {
-            panic!("Invalid input. The max number of receivers must be larger than zero and no larger than {} but was {}", utxo.len(), max_num_outputs);
             warn!("Invalid input. The max number of receivers must be larger than zero and no larger than {} but was {}", utxo.len(), max_num_outputs);
         }
         if mean_transaction_rate <= 0.0 {
@@ -70,9 +69,9 @@ impl Transaction {
         let mut normalized: f32;
         let mut transaction_rate: time::Duration;
         let mut verified_utxo = utxo.clone();
-        println!("Original UTXO:");
+        info!("Original UTXO:");
         for (key, value) in &utxo.0 {
-            println!("{:#?}: {:#?}", key, value);
+            info!("{:#?}: {:#?}", key, value);
         }
         let mut transaction_counter = 0;
         loop {
@@ -88,11 +87,11 @@ impl Transaction {
             let transaction =
                 Self::create_transaction(&utxo, &mut key_map, &mut rng, max_num_outputs);
             transaction_counter += 1;
-            println!("{} Transactions Created", transaction_counter);
+            info!("{} Transactions Created", transaction_counter);
             utxo.update(&transaction);
-            println!("Updated UTXO");
+            info!("Updated UTXO");
             for (key, value) in &utxo.0 {
-                println!("{:#?}: {:#?}", key, value);
+                info!("{:#?}: {:#?}", key, value);
             }
             transmitter.send(transaction).unwrap();
 
@@ -192,7 +191,7 @@ impl Transaction {
                 pk_script: pk_script,
             });
         }
-        println!(
+        info!(
             "Transaction created with {} inputs and {} outputs.",
             num_inputs, num_outputs
         );

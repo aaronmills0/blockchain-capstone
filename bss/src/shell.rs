@@ -1,18 +1,22 @@
 use crate::simulation::start;
 
+use chrono::prelude::*;
+use log::{info, warn};
+use log4rs;
+use std::env;
+use std::fs;
 use std::io;
 use std::process;
-use std::vec::Vec;
-use std::fs;
-use log::{info, trace, warn};
-use log4rs;
-use std::{fs::{File, create_dir}, path::Path};
-use chrono::prelude::*;
 use std::process::exit;
+use std::vec::Vec;
+use std::{
+    fs::{create_dir, File},
+    path::Path,
+};
 
 static mut SIM_STATUS: bool = false;
 
-pub fn shell(){
+pub fn shell() {
     let mut command = String::new();
 
     io::stdin()
@@ -29,9 +33,7 @@ pub fn shell(){
                 start();
                 SIM_STATUS = true;
             } else {
-                println!();
-                println!("\nSimulation has already begun!\n");
-                println!();
+                info!("\nSimulation has already begun!\n");
             }
         },
         "exit" | "Exit" | "EXIT" => {
@@ -51,23 +53,29 @@ pub fn shell(){
             //dirpathFrom will allow us to access the path of the orginal log file we copy from after we moved dirPathFrom
             let mut dirpathLog = cwdLog.into_os_string().into_string().unwrap();
 
-            dirpath.push_str("/log");
-            dirpathFrom.push_str("\\log\\my.log");
-            dirpathTo.push_str("\\log\\");
-            dirpathLog.push_str("\\log\\my.log");
-            
-            
-            let dir_path=Path::new(&dirpath);
-            let n1=Local::now().format("%Y-%m-%d-%H-%M-%S").to_string();
+            if env::consts::OS == "windows" {
+                dirpath.push_str("/log");
+                dirpathFrom.push_str("\\log\\my.log");
+                dirpathTo.push_str("\\log\\");
+                dirpathLog.push_str("\\log\\my.log");
+            } else {
+                dirpath.push_str("/log");
+                dirpathFrom.push_str("/log/my.log");
+                dirpathTo.push_str("/log/");
+                dirpathLog.push_str("/log/my.log");
+            }
+
+            let dir_path = Path::new(&dirpath);
+            let n1 = Local::now().format("%Y-%m-%d-%H-%M-%S").to_string();
             //The new log file contains the current time
-            let filename1:&str=&format!("sam{}.log",n1);
+            let filename1: &str = &format!("{}.log", n1);
             dirpathTo.push_str(filename1);
             let file_path = dir_path.join(filename1);
             let file = File::create(file_path);
             let copied = fs::copy(dirpathFrom, dirpathTo);
             //we remove the old log file
             let log_file = File::create(&dirpathLog).unwrap();
-            
+
             exit_program();
         }
         _ => {
@@ -77,9 +85,9 @@ pub fn shell(){
 }
 
 fn display_commands() {
-    println!("--> help: Displays the availble commands");
-    println!("--> sim start: Allows the user to begin the simple 3 node blockchain simulation");
-    println!("--> exit: Exits the program with error code 0");
+    info!("--> help: Displays the availble commands");
+    info!("--> sim start: Allows the user to begin the simple 3 node blockchain simulation");
+    info!("--> exit: Exits the program with error code 0");
 }
 
 fn exit_program() {

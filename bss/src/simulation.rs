@@ -71,14 +71,3 @@ pub fn start() {
         Block::block_generator(rx, ty, utxo_copy, BLOCK_MEAN, BLOCK_MULTIPLIER);
     });
 }
-
-//Uncomment to run the simulation
-// mod tests {
-//     use crate::simulation::start;
-
-//     #[test]
-//     pub fn test_simulation() {
-//         start();
-//         loop {}
-//     }
-// }
