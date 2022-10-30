@@ -14,7 +14,8 @@ use std::{thread, time};
 #[derive(Serialize)]
 pub struct Block {
     pub header: BlockHeader,
-    pub transactions: Merkle,
+    pub merkle: Merkle,
+    pub transactions: Vec<Transaction>,
 }
 
 #[derive(Serialize)]
@@ -64,7 +65,8 @@ impl Block {
                 merkle_root: genesis_merkle.tree.first().unwrap().clone(),
                 nonce: 0,
             },
-            transactions: genesis_merkle,
+            merkle: genesis_merkle,
+            transactions: Vec::new(),
         };
         // Create the blockchain and add the genesis block to the chain
         let mut blockchain: Vec<Block> = Vec::new();
@@ -72,8 +74,9 @@ impl Block {
         let mut block: Block;
         let mut counter: u32;
         let mut merkle: Merkle;
-        let mut transactions: Vec<Transaction> = Vec::new();
+        let mut transactions: Vec<Transaction>;
         loop {
+            transactions = Vec::new();
             counter = 0;
             while counter < simulation::BLOCK_SIZE {
                 transactions.push(receiver.recv().unwrap());
@@ -100,13 +103,12 @@ impl Block {
                     merkle_root: merkle.tree.first().unwrap().clone(),
                     nonce: 0,
                 },
-                transactions: merkle,
+                merkle,
+                transactions,
             };
             blockchain.push(block);
             Block::print_blockchain(&blockchain);
             transmitter.send(utxo.clone()).unwrap();
-
-            transactions.clear();
         }
     }
 
