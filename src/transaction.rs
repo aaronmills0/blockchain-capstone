@@ -1,6 +1,5 @@
 use crate::hash;
 use crate::sign_and_verify;
-use crate::sign_and_verify::sign;
 use crate::sign_and_verify::{PrivateKey, PublicKey, Signature, Verifier};
 use crate::utxo::UTXO;
 
@@ -8,9 +7,9 @@ use log::{info, warn};
 use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
 use rand::Rng;
-use rand_distr::{Alphanumeric, Distribution, Exp};
+use rand_distr::{Distribution, Exp};
 use serde::Serialize;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::mpsc::{Receiver, Sender};
 use std::vec::Vec;
@@ -150,8 +149,6 @@ impl Transaction {
         let mut old_private_key: PrivateKey;
         let mut old_public_key: PublicKey;
         let mut message: String;
-        let mut value: u32;
-        let mut pk_hash: String;
         let mut pk_script: PublicKeyScript;
         for i in 0..num_inputs {
             outpoint = utxo_keys[i].clone();

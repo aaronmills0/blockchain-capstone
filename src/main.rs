@@ -6,7 +6,7 @@ mod sign_and_verify;
 mod simulation;
 mod transaction;
 mod utxo;
-use log::{info, warn};
+use log::info;
 use log4rs;
 use shell::shell;
 use std::env;

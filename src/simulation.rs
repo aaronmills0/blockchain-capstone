@@ -8,11 +8,11 @@ use crate::utxo::UTXO;
 use std::{collections::HashMap, sync::mpsc, thread};
 
 static BLOCK_MEAN: f32 = 1.0;
-static BLOCK_MULTIPLIER: u32 = 30;
-pub static BLOCK_SIZE: u32 = 1;
+static BLOCK_MULTIPLIER: u32 = 10;
+pub static BLOCK_SIZE: u32 = 8;
 static MAX_NUM_OUTPUTS: usize = 3;
 static TRANSACTION_MEAN: f32 = 1.0;
-static TRANSACTION_MULTIPLIER: u32 = 20;
+static TRANSACTION_MULTIPLIER: u32 = 5;
 
 #[allow(dead_code)] // To prevent warning for unused functions
 pub fn start() {

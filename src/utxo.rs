@@ -1,8 +1,7 @@
 use crate::hash::hash_as_string;
-use crate::sign_and_verify::sign;
 use crate::sign_and_verify::{PublicKey, Signature};
 use crate::transaction::{Outpoint, Transaction, TxIn, TxOut};
-use log::{info, warn};
+use log::warn;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
@@ -106,7 +105,6 @@ impl UTXO {
     }
 
     pub fn update(&mut self, transaction: &Transaction) {
-        let mut key: String;
         for tx_in in transaction.tx_inputs.iter() {
             self.remove(&tx_in.outpoint);
         }
