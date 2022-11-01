@@ -156,20 +156,14 @@ mod tests {
     use rand::rngs::ThreadRng;
     static MAX_NUM_OUTPUTS: usize = 3;
 
-    #[test]
-    fn test_verify_and_update_valid_transactions() {
+    fn create_transactions() -> (std::vec::Vec<Transaction>, UTXO) {
         let mut utxo: UTXO = UTXO(HashMap::new());
-        let mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)> = HashMap::new();
 
+        let mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)> = HashMap::new();
         let (private_key0, public_key0) = sign_and_verify::create_keypair();
         let outpoint0: Outpoint = Outpoint {
             txid: "0".repeat(64),
             index: 0,
-        };
-        let (private_key1, public_key1) = sign_and_verify::create_keypair();
-        let outpoint1: Outpoint = Outpoint {
-            txid: "0".repeat(64),
-            index: 1,
         };
 
         let tx_out0: TxOut = TxOut {
@@ -180,29 +174,94 @@ mod tests {
             },
         };
 
+        key_map.insert(outpoint0.clone(), (private_key0, public_key0));
+        utxo.insert(outpoint0.clone(), tx_out0.clone());
+
+        let mut sig_script0: SignatureScript;
+        let mut sig_script1: SignatureScript;
+
+        let mut old_private_key: PrivateKey;
+        let mut old_public_key: PublicKey;
+
+        (old_private_key, old_public_key) = key_map[&outpoint0].clone();
+
+        let mut message: String;
+
+        message = String::from(&outpoint0.txid)
+            + &outpoint0.index.to_string()
+            + &utxo[&outpoint0].pk_script.public_key_hash;
+
+        sig_script0 = SignatureScript {
+            signature: sign_and_verify::sign(&message, &old_private_key),
+            full_public_key: old_public_key,
+        };
+
+        let tx_in0: TxIn = TxIn {
+            outpoint: outpoint0,
+            sig_script: sig_script0,
+        };
+
+        let mut transaction0: Transaction = Transaction {
+            tx_inputs: Vec::from([tx_in0]),
+            txin_count: 1,
+            tx_outputs: Vec::from([tx_out0]),
+            txout_count: 1,
+        };
+
+        let (private_key1, public_key1) = sign_and_verify::create_keypair();
+        let outpoint1: Outpoint = Outpoint {
+            txid: hash::hash_as_string(&transaction0),
+            index: 0,
+        };
+
         let tx_out1: TxOut = TxOut {
-            value: 850,
+            value: 500,
             pk_script: PublicKeyScript {
                 public_key_hash: hash::hash_as_string(&public_key1),
                 verifier: Verifier {},
             },
         };
 
-        key_map.insert(outpoint0.clone(), (private_key0, public_key0));
         key_map.insert(outpoint1.clone(), (private_key1, public_key1));
+        utxo.insert(outpoint1.clone(), tx_out1.clone());
 
-        utxo.insert(outpoint0, tx_out0);
-        utxo.insert(outpoint1, tx_out1);
+        (old_private_key, old_public_key) = key_map[&outpoint1].clone();
 
-        let mut rng: ThreadRng = rand::thread_rng();
+        message = String::from(&outpoint1.txid)
+            + &outpoint1.index.to_string()
+            + &utxo[&outpoint1].pk_script.public_key_hash;
 
-        let transaction: Transaction =
-            Transaction::create_transaction(&utxo, &mut key_map, &mut rng, MAX_NUM_OUTPUTS);
+        sig_script1 = SignatureScript {
+            signature: sign_and_verify::sign(&message, &old_private_key),
+            full_public_key: old_public_key,
+        };
 
-        let mut transactions: Vec<Transaction> = Vec::from([transaction]);
+        let tx_in1: TxIn = TxIn {
+            outpoint: outpoint1,
+            sig_script: sig_script1,
+        };
+
+        let mut transaction1: Transaction = Transaction {
+            tx_inputs: Vec::from([tx_in1]),
+            txin_count: 1,
+            tx_outputs: Vec::from([tx_out1]),
+            txout_count: 1,
+        };
+
+        let mut transactions: Vec<Transaction> = Vec::from([transaction0, transaction1]);
+
+        return (transactions, utxo);
+    }
+
+    #[test]
+    fn test_verify_and_update_valid_transactions() {
+        let mut utxo: UTXO = UTXO(HashMap::new());
+        let mut transactions: Vec<Transaction>;
+
+        (transactions, utxo) = create_transactions();
+
+        assert_eq!(2, transactions.len());
 
         (transactions, utxo) = Block::verify_and_update(transactions, utxo);
-
-        assert_eq!(1, transactions.len());
     }
 }
