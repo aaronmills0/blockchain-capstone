@@ -103,3 +103,11 @@ impl Merkle {
         return merkle;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_merkle_tree_even_number_of_transactions() {}
+}

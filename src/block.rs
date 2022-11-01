@@ -1,5 +1,7 @@
 use crate::merkle::Merkle;
 use crate::transaction::Transaction;
+use crate::transaction::TxIn;
+use crate::transaction::TxOut;
 use crate::utxo::UTXO;
 use crate::{hash, simulation};
 
@@ -7,6 +9,7 @@ use log::info;
 use rand::rngs::ThreadRng;
 use rand_distr::{Distribution, Exp};
 use serde::Serialize;
+use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::{thread, time};
 
@@ -142,5 +145,64 @@ impl Block {
             }
             info!(" <= Block {}", hash::hash_as_string(&block.header));
         }
+    }
+}
+
+mod tests {
+    use super::{hash, Block, HashMap, Transaction, UTXO};
+    use crate::sign_and_verify;
+    use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
+    use crate::transaction::{Outpoint, PublicKeyScript, SignatureScript, TxIn, TxOut};
+    use rand::rngs::ThreadRng;
+    static MAX_NUM_OUTPUTS: usize = 3;
+
+    #[test]
+    fn test_verify_and_update_valid_transactions() {
+        let mut utxo: UTXO = UTXO(HashMap::new());
+        let mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)> = HashMap::new();
+
+        let (private_key0, public_key0) = sign_and_verify::create_keypair();
+        let outpoint0: Outpoint = Outpoint {
+            txid: "0".repeat(64),
+            index: 0,
+        };
+        let (private_key1, public_key1) = sign_and_verify::create_keypair();
+        let outpoint1: Outpoint = Outpoint {
+            txid: "0".repeat(64),
+            index: 1,
+        };
+
+        let tx_out0: TxOut = TxOut {
+            value: 500,
+            pk_script: PublicKeyScript {
+                public_key_hash: hash::hash_as_string(&public_key0),
+                verifier: Verifier {},
+            },
+        };
+
+        let tx_out1: TxOut = TxOut {
+            value: 850,
+            pk_script: PublicKeyScript {
+                public_key_hash: hash::hash_as_string(&public_key1),
+                verifier: Verifier {},
+            },
+        };
+
+        key_map.insert(outpoint0.clone(), (private_key0, public_key0));
+        key_map.insert(outpoint1.clone(), (private_key1, public_key1));
+
+        utxo.insert(outpoint0, tx_out0);
+        utxo.insert(outpoint1, tx_out1);
+
+        let mut rng: ThreadRng = rand::thread_rng();
+
+        let transaction: Transaction =
+            Transaction::create_transaction(&utxo, &mut key_map, &mut rng, MAX_NUM_OUTPUTS);
+
+        let mut transactions: Vec<Transaction> = Vec::from([transaction]);
+
+        (transactions, utxo) = Block::verify_and_update(transactions, utxo);
+
+        assert_eq!(1, transactions.len());
     }
 }

@@ -101,7 +101,7 @@ impl Transaction {
         }
     }
 
-    fn create_transaction(
+    pub fn create_transaction(
         utxo: &UTXO,
         key_map: &mut HashMap<Outpoint, (PrivateKey, PublicKey)>,
         rng: &mut ThreadRng,
@@ -250,4 +250,66 @@ pub struct TxOut {
 pub struct PublicKeyScript {
     pub public_key_hash: String,
     pub verifier: Verifier,
+}
+
+mod tests {
+    use super::hash;
+    use crate::sign_and_verify;
+    use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
+    use crate::transaction::{Outpoint, PublicKeyScript, SignatureScript, TxIn, TxOut};
+    use crate::{transaction::Transaction, utxo::UTXO};
+    use rand::rngs::ThreadRng;
+    use std::collections::HashMap;
+
+    static MAX_NUM_OUTPUTS: usize = 3;
+
+    #[test]
+    fn create_transaction_valid() {
+        let mut utxo: UTXO = UTXO(HashMap::new());
+        let mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)> = HashMap::new();
+
+        let (private_key0, public_key0) = sign_and_verify::create_keypair();
+        let outpoint0: Outpoint = Outpoint {
+            txid: "0".repeat(64),
+            index: 0,
+        };
+        let (private_key1, public_key1) = sign_and_verify::create_keypair();
+        let outpoint1: Outpoint = Outpoint {
+            txid: "0".repeat(64),
+            index: 1,
+        };
+
+        let tx_out0: TxOut = TxOut {
+            value: 500,
+            pk_script: PublicKeyScript {
+                public_key_hash: hash::hash_as_string(&public_key0),
+                verifier: Verifier {},
+            },
+        };
+
+        let tx_out1: TxOut = TxOut {
+            value: 850,
+            pk_script: PublicKeyScript {
+                public_key_hash: hash::hash_as_string(&public_key1),
+                verifier: Verifier {},
+            },
+        };
+
+        key_map.insert(outpoint0.clone(), (private_key0, public_key0));
+        key_map.insert(outpoint1.clone(), (private_key1, public_key1));
+
+        utxo.insert(outpoint0, tx_out0);
+        utxo.insert(outpoint1, tx_out1);
+
+        let mut rng: ThreadRng = rand::thread_rng();
+
+        let transaction: Transaction =
+            Transaction::create_transaction(&utxo, &mut key_map, &mut rng, MAX_NUM_OUTPUTS);
+
+        assert!(
+            transaction.tx_outputs.len() > 0
+                && transaction.tx_outputs.len() <= utxo.len()
+                && transaction.tx_outputs.len() <= MAX_NUM_OUTPUTS
+        );
+    }
 }
