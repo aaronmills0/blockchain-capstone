@@ -1,9 +1,11 @@
-use crate::block::Block;
+use crate::block::{Block, BlockHeader};
 use crate::hash;
+use crate::merkle::Merkle;
 use crate::sign_and_verify;
 use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
 use crate::transaction::{Outpoint, PublicKeyScript, Transaction, TxOut};
 use crate::utxo::UTXO;
+use crate::validator;    
 
 use std::{collections::HashMap, sync::mpsc, thread};
 
@@ -52,8 +54,28 @@ pub fn start() {
     utxo.insert(outpoint0, tx_out0);
     utxo.insert(outpoint1, tx_out1);
 
+    // Create genesis block
+    // Create the merkle tree for the genesis block
+    let genesis_merkle: Merkle = Merkle {
+        tree: Vec::from(["0".repeat(64).to_string()]),
+    };
+    let genesis_block: Block = Block {
+        header: BlockHeader {
+            previous_hash: "0".repeat(64).to_string(),
+            merkle_root: genesis_merkle.tree.first().unwrap().clone(),
+            nonce: 0,
+        },
+        merkle: genesis_merkle,
+        transactions: Vec::new(),
+    };
+    // Create the blockchain and add the genesis block to the chain
+    let mut blockchain: Vec<Block> = Vec::new();
+    blockchain.push(genesis_block);
+    let mut blockchain_copy = blockchain.clone();
+
     let (tx, rx) = mpsc::channel();
     let (ty, ry) = mpsc::channel();
+    let (tv, rv) = mpsc::channel();
     let utxo_copy = utxo.clone();
     let transaction_handle = thread::spawn(|| {
         Transaction::transaction_generator(
@@ -68,6 +90,10 @@ pub fn start() {
     });
 
     let block_handle = thread::spawn(|| {
-        Block::block_generator(rx, ty, utxo_copy, BLOCK_MEAN, BLOCK_MULTIPLIER);
+        Block::block_generator(rx, ty, tv, utxo_copy, blockchain, BLOCK_MEAN, BLOCK_MULTIPLIER);
+    });
+
+    let verifier_handle = thread::spawn(|| {
+        validator::chain_verifier(rv, utxo_copy, blockchain_copy)
     });
 }

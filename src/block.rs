@@ -10,14 +10,14 @@ use serde::Serialize;
 use std::sync::mpsc::{Receiver, Sender};
 use std::{thread, time};
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct Block {
     pub header: BlockHeader,
     pub merkle: Merkle,
     pub transactions: Vec<Transaction>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct BlockHeader {
     pub previous_hash: String,
     pub merkle_root: String,
@@ -40,7 +40,9 @@ impl Block {
     pub fn block_generator(
         receiver: Receiver<Transaction>,
         transmitter: Sender<UTXO>,
+        transmitter_verifier: Sender<Block>,
         mut utxo: UTXO,
+        mut blockchain: Vec<Block>,
         mean: f32,
         multiplier: u32,
     ) {
@@ -53,23 +55,23 @@ impl Block {
         let mut sample: f32;
         let mut normalized: f32;
         let mut mining_time: time::Duration;
-        // Create genesis block
-        // Create the merkle tree for the genesis block
-        let genesis_merkle: Merkle = Merkle {
-            tree: Vec::from(["0".repeat(64).to_string()]),
-        };
-        let genesis_block: Block = Block {
-            header: BlockHeader {
-                previous_hash: "0".repeat(64).to_string(),
-                merkle_root: genesis_merkle.tree.first().unwrap().clone(),
-                nonce: 0,
-            },
-            merkle: genesis_merkle,
-            transactions: Vec::new(),
-        };
-        // Create the blockchain and add the genesis block to the chain
-        let mut blockchain: Vec<Block> = Vec::new();
-        blockchain.push(genesis_block);
+        // // Create genesis block
+        // // Create the merkle tree for the genesis block
+        // let genesis_merkle: Merkle = Merkle {
+        //     tree: Vec::from(["0".repeat(64).to_string()]),
+        // };
+        // let genesis_block: Block = Block {
+        //     header: BlockHeader {
+        //         previous_hash: "0".repeat(64).to_string(),
+        //         merkle_root: genesis_merkle.tree.first().unwrap().clone(),
+        //         nonce: 0,
+        //     },
+        //     merkle: genesis_merkle,
+        //     transactions: Vec::new(),
+        // };
+        // // Create the blockchain and add the genesis block to the chain
+        // let mut blockchain: Vec<Block> = Vec::new();
+        // blockchain.push(genesis_block);
         let mut block: Block;
         let mut counter: u32;
         let mut merkle: Merkle;
@@ -108,6 +110,7 @@ impl Block {
             blockchain.push(block);
             Block::print_blockchain(&blockchain);
             transmitter.send(utxo.clone()).unwrap();
+            transmitter_verifier.send(block).unwrap();
         }
     }
 
