@@ -16,7 +16,7 @@ use std::ops::{Deref, DerefMut};
  * the public key script, which is used to verify the arguments (pushed onto the stack)
  * in the transaction input.
  */
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct UTXO(pub HashMap<Outpoint, TxOut>);
 
 impl Deref for UTXO {
@@ -51,7 +51,7 @@ impl UTXO {
         for tx_in in transaction.tx_inputs.iter() {
             // If the uxto doesn't contain the output associated with this input: invalid transaction
             if !utxo.contains_key(&tx_in.outpoint) {
-                warn!(
+                println!(
                     "Invalid transaction! UTXO does not contain unspent output. {:#?}",
                     &tx_in.outpoint
                 );
@@ -74,7 +74,7 @@ impl UTXO {
 
         // If we do not have the balance to fulfill this transaction, return false.
         if outgoing_balance > incoming_balance {
-            warn!(
+            println!(
                 "Invalid transaction! The total available balance cannot support this transaction."
             );
             return false;
