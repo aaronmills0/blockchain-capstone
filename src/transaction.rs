@@ -262,11 +262,12 @@ mod tests {
     use std::collections::HashMap;
 
     static MAX_NUM_OUTPUTS: usize = 3;
-    /*
+
     #[test]
     fn create_transaction_valid() {
+        //We first insert an unspent output in the utxo to which we will
+        //refer later on.
         let mut utxo: UTXO = UTXO(HashMap::new());
-
         let mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)> = HashMap::new();
         let (private_key0, public_key0) = sign_and_verify::create_keypair();
         let outpoint0: Outpoint = Outpoint {
@@ -285,7 +286,7 @@ mod tests {
         key_map.insert(outpoint0.clone(), (private_key0, public_key0));
         utxo.insert(outpoint0.clone(), tx_out0.clone());
 
-        let mut sig_script0: SignatureScript;
+        //We create a signature script for the input of our new transaction
         let mut sig_script1: SignatureScript;
 
         let mut old_private_key: PrivateKey;
@@ -297,29 +298,41 @@ mod tests {
 
         message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
-            + &utxo[&outpoint0].pk_script.public_key_hash;
+            + &tx_out0.pk_script.public_key_hash;
 
-        sig_script0 = SignatureScript {
+        sig_script1 = SignatureScript {
             signature: sign_and_verify::sign(&message, &old_private_key),
             full_public_key: old_public_key,
         };
 
-        let tx_in0: TxIn = TxIn {
+        let tx_in1: TxIn = TxIn {
             outpoint: outpoint0,
-            sig_script: sig_script0,
+            sig_script: sig_script1,
         };
 
-        let mut transaction: Transaction = Transaction {
-            tx_inputs: Vec::from([tx_in0]),
+        //We create a new keypair corresponding to our new transaction which allows us to create its tx_out
+
+        let (private_key1, public_key1) = sign_and_verify::create_keypair();
+
+        let tx_out1: TxOut = TxOut {
+            value: 500,
+            pk_script: PublicKeyScript {
+                public_key_hash: hash::hash_as_string(&public_key1),
+                verifier: Verifier {},
+            },
+        };
+
+        let mut transaction1: Transaction = Transaction {
+            tx_inputs: Vec::from([tx_in1]),
             txin_count: 1,
-            tx_outputs: Vec::from([tx_out0]),
+            tx_outputs: Vec::from([tx_out1]),
             txout_count: 1,
         };
 
         assert!(
-            transaction.tx_outputs.len() > 0
-                && transaction.tx_outputs.len() <= utxo.len()
-                && transaction.tx_outputs.len() <= MAX_NUM_OUTPUTS
+            transaction1.tx_outputs.len() > 0
+                && transaction1.tx_outputs.len() <= utxo.len()
+                && transaction1.tx_outputs.len() <= MAX_NUM_OUTPUTS
         );
-    }*/
+    }
 }
