@@ -106,8 +106,143 @@ impl Merkle {
 
 #[cfg(test)]
 mod tests {
+
+    use crate::hash;
+    use crate::sign_and_verify;
+    use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
+    use crate::transaction::{Outpoint, PublicKeyScript, SignatureScript, TxIn, TxOut};
+    use crate::{transaction::Transaction, utxo::UTXO};
+    use rand::rngs::ThreadRng;
+    use std::collections::HashMap;
+
+    static MAX_NUM_OUTPUTS: usize = 3;
+
+    fn create_three_transactions_valid() -> (std::vec::Vec<Transaction>) {
+        //We first insert an unspent output in the utxo to which we will
+        //refer later on.
+        let mut utxo: UTXO = UTXO(HashMap::new());
+        let mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)> = HashMap::new();
+        let (private_key0, public_key0) = sign_and_verify::create_keypair();
+        let outpoint0: Outpoint = Outpoint {
+            txid: "0".repeat(64),
+            index: 0,
+        };
+
+        let tx_out0: TxOut = TxOut {
+            value: 500,
+            pk_script: PublicKeyScript {
+                public_key_hash: hash::hash_as_string(&public_key0),
+                verifier: Verifier {},
+            },
+        };
+
+        key_map.insert(outpoint0.clone(), (private_key0, public_key0));
+        utxo.insert(outpoint0.clone(), tx_out0.clone());
+
+        //We create a signature script for the input of our new transaction
+        let mut sig_script1: SignatureScript;
+
+        let mut old_private_key: PrivateKey;
+        let mut old_public_key: PublicKey;
+
+        (old_private_key, old_public_key) = key_map[&outpoint0].clone();
+
+        let mut message: String;
+
+        message = String::from(&outpoint0.txid)
+            + &outpoint0.index.to_string()
+            + &tx_out0.pk_script.public_key_hash;
+
+        sig_script1 = SignatureScript {
+            signature: sign_and_verify::sign(&message, &old_private_key),
+            full_public_key: old_public_key,
+        };
+
+        let tx_in1: TxIn = TxIn {
+            outpoint: outpoint0,
+            sig_script: sig_script1,
+        };
+
+        //We create a new keypair corresponding to our new transaction which allows us to create its tx_out
+
+        let (private_key1, public_key1) = sign_and_verify::create_keypair();
+
+        let tx_out1: TxOut = TxOut {
+            value: 500,
+            pk_script: PublicKeyScript {
+                public_key_hash: hash::hash_as_string(&public_key1),
+                verifier: Verifier {},
+            },
+        };
+
+        let mut transaction1: Transaction = Transaction {
+            tx_inputs: Vec::from([tx_in1.clone()]),
+            txin_count: 1,
+            tx_outputs: Vec::from([tx_out1.clone()]),
+            txout_count: 1,
+        };
+
+        let mut transaction2: Transaction = Transaction {
+            tx_inputs: Vec::from([tx_in1.clone()]),
+            txin_count: 1,
+            tx_outputs: Vec::from([tx_out1.clone()]),
+            txout_count: 1,
+        };
+
+        let mut transaction3: Transaction = Transaction {
+            tx_inputs: Vec::from([tx_in1]),
+            txin_count: 1,
+            tx_outputs: Vec::from([tx_out1]),
+            txout_count: 1,
+        };
+
+        return Vec::from([transaction1, transaction2, transaction3]);
+    }
+
     use super::*;
-    /*
     #[test]
-    fn test_create_merkle_tree_even_number_of_transactions() {}*/
+    fn test_create_merkle_tree_even_number_of_transactions() {
+        let mut utxo: UTXO = UTXO(HashMap::new());
+        let mut transactions: Vec<Transaction>;
+        let mut used_transactions: Vec<Transaction>;
+
+        transactions = create_three_transactions_valid();
+
+        used_transactions = Vec::from_iter(transactions[0..2].iter().cloned());
+        let h0: String = hash_as_string(&used_transactions.get(0).unwrap());
+        let h1: String = hash_as_string(&used_transactions.get(1).unwrap());
+        let root_hash: String = hash_as_string(&format!("{}{}", h0, h1));
+
+        let merkle: Merkle = Merkle::create_merkle_tree(&used_transactions);
+
+        assert_eq!(3, merkle.tree.len());
+        assert_eq!(root_hash, merkle.tree[0]);
+        assert_eq!(h0, merkle.tree[1]);
+        assert_eq!(h1, merkle.tree[2]);
+    }
+
+    #[test]
+    fn test_create_merkle_tree_odd_number_of_transactions() {
+        let mut utxo: UTXO = UTXO(HashMap::new());
+        let mut transactions: Vec<Transaction>;
+
+        transactions = create_three_transactions_valid();
+        let h0: String = hash_as_string(&transactions.get(0).unwrap());
+        let h1: String = hash_as_string(&transactions.get(1).unwrap());
+        let h2: String = hash_as_string(&transactions.get(2).unwrap());
+        let h01: String = hash_as_string(&format!("{}{}", h0, h1));
+        let h22: String = hash_as_string(&format!("{}{}", h2, h2));
+        let root_hash: String = hash_as_string(&format!("{}{}", h01, h22));
+
+        let merkle: Merkle = Merkle::create_merkle_tree(&transactions);
+
+        assert_eq!(7, merkle.tree.len());
+        assert_eq!(root_hash, merkle.tree[0]);
+        assert_eq!(h01, merkle.tree[1]);
+        assert_eq!(h22, merkle.tree[2]);
+        assert_eq!(h0, merkle.tree[3]);
+        assert_eq!(h1, merkle.tree[4]);
+        assert_eq!(h2, merkle.tree[5]);
+        assert_eq!(h2, merkle.tree[6]);
+    }
 }
