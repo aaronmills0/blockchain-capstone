@@ -1,17 +1,17 @@
 use crate::block::{Block, BlockHeader};
 use crate::hash;
 use crate::merkle::Merkle;
+use crate::save_and_load;
+use crate::save_and_load::Config;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_with::serde_as;
-use crate::save_and_load;
-use crate::save_and_load::Config;
 
 use crate::sign_and_verify;
 use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
 use crate::transaction::{Outpoint, PublicKeyScript, Transaction, TxOut};
 use crate::utxo::UTXO;
-use crate::validator;    
+use crate::validator;
 
 use std::ops::Deref;
 use std::ops::DerefMut;
@@ -24,8 +24,8 @@ pub static BLOCK_SIZE: u32 = 8;
 static MAX_NUM_OUTPUTS: usize = 3;
 static TRANSACTION_MEAN: f32 = 1.0;
 static TRANSACTION_DURATION: u32 = 5;
+static MEAN_INVALID_RATIO: u32 = 50;
 
-#[allow(dead_code)] // To prevent warning for unused functions
 pub fn start(rx_sim: Receiver<String>) {
     let mut blockchain: Vec<Block> = Vec::new();
     let mut utxo: UTXO = UTXO(HashMap::new());
@@ -74,15 +74,14 @@ pub fn start(rx_sim: Receiver<String>) {
     utxo.insert(outpoint0, tx_out0);
     utxo.insert(outpoint1, tx_out1);
 
-
     // Create genesis block
     // Create the merkle tree for the genesis block
     let genesis_merkle: Merkle = Merkle {
-        tree: Vec::from(["0".repeat(64).to_string()]),
+        tree: Vec::from(["0".repeat(64)]),
     };
     let genesis_block: Block = Block {
         header: BlockHeader {
-            previous_hash: "0".repeat(64).to_string(),
+            previous_hash: "0".repeat(64),
             merkle_root: genesis_merkle.tree.first().unwrap().clone(),
             nonce: 0,
         },
@@ -106,20 +105,26 @@ pub fn start(rx_sim: Receiver<String>) {
     let (block_sim_keymap_tx, block_sim_keymap_rx) = mpsc::channel();
     let (block_validator_block_tx, block_validator_block_rx) = mpsc::channel();
 
-    let _transaction_handle = thread::spawn(|| {
+    thread::spawn(|| {
         Transaction::transaction_generator(
+            transaction_block_transaction_keymap_tx,
             MAX_NUM_OUTPUTS,
             TRANSACTION_MEAN,
             TRANSACTION_DURATION,
-            transaction_block_transaction_keymap_tx,
+            MEAN_INVALID_RATIO,
             utxo,
             key_map,
         );
     });
 
-    let _block_handle = thread::spawn(|| {
+    thread::spawn(|| {
         Block::block_generator(
-            (block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx, block_validator_block_tx),
+            (
+                block_sim_block_tx,
+                block_sim_utxo_tx,
+                block_sim_keymap_tx,
+                block_validator_block_tx,
+            ),
             (transaction_block_transaction_keymap_rx,),
             utxo_copy,
             blockchain_copy,
@@ -131,28 +136,28 @@ pub fn start(rx_sim: Receiver<String>) {
     let _verifier_handle = thread::spawn(|| {
         validator::chain_validator(block_validator_block_rx, utxo_copy2, blockchain_copy2)
     });
-    
+
     utxo = UTXO(HashMap::new());
     key_map = KeyMap(HashMap::new());
     loop {
         let new_block = block_sim_block_rx.try_recv();
-        if !new_block.is_err() {
-            blockchain.push(new_block.unwrap());
+        if let Ok(block) = new_block {
+            blockchain.push(block);
         }
 
         let new_utxo = block_sim_utxo_rx.try_recv();
-        if !new_utxo.is_err() {
-            utxo = new_utxo.unwrap();
+        if let Ok(utxo1) = new_utxo {
+            utxo = utxo1;
         }
 
         let new_keymap = block_sim_keymap_rx.try_recv();
-        if !new_keymap.is_err() {
-            key_map = new_keymap.unwrap();
+        if let Ok(key_map1) = new_keymap {
+            key_map = key_map1;
         }
 
         let command = rx_sim.try_recv();
-        if !command.is_err() {
-            if command.unwrap() == "save" {
+        if let Ok(command1) = command {
+            if command1 == "save" {
                 save_and_load::serialize_json(
                     &blockchain,
                     &utxo,

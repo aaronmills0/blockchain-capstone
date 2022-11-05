@@ -3,3 +3,4 @@ Cargo.lock
 log/
 config/
 .vscode/
+graphs/

@@ -9,7 +9,7 @@ pub fn chain_validator(receiver: Receiver<Block>, mut utxo: UTXO, mut chain: Vec
     'main: loop {
         let incoming_block = receiver.recv().unwrap();
 
-        if fork_exists(&incoming_block, &chain){
+        if fork_exists(&incoming_block, &chain) {
             continue;
         }
 
@@ -30,10 +30,13 @@ pub fn fork_exists(block: &Block, chain: &Vec<Block>) -> bool {
     let prev_hash = &block.header.previous_hash;
     let head_hash = hash::hash_as_string(&chain.last().unwrap().header);
     if head_hash.eq(prev_hash) {
-        info!("Block {} has been introduced, no fork detected", prev_hash);
+        info!(
+            "Block {} has been introduced, no fork detected",
+            hash::hash_as_string(&block.header)
+        );
         return false;
     } else {
-        for b in chain.iter().rev(){
+        for b in chain.iter().rev() {
             if b.header.previous_hash.eq(prev_hash) {
                 warn!(
                     "Fork has been detected! Fork root at block header {}",
@@ -42,7 +45,10 @@ pub fn fork_exists(block: &Block, chain: &Vec<Block>) -> bool {
                 return true;
             }
         }
-        warn!("Received new block containing previous hash ({}) to unknown block", prev_hash);
+        warn!(
+            "Received new block containing previous hash ({}) to unknown block",
+            prev_hash
+        );
         return true;
     }
 }
