@@ -6,6 +6,7 @@ mod sign_and_verify;
 mod simulation;
 mod transaction;
 mod utxo;
+mod validator;
 use log::info;
 use log4rs;
 use shell::shell;

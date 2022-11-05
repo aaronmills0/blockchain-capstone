@@ -3,7 +3,9 @@ use crate::transaction::Transaction;
 use crate::utxo::UTXO;
 use crate::{hash, simulation};
 
+use bitcoin::blockdata::block;
 use log::info;
+use rand::Rng;
 use rand::rngs::ThreadRng;
 use rand_distr::{Distribution, Exp};
 use serde::Serialize;
@@ -55,23 +57,7 @@ impl Block {
         let mut sample: f32;
         let mut normalized: f32;
         let mut mining_time: time::Duration;
-        // // Create genesis block
-        // // Create the merkle tree for the genesis block
-        // let genesis_merkle: Merkle = Merkle {
-        //     tree: Vec::from(["0".repeat(64).to_string()]),
-        // };
-        // let genesis_block: Block = Block {
-        //     header: BlockHeader {
-        //         previous_hash: "0".repeat(64).to_string(),
-        //         merkle_root: genesis_merkle.tree.first().unwrap().clone(),
-        //         nonce: 0,
-        //     },
-        //     merkle: genesis_merkle,
-        //     transactions: Vec::new(),
-        // };
-        // // Create the blockchain and add the genesis block to the chain
-        // let mut blockchain: Vec<Block> = Vec::new();
-        // blockchain.push(genesis_block);
+
         let mut block: Block;
         let mut counter: u32;
         let mut merkle: Merkle;
@@ -107,10 +93,16 @@ impl Block {
                 merkle,
                 transactions,
             };
+            let block_copy = block.clone();
+            //Randomly Injects Fork
+            if rng.gen_range(1..10) == 1{
+                let block_copy2 = block_copy.clone();
+                transmitter_verifier.send(block_copy2).unwrap();
+                }
             blockchain.push(block);
             Block::print_blockchain(&blockchain);
             transmitter.send(utxo.clone()).unwrap();
-            transmitter_verifier.send(block).unwrap();
+            transmitter_verifier.send(block_copy).unwrap();
         }
     }
 

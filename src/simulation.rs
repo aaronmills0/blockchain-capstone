@@ -76,7 +76,8 @@ pub fn start() {
     let (tx, rx) = mpsc::channel();
     let (ty, ry) = mpsc::channel();
     let (tv, rv) = mpsc::channel();
-    let utxo_copy = utxo.clone();
+    let mut utxo_copy = utxo.clone();
+    let mut utxo_copy2 = utxo.clone();
     let transaction_handle = thread::spawn(|| {
         Transaction::transaction_generator(
             MAX_NUM_OUTPUTS,
@@ -94,6 +95,6 @@ pub fn start() {
     });
 
     let verifier_handle = thread::spawn(|| {
-        validator::chain_verifier(rv, utxo_copy, blockchain_copy)
+        validator::chain_validator(rv, utxo_copy2, blockchain_copy)
     });
 }

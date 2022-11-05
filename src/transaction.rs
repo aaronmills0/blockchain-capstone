@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::mpsc::{Receiver, Sender};
 use std::vec::Vec;
+use std::fmt::Display;
 use std::{thread, time};
 
 #[derive(Clone, Serialize)]
