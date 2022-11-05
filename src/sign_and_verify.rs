@@ -66,9 +66,9 @@ impl Verifier {
         public_key: &PublicKey,
     ) -> bool {
         let secp = Secp256k1::new();
-        let message = Message::from_hashed_data::<sha256::Hash>(&message.as_bytes());
+        let message = Message::from_hashed_data::<sha256::Hash>(message.as_bytes());
         return secp
-            .verify_ecdsa(&message, &signed_message, &public_key)
+            .verify_ecdsa(&message, signed_message, public_key)
             .is_ok();
     }
 }
@@ -76,8 +76,8 @@ impl Verifier {
 //We sign a message and return its signed hash + the public key that was generated
 pub fn sign(message: &str, private_key: &PrivateKey) -> Signature {
     let secp = Secp256k1::new();
-    let message = Message::from_hashed_data::<sha256::Hash>(&message.as_bytes());
-    let signed_message = secp.sign_ecdsa(&message, &private_key);
+    let message = Message::from_hashed_data::<sha256::Hash>(message.as_bytes());
+    let signed_message = secp.sign_ecdsa(&message, private_key);
     return Signature(signed_message);
 }
 
@@ -90,8 +90,7 @@ pub fn create_keypair() -> (PrivateKey, PublicKey) {
 #[cfg(test)]
 mod tests {
     use crate::hash::hash_as_string;
-
-    use super::*;
+    use crate::sign_and_verify::{create_keypair, sign, Verifier};
 
     #[test]
     fn test_verify_signature() {
@@ -100,9 +99,6 @@ mod tests {
         let (private_key, public_key) = create_keypair();
         let signature_of_sender = sign(&transaction_hash, &private_key);
 
-        assert_eq!(
-            true,
-            verifier.verify(&transaction_hash, &signature_of_sender, &public_key)
-        );
+        assert!(verifier.verify(&transaction_hash, &signature_of_sender, &public_key));
     }
 }

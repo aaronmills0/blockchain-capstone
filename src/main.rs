@@ -1,4 +1,5 @@
 mod block;
+mod graph;
 mod hash;
 mod merkle;
 mod save_and_load;
@@ -9,7 +10,6 @@ mod transaction;
 mod utxo;
 mod validator;
 use log::info;
-use log4rs;
 use shell::shell;
 use std::env;
 

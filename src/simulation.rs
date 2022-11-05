@@ -141,8 +141,8 @@ pub fn start(rx_sim: Receiver<String>) {
     key_map = KeyMap(HashMap::new());
     loop {
         let new_block = block_sim_block_rx.try_recv();
-        if let Ok(block) = new_block {
-            blockchain.push(block);
+        if let Ok(block1) = new_block {
+            blockchain.push(block1);
         }
 
         let new_utxo = block_sim_utxo_rx.try_recv();
