@@ -5,8 +5,8 @@ use crate::utxo::UTXO;
 use crate::{hash, simulation};
 
 use log::info;
-use rand::Rng;
 use rand::rngs::ThreadRng;
+use rand::Rng;
 use rand_distr::{Distribution, Exp};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -55,7 +55,8 @@ impl Block {
             panic!("Invalid input. A non-positive mean is invalid for an exponential distribution");
         }
 
-        let (block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx, block_validator_block_tx) = block_tx;
+        let (block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx, block_validator_block_tx) =
+            block_tx;
         let (transaction_block_transaction_keymap_rx,) = block_rx;
 
         let lambda: f32 = 1.0 / mean;
@@ -64,7 +65,6 @@ impl Block {
         let mut sample: f32;
         let mut normalized: f32;
         let mut mining_time: time::Duration;
-
         let mut block: Block;
         let mut counter: u32;
         let mut merkle: Merkle;
@@ -94,7 +94,7 @@ impl Block {
             thread::sleep(mining_time);
             // Create a new block
             (transactions, utxo) = Block::verify_and_update(transactions, utxo);
-            if transactions.len() == 0 {
+            if transactions.is_empty() {
                 continue;
             }
             let mut found = false;
@@ -109,6 +109,7 @@ impl Block {
             if !found {
                 panic!("KeyMap not found!");
             }
+            info!("Creating block with {} transactions", transactions.len());
             merkle = Merkle::create_merkle_tree(&transactions);
             block = Block {
                 header: BlockHeader {
@@ -122,17 +123,16 @@ impl Block {
 
             let block_copy = block.clone();
             //Randomly Injects Fork
-            if rng.gen_range(1..=10) == 1{
+            if rng.gen_range(1..=10) == 1 {
                 let block_copy2 = block_copy.clone();
                 block_validator_block_tx.send(block_copy2).unwrap();
-                }
+            }
             block_sim_block_tx.send(block.clone()).unwrap();
             blockchain.push(block);
             Block::print_blockchain(&blockchain);
             block_sim_utxo_tx.send(utxo.clone()).unwrap();
             block_sim_keymap_tx.send(keymap.clone()).unwrap();
             block_validator_block_tx.send(block_copy).unwrap();
-
         }
     }
 
@@ -144,17 +144,17 @@ impl Block {
         transactions: Vec<Transaction>,
         utxo: UTXO,
     ) -> (Vec<Transaction>, UTXO) {
-        let mut utxo_copy = utxo.clone();
+        let mut utxo1 = utxo;
         let mut transactions_valid: Vec<Transaction> = Vec::new();
         for transaction in transactions {
-            if !utxo_copy.verify_transaction(&transaction) {
+            if !utxo1.verify_transaction(&transaction) {
                 continue;
             }
-            utxo_copy.update(&transaction);
+            utxo1.update(&transaction);
 
             transactions_valid.push(transaction);
         }
-        return (transactions_valid, utxo_copy);
+        return (transactions_valid, utxo1);
     }
 
     pub fn print_blockchain(blockchain: &Vec<Block>) {
@@ -162,7 +162,7 @@ impl Block {
             if hash::hash_as_string(&block.header.merkle_root)
                 == hash::hash_as_string(&("0".repeat(64)))
             {
-                info!("\nBlock {}", hash::hash_as_string(&block.header));
+                info!("Block {}", hash::hash_as_string(&block.header));
                 continue;
             }
             info!(" <= Block {}", hash::hash_as_string(&block.header));

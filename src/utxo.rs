@@ -20,6 +20,7 @@ use std::ops::{Deref, DerefMut};
  */
 #[serde_as]
 #[derive(Clone, Serialize, Deserialize)]
+#[allow(clippy::upper_case_acronyms)]
 pub struct UTXO(#[serde_as(as = "Vec<(_, _)>")] pub HashMap<Outpoint, TxOut>);
 
 impl Deref for UTXO {
@@ -55,7 +56,7 @@ impl UTXO {
             // If the uxto doesn't contain the output associated with this input: invalid transaction
             if !utxo.contains_key(&tx_in.outpoint) {
                 warn!(
-                    "Invalid transaction! UTXO does not contain unspent output. {:#?}",
+                    "Discarding invalid transaction! UTXO does not contain unspent outpoint: {:#?}",
                     &tx_in.outpoint
                 );
                 return false;
@@ -78,7 +79,7 @@ impl UTXO {
         // If we do not have the balance to fulfill this transaction, return false.
         if outgoing_balance > incoming_balance {
             warn!(
-                "Invalid transaction! The total available balance cannot support this transaction."
+                "Discarding invalid transaction! The total available balance cannot support this transaction."
             );
             return false;
         }
@@ -98,8 +99,11 @@ impl UTXO {
             if !(tx_out
                 .pk_script
                 .verifier
-                .verify(&message, &signature, &public_key))
+                .verify(&message, signature, public_key))
             {
+                warn!(
+                    "Discarding invalid transaction! The transaction script could not be verified"
+                );
                 return false;
             }
         }
@@ -122,7 +126,6 @@ impl UTXO {
             self.insert(outpoint, tx_out.clone());
         }
     }
-
 }
 
 #[cfg(test)]
@@ -188,11 +191,6 @@ mod tests {
         utxo.insert(outpoint0_1.clone(), tx_out0_1.clone());
         utxo.insert(outpoint0_2.clone(), tx_out0_2.clone());
 
-        //We create a signature script for the inputs of our new transaction
-        let sig_script1: SignatureScript;
-        let sig_script1_1: SignatureScript;
-        let sig_script1_2: SignatureScript;
-
         let old_private_key0: PrivateKey;
         let old_public_key0: PublicKey;
 
@@ -212,7 +210,7 @@ mod tests {
             + &outpoint0.index.to_string()
             + &tx_out0.pk_script.public_key_hash;
 
-        sig_script1 = SignatureScript {
+        let sig_script1 = SignatureScript {
             signature: sign_and_verify::sign(&message, &old_private_key0),
             full_public_key: old_public_key0,
         };
@@ -226,7 +224,7 @@ mod tests {
             + &outpoint0_1.index.to_string()
             + &tx_out0_1.pk_script.public_key_hash;
 
-        sig_script1_1 = SignatureScript {
+        let sig_script1_1 = SignatureScript {
             signature: sign_and_verify::sign(&message, &old_private_key0_1),
             full_public_key: old_public_key0_1,
         };
@@ -240,7 +238,7 @@ mod tests {
             + &outpoint0_2.index.to_string()
             + &tx_out0_2.pk_script.public_key_hash;
 
-        sig_script1_2 = SignatureScript {
+        let sig_script1_2 = SignatureScript {
             signature: sign_and_verify::sign(&message, &old_private_key0_2),
             full_public_key: old_public_key0_2,
         };
@@ -292,21 +290,16 @@ mod tests {
         key_map.insert(outpoint0.clone(), (private_key0, public_key0));
         utxo.insert(outpoint0.clone(), tx_out0.clone());
 
-        //We create a signature script for the input of our new transaction
-        let sig_script1: SignatureScript;
-
         let old_private_key: PrivateKey;
         let old_public_key: PublicKey;
 
         (old_private_key, old_public_key) = key_map[&outpoint0].clone();
 
-        let message: String;
-
-        message = String::from(&outpoint0.txid)
+        let message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
             + &tx_out0.pk_script.public_key_hash;
 
-        sig_script1 = SignatureScript {
+        let sig_script1 = SignatureScript {
             signature: sign_and_verify::sign(&message, &old_private_key),
             full_public_key: old_public_key,
         };
@@ -356,21 +349,16 @@ mod tests {
 
         key_map.insert(outpoint0.clone(), (private_key0, public_key0));
 
-        //We create a signature script for the input of our new transaction
-        let sig_script1: SignatureScript;
-
         let old_private_key: PrivateKey;
         let old_public_key: PublicKey;
 
         (old_private_key, old_public_key) = key_map[&outpoint0].clone();
 
-        let message: String;
-
-        message = String::from(&outpoint0.txid)
+        let message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
             + &tx_out0.pk_script.public_key_hash;
 
-        sig_script1 = SignatureScript {
+        let sig_script1 = SignatureScript {
             signature: sign_and_verify::sign(&message, &old_private_key),
             full_public_key: old_public_key,
         };
@@ -422,21 +410,16 @@ mod tests {
         key_map.insert(outpoint0.clone(), (private_key0, public_key0));
         utxo.insert(outpoint0.clone(), tx_out0.clone());
 
-        //We create a signature script for the input of our new transaction
-        let sig_script1: SignatureScript;
-
         let old_private_key: PrivateKey;
         let old_public_key: PublicKey;
 
         (old_private_key, old_public_key) = sign_and_verify::create_keypair();
 
-        let message: String;
-
-        message = String::from(&outpoint0.txid)
+        let message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
             + &tx_out0.pk_script.public_key_hash;
 
-        sig_script1 = SignatureScript {
+        let sig_script1 = SignatureScript {
             signature: sign_and_verify::sign(&message, &old_private_key),
             full_public_key: old_public_key,
         };

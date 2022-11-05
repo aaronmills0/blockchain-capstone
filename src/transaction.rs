@@ -43,50 +43,53 @@ impl Transaction {
      *
      * The transaction list created is constantly transmitted so that the block generator can receive it
      */
+    #[allow(clippy::too_many_arguments)]
     pub fn transaction_generator(
-        max_num_outputs: usize,
-        mean_transaction_rate: f32,
-        duration: u32,
         transmitter: Sender<(Transaction, KeyMap)>,
+        max_num_outputs: usize,
+        transaction_mean: f32,
+        transaction_duration: u32,
+        mean_invalid_ratio: u32,
         mut utxo: UTXO,
         mut key_map: KeyMap,
     ) {
-        if max_num_outputs <= 0 {
-            warn!("Invalid input. The max number of receivers must be larger than zero and no larger than {} but was {}", utxo.len(), max_num_outputs);
-        }
-        if mean_transaction_rate <= 0.0 {
-            warn!("Invalid input. A non-positive mean for transaction rate is invalid for an exponential distribution but the mean was {}", mean_transaction_rate);
+        if transaction_mean <= 0.0 {
+            warn!("Invalid input. A non-positive mean for transaction rate is invalid for an exponential distribution but the mean was {}", transaction_mean);
         }
 
-        let lambda: f32 = 1.0 / mean_transaction_rate;
-        let exp: Exp<f32> = Exp::new(lambda).unwrap();
         let mut rng: ThreadRng = rand::thread_rng();
+        let mut invalid: bool;
+        let lambda: f32 = 1.0 / transaction_mean;
+        let exp: Exp<f32> = Exp::new(lambda).unwrap();
         let mut sample: f32;
         let mut normalized: f32;
         let mut transaction_rate: time::Duration;
-        info!("Original UTXO:");
-        for (key, value) in &utxo.0 {
-            info!("{:#?}: {:#?}", key, value);
-        }
         let mut transaction_counter = 0;
         loop {
+            // Invalid transactions happen with a probability of 1 / mean_invalid_ratio
+            // There is no chance of invalid transactions if mean_invalid ratio is set to 0
+            if mean_invalid_ratio == 0 {
+                invalid = false;
+            } else {
+                invalid = (rng.gen_range(1..=mean_invalid_ratio)) == 1;
+            }
+
             sample = exp.sample(&mut rng);
             // For an exponential distribution (with lambda > 0), the values range from (0, lambda].
             // Since mean = 1 / lambda, multiply the sample by the mean to normalize.
-            normalized = sample * mean_transaction_rate;
+            normalized = sample * transaction_mean;
             // Get the time between transactions generated as a duration
-            transaction_rate = time::Duration::from_secs((duration * normalized as u32) as u64);
+            transaction_rate =
+                time::Duration::from_secs((transaction_duration * normalized as u32) as u64);
             // Sleep to mimic the time between creation of transactions
             thread::sleep(transaction_rate);
 
             let transaction =
-                Self::create_transaction(&utxo, &mut key_map, &mut rng, max_num_outputs);
+                Self::create_transaction(&utxo, &mut key_map, &mut rng, max_num_outputs, invalid);
             transaction_counter += 1;
             info!("{} Transactions Created", transaction_counter);
-            utxo.update(&transaction);
-            info!("Updated UTXO");
-            for (key, value) in &utxo.0 {
-                info!("{:#?}: {:#?}", key, value);
+            if !invalid {
+                utxo.update(&transaction);
             }
             transmitter.send((transaction, key_map.clone())).unwrap();
         }
@@ -97,7 +100,29 @@ impl Transaction {
         key_map: &mut KeyMap,
         rng: &mut ThreadRng,
         max_num_outputs: usize,
+        invalid: bool,
     ) -> Transaction {
+        // Set a random invalid flag to true if this is intended to be an invalid transaction
+        let mut invalid_input: bool = false;
+        let mut invalid_sum: bool = false;
+        let mut invalid_verification: bool = false;
+        if invalid {
+            match rng.gen_range(1..=3) {
+                1 => {
+                    invalid_input = true;
+                    warn!("Expecting an invalid transaction since an input is not in the utxo");
+                }
+                2 => {
+                    invalid_sum = true;
+                    warn!("Expecting an invalid transaction since the total output balance is larger than the total input balance");
+                }
+                _ => {
+                    invalid_verification = true;
+                    warn!("Expecting an invalid transaction since the verification script fails");
+                }
+            }
+        }
+
         let mut unspent_txos: Vec<Outpoint> = Vec::new();
         for (utxo_key, _) in utxo.iter() {
             unspent_txos.push(utxo_key.clone());
@@ -131,6 +156,11 @@ impl Transaction {
         }
         output_values[0] += available_balance - output_values_sum;
 
+        // If the invalid sum flag is set, ensure the output balance is greater than the input
+        if invalid_sum {
+            output_values[0] += 1
+        }
+
         let mut tx_inputs: Vec<TxIn> = Vec::new();
         let mut tx_outputs: Vec<TxOut> = Vec::new();
         let mut outpoint: Outpoint;
@@ -141,8 +171,9 @@ impl Transaction {
         let mut old_public_key: PublicKey;
         let mut message: String;
         let mut pk_script: PublicKeyScript;
-        for i in 0..num_inputs {
-            outpoint = utxo_keys[i].clone();
+        let invalid_index: usize = rng.gen_range(0..num_inputs);
+        for (i, utxo_key) in utxo_keys.iter().enumerate().take(num_inputs) {
+            outpoint = utxo_key.clone();
 
             (old_private_key, old_public_key) = key_map[&outpoint].clone();
 
@@ -150,21 +181,37 @@ impl Transaction {
                 + &outpoint.index.to_string()
                 + &utxo[&outpoint].pk_script.public_key_hash;
 
+            // Set the public key as the old public key unless the invalid verification flag is set
+            // and this is the chosen index for ensuring an invalid signature script
+            let mut public_key = old_public_key;
+            if invalid_verification && i == invalid_index {
+                let (_, bad_public_key) = sign_and_verify::create_keypair();
+                public_key = bad_public_key;
+            }
+
             sig_script = SignatureScript {
                 signature: sign_and_verify::sign(&message, &old_private_key),
-                full_public_key: old_public_key,
+                full_public_key: public_key,
             };
 
-            key_map.remove(&outpoint); // Remove the old key pair
+            if !invalid {
+                key_map.remove(&outpoint); // Remove the old key pair
+            }
+
+            // If the invalid input flag is set and this is the chosen invalid input,
+            // Rehash the txid so that the output is faulty
+            if invalid_input && i == invalid_index {
+                outpoint.txid = hash::hash_as_string(&outpoint.txid);
+            }
 
             tx_inputs.push(TxIn {
-                outpoint: outpoint,
-                sig_script: sig_script,
+                outpoint,
+                sig_script,
             });
         }
 
         let mut key_vec: Vec<(PrivateKey, PublicKey)> = Vec::new();
-        for j in 0..num_outputs {
+        for output_value in output_values.iter().take(num_outputs) {
             (new_private_key, new_public_key) = sign_and_verify::create_keypair();
 
             pk_script = PublicKeyScript {
@@ -175,8 +222,8 @@ impl Transaction {
             key_vec.push((new_private_key, new_public_key));
 
             tx_outputs.push(TxOut {
-                value: output_values[j],
-                pk_script: pk_script,
+                value: *output_value,
+                pk_script,
             });
         }
         info!(
@@ -184,20 +231,20 @@ impl Transaction {
             num_inputs, num_outputs
         );
         let transaction = Transaction {
-            tx_inputs: tx_inputs,
-            tx_outputs: tx_outputs,
+            tx_inputs,
+            tx_outputs,
         };
 
-        let txid: String = hash::hash_as_string(&transaction);
-
-        // Update the key_map
-
-        for k in 0..num_outputs {
-            outpoint = Outpoint {
-                txid: txid.clone(),
-                index: k as u32,
-            };
-            key_map.insert(outpoint, key_vec[k].clone());
+        // Update the key_map but only if the transaction is valid
+        if !invalid {
+            let txid: String = hash::hash_as_string(&transaction);
+            for (k, key) in key_vec.iter().enumerate().take(num_outputs) {
+                outpoint = Outpoint {
+                    txid: txid.clone(),
+                    index: k as u32,
+                };
+                key_map.insert(outpoint, key.clone());
+            }
         }
 
         return transaction;
@@ -222,6 +269,7 @@ pub struct Outpoint {
     pub index: u32,
 }
 
+#[allow(clippy::derive_hash_xor_eq)]
 impl Hash for Outpoint {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.txid.hash(state);
@@ -275,21 +323,16 @@ mod tests {
         key_map.insert(outpoint0.clone(), (private_key0, public_key0));
         utxo.insert(outpoint0.clone(), tx_out0.clone());
 
-        //We create a signature script for the input of our new transaction
-        let sig_script1: SignatureScript;
-
         let old_private_key: PrivateKey;
         let old_public_key: PublicKey;
 
         (old_private_key, old_public_key) = key_map[&outpoint0].clone();
 
-        let message: String;
-
-        message = String::from(&outpoint0.txid)
+        let message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
             + &tx_out0.pk_script.public_key_hash;
 
-        sig_script1 = SignatureScript {
+        let sig_script1 = SignatureScript {
             signature: sign_and_verify::sign(&message, &old_private_key),
             full_public_key: old_public_key,
         };
