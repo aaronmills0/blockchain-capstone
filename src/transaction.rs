@@ -1,6 +1,7 @@
 use crate::hash;
 use crate::sign_and_verify;
 use crate::sign_and_verify::{PrivateKey, PublicKey, Signature, Verifier};
+use crate::simulation::KeyMap;
 use crate::utxo::UTXO;
 
 use log::{info, warn};
@@ -8,19 +9,17 @@ use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
 use rand::Rng;
 use rand_distr::{Distribution, Exp};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::mpsc::{Receiver, Sender};
 use std::vec::Vec;
 use std::{thread, time};
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Transaction {
     pub tx_inputs: Vec<TxIn>,
-    pub txin_count: u32,
     pub tx_outputs: Vec<TxOut>,
-    pub txout_count: u32,
 }
 
 /**
@@ -52,7 +51,7 @@ impl Transaction {
         transmitter: Sender<Transaction>,
         receiver: Receiver<UTXO>,
         mut utxo: UTXO,
-        mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)>,
+        mut key_map: KeyMap,
     ) {
         if max_num_outputs <= 0 {
             warn!("Invalid input. The max number of receivers must be larger than zero and no larger than {} but was {}", utxo.len(), max_num_outputs);
@@ -84,7 +83,7 @@ impl Transaction {
             thread::sleep(transaction_rate);
 
             let transaction =
-                Self::create_transaction(&utxo, &mut key_map, &mut rng, max_num_outputs);
+                Self::create_rng_transaction(&utxo, &mut key_map, &mut rng, max_num_outputs);
             transaction_counter += 1;
             info!("{} Transactions Created", transaction_counter);
             utxo.update(&transaction);
@@ -101,7 +100,7 @@ impl Transaction {
         }
     }
 
-    fn create_transaction(
+    fn create_rng_transaction(
         utxo: &UTXO,
         key_map: &mut HashMap<Outpoint, (PrivateKey, PublicKey)>,
         rng: &mut ThreadRng,
@@ -194,9 +193,7 @@ impl Transaction {
         );
         let transaction = Transaction {
             tx_inputs: tx_inputs,
-            txin_count: num_inputs as u32,
             tx_outputs: tx_outputs,
-            txout_count: num_outputs as u32,
         };
 
         let txid: String = hash::hash_as_string(&transaction);
@@ -215,19 +212,19 @@ impl Transaction {
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct TxIn {
     pub outpoint: Outpoint,
     pub sig_script: SignatureScript,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct SignatureScript {
     pub signature: Signature,
     pub full_public_key: PublicKey,
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug)]
 pub struct Outpoint {
     pub txid: String,
     pub index: u32,
@@ -240,13 +237,13 @@ impl Hash for Outpoint {
     }
 }
 
-#[derive(Clone, Serialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct TxOut {
     pub value: u32,
     pub pk_script: PublicKeyScript,
 }
 
-#[derive(Clone, Serialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PublicKeyScript {
     pub public_key_hash: String,
     pub verifier: Verifier,

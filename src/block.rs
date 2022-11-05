@@ -6,18 +6,18 @@ use crate::{hash, simulation};
 use log::info;
 use rand::rngs::ThreadRng;
 use rand_distr::{Distribution, Exp};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::mpsc::{Receiver, Sender};
 use std::{thread, time};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Block {
     pub header: BlockHeader,
     pub merkle: Merkle,
     pub transactions: Vec<Transaction>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct BlockHeader {
     pub previous_hash: String,
     pub merkle_root: String,

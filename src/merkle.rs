@@ -1,10 +1,10 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::hash::hash_as_string;
 use crate::transaction::Transaction;
 use std::collections::VecDeque;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Merkle {
     pub tree: Vec<String>,
 }

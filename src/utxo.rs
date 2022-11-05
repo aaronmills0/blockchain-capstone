@@ -2,6 +2,8 @@ use crate::hash::hash_as_string;
 use crate::sign_and_verify::{PublicKey, Signature};
 use crate::transaction::{Outpoint, Transaction, TxIn, TxOut};
 use log::warn;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
@@ -16,8 +18,9 @@ use std::ops::{Deref, DerefMut};
  * the public key script, which is used to verify the arguments (pushed onto the stack)
  * in the transaction input.
  */
-#[derive(Clone)]
-pub struct UTXO(pub HashMap<Outpoint, TxOut>);
+#[serde_as]
+#[derive(Clone, Serialize, Deserialize)]
+pub struct UTXO(#[serde_as(as = "Vec<(_, _)>")] pub HashMap<Outpoint, TxOut>);
 
 impl Deref for UTXO {
     type Target = HashMap<Outpoint, TxOut>;

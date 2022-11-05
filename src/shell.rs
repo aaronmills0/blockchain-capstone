@@ -1,6 +1,6 @@
 use crate::simulation::start;
 
-use chrono::prelude::*;
+use chrono::Local;
 use log::{info, warn};
 use std::env;
 use std::fs;

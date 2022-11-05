@@ -1,5 +1,6 @@
 mod block;
 mod hash;
+mod load;
 mod merkle;
 mod shell;
 mod sign_and_verify;

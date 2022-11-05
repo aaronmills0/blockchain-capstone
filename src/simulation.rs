@@ -1,3 +1,7 @@
+use serde::Deserialize;
+use serde::Serialize;
+use serde_with::serde_as;
+
 use crate::block::Block;
 use crate::hash;
 use crate::sign_and_verify;
@@ -5,6 +9,8 @@ use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
 use crate::transaction::{Outpoint, PublicKeyScript, Transaction, TxOut};
 use crate::utxo::UTXO;
 
+use std::ops::Deref;
+use std::ops::DerefMut;
 use std::{collections::HashMap, sync::mpsc, thread};
 
 static BLOCK_MEAN: f32 = 1.0;
@@ -14,11 +20,28 @@ static MAX_NUM_OUTPUTS: usize = 3;
 static TRANSACTION_MEAN: f32 = 1.0;
 static TRANSACTION_MULTIPLIER: u32 = 5;
 
+#[serde_as]
+#[derive(Clone, Serialize, Deserialize)]
+pub struct KeyMap(#[serde_as(as = "Vec<(_, _)>")] pub HashMap<Outpoint, (PrivateKey, PublicKey)>);
+
+impl Deref for KeyMap {
+    type Target = HashMap<Outpoint, (PrivateKey, PublicKey)>;
+    fn deref(&self) -> &HashMap<Outpoint, (PrivateKey, PublicKey)> {
+        return &self.0;
+    }
+}
+
+impl DerefMut for KeyMap {
+    fn deref_mut(&mut self) -> &mut HashMap<Outpoint, (PrivateKey, PublicKey)> {
+        return &mut self.0;
+    }
+}
+
 #[allow(dead_code)] // To prevent warning for unused functions
 pub fn start() {
     let mut utxo: UTXO = UTXO(HashMap::new());
 
-    let mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)> = HashMap::new();
+    let mut key_map: KeyMap = KeyMap(HashMap::new());
     let (private_key0, public_key0) = sign_and_verify::create_keypair();
     let outpoint0: Outpoint = Outpoint {
         txid: "0".repeat(64),
