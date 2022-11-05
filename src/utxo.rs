@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
 /**
- * The UTXO is a map containing the Unspent Transaction (X) Outputs.
+ * The Utxo is a map containing the Unspent Transaction (X) Outputs.
  *
  * The key to this map comes from the Outpoint (see transactions.rs),
  * and is formed from the concatenation (or some other function that yields a unique key)
@@ -204,9 +204,7 @@ mod tests {
         (old_private_key0_1, old_public_key0_1) = key_map[&outpoint0_1].clone();
         (old_private_key0_2, old_public_key0_2) = key_map[&outpoint0_2].clone();
 
-        let mut message: String;
-
-        message = String::from(&outpoint0.txid)
+        let message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
             + &tx_out0.pk_script.public_key_hash;
 
@@ -220,7 +218,7 @@ mod tests {
             sig_script: sig_script1,
         };
 
-        message = String::from(&outpoint0_1.txid)
+        let message = String::from(&outpoint0_1.txid)
             + &outpoint0_1.index.to_string()
             + &tx_out0_1.pk_script.public_key_hash;
 
@@ -234,7 +232,7 @@ mod tests {
             sig_script: sig_script1_1,
         };
 
-        message = String::from(&outpoint0_2.txid)
+        let message = String::from(&outpoint0_2.txid)
             + &outpoint0_2.index.to_string()
             + &tx_out0_2.pk_script.public_key_hash;
 

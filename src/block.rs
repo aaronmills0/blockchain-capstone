@@ -28,6 +28,8 @@ pub struct BlockHeader {
     pub nonce: u32,
 }
 
+pub static mut LENGTH: usize = 1;
+
 impl Block {
     /**
      * Take the receiver object and initial utxo as input
@@ -129,6 +131,9 @@ impl Block {
             }
             block_sim_block_tx.send(block.clone()).unwrap();
             blockchain.push(block);
+            unsafe {
+                LENGTH += 1;
+            }
             Block::print_blockchain(&blockchain);
             block_sim_utxo_tx.send(utxo.clone()).unwrap();
             block_sim_keymap_tx.send(keymap.clone()).unwrap();
