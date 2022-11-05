@@ -436,6 +436,76 @@ mod tests {
         return (transactions, utxo);
     }
 
+    fn create_invalid_transactions_nomatch_signature() -> (std::vec::Vec<Transaction>, UTXO) {
+        //We first insert an unspent output in the utxo to which we will
+        //refer later on.
+        let mut utxo: UTXO = UTXO(HashMap::new());
+        let mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)> = HashMap::new();
+        let (private_key0, public_key0) = sign_and_verify::create_keypair();
+        let outpoint0: Outpoint = Outpoint {
+            txid: "0".repeat(64),
+            index: 0,
+        };
+
+        let tx_out0: TxOut = TxOut {
+            value: 500,
+            pk_script: PublicKeyScript {
+                public_key_hash: hash::hash_as_string(&public_key0),
+                verifier: Verifier {},
+            },
+        };
+
+        key_map.insert(outpoint0.clone(), (private_key0, public_key0));
+        utxo.insert(outpoint0.clone(), tx_out0.clone());
+
+        //We create a signature script for the input of our new transaction
+        let mut sig_script1: SignatureScript;
+
+        let mut old_private_key: PrivateKey;
+        let mut old_public_key: PublicKey;
+
+        (old_private_key, old_public_key) = sign_and_verify::create_keypair();
+
+        let mut message: String;
+
+        message = String::from(&outpoint0.txid)
+            + &outpoint0.index.to_string()
+            + &tx_out0.pk_script.public_key_hash;
+
+        sig_script1 = SignatureScript {
+            signature: sign_and_verify::sign(&message, &old_private_key),
+            full_public_key: old_public_key,
+        };
+
+        let tx_in1: TxIn = TxIn {
+            outpoint: outpoint0,
+            sig_script: sig_script1,
+        };
+
+        //We create a new keypair corresponding to our new transaction which allows us to create its tx_out
+
+        let (private_key1, public_key1) = sign_and_verify::create_keypair();
+
+        let tx_out1: TxOut = TxOut {
+            value: 700,
+            pk_script: PublicKeyScript {
+                public_key_hash: hash::hash_as_string(&public_key1),
+                verifier: Verifier {},
+            },
+        };
+
+        let mut transaction1: Transaction = Transaction {
+            tx_inputs: Vec::from([tx_in1]),
+            txin_count: 1,
+            tx_outputs: Vec::from([tx_out1]),
+            txout_count: 1,
+        };
+
+        let mut transactions: Vec<Transaction> = Vec::from([transaction1]);
+
+        return (transactions, utxo);
+    }
+
     #[test]
     fn test_verify_and_update_valid_transactions() {
         let mut utxo: UTXO = UTXO(HashMap::new());
@@ -488,6 +558,31 @@ mod tests {
 
     #[test]
     fn test_verify_and_update_invalid_input_nomatch_output() {
+        let mut utxo_original: UTXO = UTXO(HashMap::new());
+        let mut utxo_new: UTXO = UTXO(HashMap::new());
+        let mut transactions: Vec<Transaction>;
+
+        (transactions, utxo_original) =
+            create_invalid_transactions_no_output_corresponding_to_input();
+
+        let old_outpoint = transactions
+            .get(0)
+            .unwrap()
+            .tx_inputs
+            .get(0)
+            .unwrap()
+            .outpoint
+            .clone();
+
+        (transactions, utxo_new) = Block::verify_and_update(transactions, utxo_original.clone());
+
+        assert_eq!(utxo_new.len(), utxo_original.len());
+        assert_eq!(utxo_new.len(), 0);
+        assert_eq!(0, transactions.len());
+    }
+
+    #[test]
+    fn test_verify_and_update_invalid_nomatch_signature() {
         let mut utxo_original: UTXO = UTXO(HashMap::new());
         let mut utxo_new: UTXO = UTXO(HashMap::new());
         let mut transactions: Vec<Transaction>;
