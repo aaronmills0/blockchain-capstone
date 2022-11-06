@@ -48,7 +48,7 @@ impl Transaction {
         max_num_outputs: usize,
         mean_transaction_rate: f32,
         multiplier: u32,
-        transmitter: Sender<Transaction>,
+        transmitter: Sender<(Transaction, KeyMap)>,
         receiver: Receiver<UTXO>,
         mut utxo: UTXO,
         mut key_map: KeyMap,
@@ -91,7 +91,7 @@ impl Transaction {
             for (key, value) in &utxo.0 {
                 info!("{:#?}: {:#?}", key, value);
             }
-            transmitter.send(transaction).unwrap();
+            transmitter.send((transaction, key_map.clone())).unwrap();
 
             let new_utxo = receiver.try_recv();
             if new_utxo.is_ok() {
@@ -102,7 +102,7 @@ impl Transaction {
 
     fn create_rng_transaction(
         utxo: &UTXO,
-        key_map: &mut HashMap<Outpoint, (PrivateKey, PublicKey)>,
+        key_map: &mut KeyMap,
         rng: &mut ThreadRng,
         max_num_outputs: usize,
     ) -> Transaction {

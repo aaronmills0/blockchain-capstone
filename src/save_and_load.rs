@@ -15,29 +15,29 @@ use crate::simulation::KeyMap;
 use crate::transaction::Outpoint;
 use crate::{block::Block, utxo::UTXO};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Config {
-    block_mean: f32,
-    block_multiplier: u32,
-    block_size: u32,
-    max_tx_outputs: usize,
-    tx_mean: f32,
-    tx_multiplier: u32,
-    invalid_tx_mean: f32,
-    invalid_tx_sigma: f32,
+    pub block_mean: f32,
+    pub block_multiplier: u32,
+    pub block_size: u32,
+    pub max_tx_outputs: usize,
+    pub tx_mean: f32,
+    pub tx_multiplier: u32,
+    pub invalid_tx_mean: f32,
+    pub invalid_tx_sigma: f32,
 }
 
 pub fn serialize_json(
-    blockchain: Vec<Block>,
-    utxo: UTXO,
-    keymap: KeyMap,
-    sim_config: Config,
+    blockchain: &Vec<Block>,
+    utxo: &UTXO,
+    keymap: &KeyMap,
+    sim_config: &Config,
     file_prefix: Option<String>,
 ) {
-    let blockchain_json = serde_json::to_value(&blockchain);
-    let utxo_json = serde_json::to_value(&utxo);
-    let keymap_json = serde_json::to_value(&keymap);
-    let config_json = serde_json::to_value(&sim_config);
+    let blockchain_json = serde_json::to_value(blockchain);
+    let utxo_json = serde_json::to_value(utxo);
+    let keymap_json = serde_json::to_value(keymap);
+    let config_json = serde_json::to_value(sim_config);
 
     if blockchain_json.is_err() {
         error!("Failed to serialize blocks!");
@@ -407,7 +407,13 @@ mod tests {
             invalid_tx_sigma: 1.0,
         };
 
-        serialize_json(blockchain, utxo, keymap, config, Some(String::from("test")));
+        serialize_json(
+            &blockchain,
+            &utxo,
+            &keymap,
+            &config,
+            Some(String::from("test")),
+        );
     }
 
     #[test]

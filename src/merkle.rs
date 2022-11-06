@@ -4,7 +4,7 @@ use crate::hash::hash_as_string;
 use crate::transaction::Transaction;
 use std::collections::VecDeque;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Merkle {
     pub tree: Vec<String>,
 }

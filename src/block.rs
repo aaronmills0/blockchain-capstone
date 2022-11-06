@@ -1,23 +1,26 @@
 use crate::merkle::Merkle;
+use crate::simulation::KeyMap;
 use crate::transaction::Transaction;
 use crate::utxo::UTXO;
 use crate::{hash, simulation};
 
+use bitcoin::hashes::sha1::Hash;
 use log::info;
 use rand::rngs::ThreadRng;
 use rand_distr::{Distribution, Exp};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::{thread, time};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Block {
     pub header: BlockHeader,
     pub merkle: Merkle,
     pub transactions: Vec<Transaction>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct BlockHeader {
     pub previous_hash: String,
     pub merkle_root: String,
@@ -38,8 +41,11 @@ impl Block {
      * tx.send(transactions);  
      */
     pub fn block_generator(
-        receiver: Receiver<Transaction>,
-        transmitter: Sender<UTXO>,
+        tx_receiver: Receiver<(Transaction, KeyMap)>,
+        utxo_transmitter: Sender<UTXO>,
+        block_transmitter: Sender<Block>,
+        utxo_sim_transmitter: Sender<UTXO>,
+        keymap_transmitter: Sender<KeyMap>,
         mut utxo: UTXO,
         mean: f32,
         multiplier: u32,
@@ -74,11 +80,18 @@ impl Block {
         let mut counter: u32;
         let mut merkle: Merkle;
         let mut transactions: Vec<Transaction>;
+        let mut keymap_map: HashMap<String, KeyMap>;
+        let mut keymap: KeyMap;
+        let mut tx: Transaction;
         loop {
             transactions = Vec::new();
+            keymap_map = HashMap::new();
+            keymap = KeyMap(HashMap::new());
             counter = 0;
             while counter < simulation::BLOCK_SIZE {
-                transactions.push(receiver.recv().unwrap());
+                (tx, keymap) = tx_receiver.recv().unwrap();
+                keymap_map.insert(hash::hash_as_string(&tx), keymap.clone());
+                transactions.push(tx);
                 counter += 1;
             }
 
@@ -95,6 +108,18 @@ impl Block {
             if transactions.len() == 0 {
                 continue;
             }
+            let mut found = false;
+            for transaction in transactions.iter().rev() {
+                let hash = hash::hash_as_string(transaction);
+                if keymap_map.contains_key(&hash) {
+                    keymap = keymap_map.remove(&hash).unwrap();
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                panic!("KeyMap not found!");
+            }
             merkle = Merkle::create_merkle_tree(&transactions);
             block = Block {
                 header: BlockHeader {
@@ -105,9 +130,11 @@ impl Block {
                 merkle,
                 transactions,
             };
+            block_transmitter.send(block.clone());
             blockchain.push(block);
             Block::print_blockchain(&blockchain);
-            transmitter.send(utxo.clone()).unwrap();
+            utxo_transmitter.send(utxo.clone());
+            keymap_transmitter.send(keymap.clone());
         }
     }
 
