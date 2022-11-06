@@ -264,7 +264,7 @@ mod tests {
     static MAX_NUM_OUTPUTS: usize = 3;
 
     #[test]
-    fn create_transaction_valid() {
+    fn test_create_transaction_valid() {
         //We first insert an unspent output in the utxo to which we will
         //refer later on.
         let mut utxo: UTXO = UTXO(HashMap::new());
@@ -330,9 +330,11 @@ mod tests {
         };
 
         assert!(
-            transaction1.tx_outputs.len() > 0
+            transaction1.tx_outputs.len() == 1
                 && transaction1.tx_outputs.len() <= utxo.len()
                 && transaction1.tx_outputs.len() <= MAX_NUM_OUTPUTS
+                && transaction1.tx_outputs.get(0).unwrap().value == 500
+                && transaction1.tx_inputs.len() == 1
         );
     }
 }
