@@ -134,6 +134,7 @@ impl Block {
             blockchain.push(block);
             Block::print_blockchain(&blockchain);
             utxo_transmitter.send(utxo.clone());
+            utxo_sim_transmitter.send(utxo.clone());
             keymap_transmitter.send(keymap.clone());
         }
     }

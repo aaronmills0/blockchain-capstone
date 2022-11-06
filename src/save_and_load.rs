@@ -1,8 +1,10 @@
 use chrono::Local;
 use log::error;
+use log::warn;
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 use serde_json::Value;
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::fs::File;
@@ -41,18 +43,22 @@ pub fn serialize_json(
 
     if blockchain_json.is_err() {
         error!("Failed to serialize blocks!");
+        panic!();
     }
 
     if utxo_json.is_err() {
         error!("Failed to serialize utxo!");
+        panic!();
     }
 
     if keymap_json.is_err() {
         error!("Failed to serialize utxo!");
+        panic!();
     }
 
     if config_json.is_err() {
         error!("Failed to serialize simulation configuration data!");
+        panic!();
     }
 
     let mut map = Map::new();
@@ -65,11 +71,11 @@ pub fn serialize_json(
 
     if env::consts::OS == "windows" {
         if fs::create_dir("config\\").is_err() {
-            error!("Failed to create directory!");
+            warn!("Failed to create directory! It may already exist, or permissions are needed.");
         }
     } else {
         if fs::create_dir("config/").is_err() {
-            error!("Failed to create directory!");
+            warn!("Failed to create directory! It may already exist, or permissions are needed.");
         }
     }
 
@@ -103,14 +109,7 @@ pub fn serialize_json(
     }
 }
 
-pub fn deserialize_json(
-    filepath: &str,
-) -> (
-    Vec<Block>,
-    UTXO,
-    Vec<(Outpoint, (PrivateKey, PublicKey))>,
-    Config,
-) {
+pub fn deserialize_json(filepath: &str) -> (Vec<Block>, UTXO, KeyMap, Config) {
     let data = fs::read_to_string(filepath);
     if data.is_err() {
         println!("Failed to load file. {:?}", data.err());
@@ -125,9 +124,6 @@ pub fn deserialize_json(
         .as_array()
         .unwrap()
         .to_owned();
-    for block in blockchain_json.clone() {
-        println!("{}", block);
-    }
     let utxo_json = json.get("utxo").unwrap().to_owned();
     let keymap_json = json.get("keymap").unwrap().as_array().unwrap().to_owned();
     let config_json = json.get("config").unwrap().to_owned();
@@ -156,7 +152,13 @@ pub fn deserialize_json(
         panic!();
     }
 
-    return (blockchain, utxo.unwrap(), keymap, config.unwrap());
+    let mut key_map = KeyMap(HashMap::new());
+
+    for (outpoint, key_pair) in keymap {
+        key_map.insert(outpoint, key_pair);
+    }
+
+    return (blockchain, utxo.unwrap(), key_map, config.unwrap());
 }
 
 #[cfg(test)]
@@ -407,19 +409,19 @@ mod tests {
             invalid_tx_sigma: 1.0,
         };
 
-        serialize_json(
-            &blockchain,
-            &utxo,
-            &keymap,
-            &config,
-            Some(String::from("test")),
-        );
+        // serialize_json(
+        //     &blockchain,
+        //     &utxo,
+        //     &keymap,
+        //     &config,
+        //     Some(String::from("test")),
+        // );
     }
 
     #[test]
     fn test_deserialize_json() {
-        let path = "config/test_2022-11-04-12-21-22.json";
+        let path = "config/state_2022-11-06-14-40-29.json";
 
-        let (blockchain, utxo, keymap, config) = deserialize_json(path);
+        // let (blockchain, utxo, keymap, config) = deserialize_json(path);
     }
 }

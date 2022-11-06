@@ -82,10 +82,12 @@ pub fn shell() {
             "save" => unsafe {
                 if SIM_STATUS && tx_sim_option.is_some() {
                     let tx_sim = tx_sim_option.unwrap();
-                    tx_sim.send(String::from("save"));
+                    if tx_sim.send(String::from("save")).is_err() {
+                        warn!("Failed to send command to the simulation");
+                    }
                     tx_sim_option = Some(tx_sim);
                 } else {
-                    info!("Simulation has not started");
+                    warn!("Simulation has not started");
                 }
             },
             _ => {
