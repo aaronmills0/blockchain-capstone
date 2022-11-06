@@ -30,7 +30,6 @@ pub fn check_for_fork(block: &Block, chain: &Vec<Block>) -> bool {
     let prev_hash = &block.header.previous_hash;
     let head_hash = hash::hash_as_string(&chain.last().unwrap().header);
     if head_hash.eq(prev_hash) {
-        println!("here");
         info!("Block {} has been introduced, no fork detected", prev_hash);
         return false;
     } else {
