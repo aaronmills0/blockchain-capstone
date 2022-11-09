@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 #[cfg(test)]
 mod tests {
     use super::{HashMap, Transaction, UTXO};
@@ -88,7 +90,11 @@ mod tests {
         let mut utxo: UTXO = UTXO(HashMap::new());
         let mut transaction: Transaction;
 
+        let start = Instant::now();
         (transaction, utxo) = one_input_diff_output_transaction_valid(2);
+        let duration = start.elapsed();
+
+        println!("Time elapsed is: {:?}", duration);
 
         assert_eq!(transaction.tx_outputs.len(), 2);
     }
