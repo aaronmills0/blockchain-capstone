@@ -95,7 +95,7 @@ impl Block {
             };
             let block_copy = block.clone();
             //Randomly Injects Fork
-            if rng.gen_range(1..=2) == 1{
+            if rng.gen_range(1..=10) == 1{
                 let block_copy2 = block_copy.clone();
                 transmitter_verifier.send(block_copy2).unwrap();
                 }

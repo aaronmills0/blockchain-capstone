@@ -9,7 +9,7 @@ pub fn chain_validator(receiver: Receiver<Block>, mut utxo: UTXO, mut chain: Vec
     'main: loop {
         let incoming_block = receiver.recv().unwrap();
 
-        if check_for_fork(&incoming_block, &chain){
+        if fork_exists(&incoming_block, &chain){
             continue;
         }
 
@@ -25,7 +25,7 @@ pub fn chain_validator(receiver: Receiver<Block>, mut utxo: UTXO, mut chain: Vec
     }
 }
 
-pub fn check_for_fork(block: &Block, chain: &Vec<Block>) -> bool {
+pub fn fork_exists(block: &Block, chain: &Vec<Block>) -> bool {
     //Check prev block hash against newest validated block
     let prev_hash = &block.header.previous_hash;
     let head_hash = hash::hash_as_string(&chain.last().unwrap().header);
@@ -51,7 +51,7 @@ mod tests {
     use crate::block::{Block, BlockHeader};
     use crate::hash;
     use crate::merkle::Merkle;
-    use crate::validator::check_for_fork;
+    use crate::validator::fork_exists;
 
     #[test]
     fn force_fork() {
@@ -98,9 +98,9 @@ mod tests {
         let mut blockchain_copy = blockchain.clone();
         let block1_copy = block1.clone();
 
-        assert!(check_for_fork(&block1, &blockchain) == false);
+        assert!(fork_exists(&block1, &blockchain) == false);
         blockchain_copy.push(block1_copy);
 
-        assert!(check_for_fork(&block2, &blockchain_copy) == true);
+        assert!(fork_exists(&block2, &blockchain_copy) == true);
     }
 }
