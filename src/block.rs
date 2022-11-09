@@ -1,5 +1,7 @@
 use crate::merkle::Merkle;
 use crate::transaction::Transaction;
+use crate::transaction::TxIn;
+use crate::transaction::TxOut;
 use crate::utxo::UTXO;
 use crate::{hash, simulation};
 
@@ -7,6 +9,7 @@ use log::info;
 use rand::rngs::ThreadRng;
 use rand_distr::{Distribution, Exp};
 use serde::Serialize;
+use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::{thread, time};
 
