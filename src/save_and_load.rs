@@ -69,14 +69,13 @@ pub fn serialize_json(
 
     let json: Value = serde_json::Value::Object(map);
 
-    if env::consts::OS == "windows" {
-        if fs::create_dir("config\\").is_err() {
-            warn!("Failed to create directory! It may already exist, or permissions are needed.");
-        }
+    let slash = if env::consts::OS == "windows" {
+        "\\"
     } else {
-        if fs::create_dir("config/").is_err() {
-            warn!("Failed to create directory! It may already exist, or permissions are needed.");
-        }
+        "/"
+    };
+    if fs::create_dir("config".to_owned() + slash).is_err() {
+        warn!("Failed to create directory! It may already exist, or permissions are needed.");
     }
 
     let cwd = std::env::current_dir().unwrap();
