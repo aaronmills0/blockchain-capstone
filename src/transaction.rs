@@ -80,7 +80,7 @@ impl Transaction {
             thread::sleep(transaction_rate);
 
             let transaction =
-                Self::create_rng_transaction(&utxo, &mut key_map, &mut rng, max_num_outputs);
+                Self::create_transaction(&utxo, &mut key_map, &mut rng, max_num_outputs);
             transaction_counter += 1;
             info!("{} Transactions Created", transaction_counter);
             utxo.update(&transaction);
@@ -241,13 +241,13 @@ pub struct PublicKeyScript {
     pub verifier: Verifier,
 }
 
+#[cfg(test)]
 mod tests {
     use super::hash;
     use crate::sign_and_verify;
     use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
     use crate::transaction::{Outpoint, PublicKeyScript, SignatureScript, TxIn, TxOut};
     use crate::{transaction::Transaction, utxo::UTXO};
-    use rand::rngs::ThreadRng;
     use std::collections::HashMap;
 
     static MAX_NUM_OUTPUTS: usize = 3;
@@ -313,9 +313,7 @@ mod tests {
 
         let mut transaction1: Transaction = Transaction {
             tx_inputs: Vec::from([tx_in1]),
-            txin_count: 1,
             tx_outputs: Vec::from([tx_out1]),
-            txout_count: 1,
         };
 
         assert!(

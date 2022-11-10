@@ -112,12 +112,9 @@ mod tests {
     use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
     use crate::transaction::{Outpoint, PublicKeyScript, SignatureScript, TxIn, TxOut};
     use crate::{transaction::Transaction, utxo::UTXO};
-    use rand::rngs::ThreadRng;
     use std::collections::HashMap;
 
-    static MAX_NUM_OUTPUTS: usize = 3;
-
-    fn create_three_transactions_valid() -> (std::vec::Vec<Transaction>) {
+    fn create_three_transactions_valid() -> std::vec::Vec<Transaction> {
         //We first insert an unspent output in the utxo to which we will
         //refer later on.
         let mut utxo: UTXO = UTXO(HashMap::new());
@@ -140,14 +137,14 @@ mod tests {
         utxo.insert(outpoint0.clone(), tx_out0.clone());
 
         //We create a signature script for the input of our new transaction
-        let mut sig_script1: SignatureScript;
+        let sig_script1: SignatureScript;
 
-        let mut old_private_key: PrivateKey;
-        let mut old_public_key: PublicKey;
+        let old_private_key: PrivateKey;
+        let old_public_key: PublicKey;
 
         (old_private_key, old_public_key) = key_map[&outpoint0].clone();
 
-        let mut message: String;
+        let message: String;
 
         message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
@@ -175,25 +172,19 @@ mod tests {
             },
         };
 
-        let mut transaction1: Transaction = Transaction {
+        let transaction1: Transaction = Transaction {
             tx_inputs: Vec::from([tx_in1.clone()]),
-            txin_count: 1,
             tx_outputs: Vec::from([tx_out1.clone()]),
-            txout_count: 1,
         };
 
-        let mut transaction2: Transaction = Transaction {
+        let transaction2: Transaction = Transaction {
             tx_inputs: Vec::from([tx_in1.clone()]),
-            txin_count: 1,
             tx_outputs: Vec::from([tx_out1.clone()]),
-            txout_count: 1,
         };
 
-        let mut transaction3: Transaction = Transaction {
+        let transaction3: Transaction = Transaction {
             tx_inputs: Vec::from([tx_in1]),
-            txin_count: 1,
             tx_outputs: Vec::from([tx_out1]),
-            txout_count: 1,
         };
 
         return Vec::from([transaction1, transaction2, transaction3]);
@@ -202,9 +193,8 @@ mod tests {
     use super::*;
     #[test]
     fn test_create_merkle_tree_even_number_of_transactions() {
-        let mut utxo: UTXO = UTXO(HashMap::new());
-        let mut transactions: Vec<Transaction>;
-        let mut used_transactions: Vec<Transaction>;
+        let transactions: Vec<Transaction>;
+        let used_transactions: Vec<Transaction>;
 
         transactions = create_three_transactions_valid();
 
@@ -223,8 +213,7 @@ mod tests {
 
     #[test]
     fn test_create_merkle_tree_odd_number_of_transactions() {
-        let mut utxo: UTXO = UTXO(HashMap::new());
-        let mut transactions: Vec<Transaction>;
+        let transactions: Vec<Transaction>;
 
         transactions = create_three_transactions_valid();
         let h0: String = hash_as_string(&transactions.get(0).unwrap());
