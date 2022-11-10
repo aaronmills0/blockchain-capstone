@@ -397,7 +397,7 @@ mod tests {
         keymap.insert(outpoint20, (private_key20, public_key20));
         keymap.insert(outpoint21, (private_key21, public_key21));
 
-        let config: Config = Config {
+        let _config: Config = Config {
             block_mean: 1.0,
             block_duration: 10,
             block_size: 1,
@@ -419,7 +419,7 @@ mod tests {
 
     #[test]
     fn test_deserialize_json() {
-        let path = "config/state_2022-11-06-14-40-29.json";
+        let _path = "config/state_2022-11-06-14-40-29.json";
 
         // let (blockchain, utxo, keymap, config) = deserialize_json(path);
     }

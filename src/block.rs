@@ -4,7 +4,6 @@ use crate::transaction::Transaction;
 use crate::utxo::UTXO;
 use crate::{hash, simulation};
 
-use bitcoin::blockdata::block;
 use log::info;
 use rand::Rng;
 use rand::rngs::ThreadRng;
@@ -44,7 +43,7 @@ impl Block {
      */
     pub fn block_generator(
         // block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx
-        block_tx: (Sender<Block>, Sender<UTXO>, Sender<KeyMap>),
+        block_tx: (Sender<Block>, Sender<UTXO>, Sender<KeyMap>, Sender<Block>),
         // transaction_block_transaction_keymap_rx
         block_rx: (Receiver<(Transaction, KeyMap)>,),
         mut utxo: UTXO,
@@ -56,7 +55,7 @@ impl Block {
             panic!("Invalid input. A non-positive mean is invalid for an exponential distribution");
         }
 
-        let (block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx) = block_tx;
+        let (block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx, block_validator_block_tx) = block_tx;
         let (transaction_block_transaction_keymap_rx,) = block_rx;
 
         let lambda: f32 = 1.0 / mean;
@@ -125,14 +124,14 @@ impl Block {
             //Randomly Injects Fork
             if rng.gen_range(1..=10) == 1{
                 let block_copy2 = block_copy.clone();
-                transmitter_verifier.send(block_copy2).unwrap();
+                block_validator_block_tx.send(block_copy2).unwrap();
                 }
-            block_sim_block_tx.send(block.clone());
+            block_sim_block_tx.send(block.clone()).unwrap();
             blockchain.push(block);
             Block::print_blockchain(&blockchain);
-            block_sim_utxo_tx.send(utxo.clone());
-            block_sim_keymap_tx.send(keymap.clone());
-            transmitter_verifier.send(block_copy).unwrap();
+            block_sim_utxo_tx.send(utxo.clone()).unwrap();
+            block_sim_keymap_tx.send(keymap.clone()).unwrap();
+            block_validator_block_tx.send(block_copy).unwrap();
 
         }
     }

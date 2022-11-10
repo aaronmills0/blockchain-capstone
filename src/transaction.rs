@@ -276,14 +276,14 @@ mod tests {
         utxo.insert(outpoint0.clone(), tx_out0.clone());
 
         //We create a signature script for the input of our new transaction
-        let mut sig_script1: SignatureScript;
+        let sig_script1: SignatureScript;
 
-        let mut old_private_key: PrivateKey;
-        let mut old_public_key: PublicKey;
+        let old_private_key: PrivateKey;
+        let old_public_key: PublicKey;
 
         (old_private_key, old_public_key) = key_map[&outpoint0].clone();
 
-        let mut message: String;
+        let message: String;
 
         message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
@@ -301,7 +301,7 @@ mod tests {
 
         //We create a new keypair corresponding to our new transaction which allows us to create its tx_out
 
-        let (private_key1, public_key1) = sign_and_verify::create_keypair();
+        let (_private_key1, public_key1) = sign_and_verify::create_keypair();
 
         let tx_out1: TxOut = TxOut {
             value: 500,
@@ -311,7 +311,7 @@ mod tests {
             },
         };
 
-        let mut transaction1: Transaction = Transaction {
+        let transaction1: Transaction = Transaction {
             tx_inputs: Vec::from([tx_in1]),
             tx_outputs: Vec::from([tx_out1]),
         };

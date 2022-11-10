@@ -47,6 +47,7 @@ pub fn fork_exists(block: &Block, chain: &Vec<Block>) -> bool {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use crate::block::{Block, BlockHeader};
     use crate::hash;

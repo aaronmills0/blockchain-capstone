@@ -90,12 +90,12 @@ pub fn start(rx_sim: Receiver<String>) {
         transactions: Vec::new(),
     };
     // Create the blockchain and add the genesis block to the chain
-    let mut blockchain: Vec<Block> = Vec::new();
     blockchain.push(genesis_block);
-    let mut blockchain_copy = blockchain.clone();
+    let blockchain_copy = blockchain.clone();
+    let blockchain_copy2 = blockchain.clone();
 
-    let mut utxo_copy = utxo.clone();
-    let mut utxo_copy2 = utxo.clone();
+    let utxo_copy = utxo.clone();
+    let utxo_copy2 = utxo.clone();
 
     // senderfile_receiverfile_object(s)sent_tx/rx
 
@@ -104,8 +104,9 @@ pub fn start(rx_sim: Receiver<String>) {
     let (block_sim_block_tx, block_sim_block_rx) = mpsc::channel();
     let (block_sim_utxo_tx, block_sim_utxo_rx) = mpsc::channel();
     let (block_sim_keymap_tx, block_sim_keymap_rx) = mpsc::channel();
+    let (block_validator_block_tx, block_validator_block_rx) = mpsc::channel();
 
-    let transaction_handle = thread::spawn(|| {
+    let _transaction_handle = thread::spawn(|| {
         Transaction::transaction_generator(
             MAX_NUM_OUTPUTS,
             TRANSACTION_MEAN,
@@ -116,18 +117,19 @@ pub fn start(rx_sim: Receiver<String>) {
         );
     });
 
-    let block_handle = thread::spawn(|| {
+    let _block_handle = thread::spawn(|| {
         Block::block_generator(
-            (block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx),
+            (block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx, block_validator_block_tx),
             (transaction_block_transaction_keymap_rx,),
             utxo_copy,
+            blockchain_copy,
             BLOCK_MEAN,
             BLOCK_DURATION,
         );
     });
 
-    let verifier_handle = thread::spawn(|| {
-        validator::chain_validator(rv, utxo_copy2, blockchain_copy)
+    let _verifier_handle = thread::spawn(|| {
+        validator::chain_validator(block_validator_block_rx, utxo_copy2, blockchain_copy2)
     });
     
     utxo = UTXO(HashMap::new());
