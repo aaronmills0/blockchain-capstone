@@ -1,15 +1,17 @@
+use crate::block::{Block, BlockHeader};
+use crate::hash;
+use crate::merkle::Merkle;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_with::serde_as;
-
-use crate::block::Block;
-use crate::hash;
 use crate::save_and_load;
 use crate::save_and_load::Config;
+
 use crate::sign_and_verify;
 use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
 use crate::transaction::{Outpoint, PublicKeyScript, Transaction, TxOut};
 use crate::utxo::UTXO;
+use crate::validator;    
 
 use std::ops::Deref;
 use std::ops::DerefMut;
@@ -72,6 +74,29 @@ pub fn start(rx_sim: Receiver<String>) {
     utxo.insert(outpoint0, tx_out0);
     utxo.insert(outpoint1, tx_out1);
 
+
+    // Create genesis block
+    // Create the merkle tree for the genesis block
+    let genesis_merkle: Merkle = Merkle {
+        tree: Vec::from(["0".repeat(64).to_string()]),
+    };
+    let genesis_block: Block = Block {
+        header: BlockHeader {
+            previous_hash: "0".repeat(64).to_string(),
+            merkle_root: genesis_merkle.tree.first().unwrap().clone(),
+            nonce: 0,
+        },
+        merkle: genesis_merkle,
+        transactions: Vec::new(),
+    };
+    // Create the blockchain and add the genesis block to the chain
+    blockchain.push(genesis_block);
+    let blockchain_copy = blockchain.clone();
+    let blockchain_copy2 = blockchain.clone();
+
+    let utxo_copy = utxo.clone();
+    let utxo_copy2 = utxo.clone();
+
     // senderfile_receiverfile_object(s)sent_tx/rx
 
     let (transaction_block_transaction_keymap_tx, transaction_block_transaction_keymap_rx) =
@@ -79,9 +104,9 @@ pub fn start(rx_sim: Receiver<String>) {
     let (block_sim_block_tx, block_sim_block_rx) = mpsc::channel();
     let (block_sim_utxo_tx, block_sim_utxo_rx) = mpsc::channel();
     let (block_sim_keymap_tx, block_sim_keymap_rx) = mpsc::channel();
+    let (block_validator_block_tx, block_validator_block_rx) = mpsc::channel();
 
-    let utxo_copy = utxo.clone();
-    let transaction_handle = thread::spawn(|| {
+    let _transaction_handle = thread::spawn(|| {
         Transaction::transaction_generator(
             MAX_NUM_OUTPUTS,
             TRANSACTION_MEAN,
@@ -92,15 +117,21 @@ pub fn start(rx_sim: Receiver<String>) {
         );
     });
 
-    let block_handle = thread::spawn(|| {
+    let _block_handle = thread::spawn(|| {
         Block::block_generator(
-            (block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx),
+            (block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx, block_validator_block_tx),
             (transaction_block_transaction_keymap_rx,),
             utxo_copy,
+            blockchain_copy,
             BLOCK_MEAN,
             BLOCK_DURATION,
         );
     });
+
+    let _verifier_handle = thread::spawn(|| {
+        validator::chain_validator(block_validator_block_rx, utxo_copy2, blockchain_copy2)
+    });
+    
     utxo = UTXO(HashMap::new());
     key_map = KeyMap(HashMap::new());
     loop {

@@ -31,7 +31,7 @@ pub fn shell() {
                 if !SIM_STATUS {
                     let (tx_sim_temp, rx_sim) = mpsc::channel();
                     tx_sim_option = Some(tx_sim_temp);
-                    let sim_handle = thread::spawn(|| start(rx_sim));
+                    let _sim_handle = thread::spawn(|| start(rx_sim));
                     SIM_STATUS = true;
                 } else {
                     info!("\nSimulation has already begun!\n");
@@ -72,10 +72,10 @@ pub fn shell() {
                 let filename1: &str = &format!("{}.log", n1);
                 dirpath_to.push_str(filename1);
                 let file_path = dir_path.join(filename1);
-                let file = File::create(file_path);
-                let copied = fs::copy(dirpath_from, dirpath_to);
+                let _file = File::create(file_path);
+                let _copied = fs::copy(dirpath_from, dirpath_to);
                 //we remove the old log file
-                let log_file = File::create(&dirpath_log).unwrap();
+                let _log_file = File::create(&dirpath_log).unwrap();
 
                 exit_program();
             }

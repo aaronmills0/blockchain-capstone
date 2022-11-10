@@ -122,6 +122,7 @@ impl UTXO {
             self.insert(outpoint, tx_out.clone());
         }
     }
+
 }
 
 #[cfg(test)]
@@ -251,7 +252,7 @@ mod tests {
 
         //We create a new keypair corresponding to our new transaction which allows us to create its tx_out
 
-        let (private_key1, public_key1) = sign_and_verify::create_keypair();
+        let (_private_key1, public_key1) = sign_and_verify::create_keypair();
 
         let tx_out1: TxOut = TxOut {
             value: 500,
@@ -317,7 +318,7 @@ mod tests {
 
         //We create a new keypair corresponding to our new transaction which allows us to create its tx_out
 
-        let (private_key1, public_key1) = sign_and_verify::create_keypair();
+        let (_private_key1, public_key1) = sign_and_verify::create_keypair();
 
         let tx_out1: TxOut = TxOut {
             value: 700,
@@ -381,7 +382,7 @@ mod tests {
 
         //We create a new keypair corresponding to our new transaction which allows us to create its tx_out
 
-        let (private_key1, public_key1) = sign_and_verify::create_keypair();
+        let (_private_key1, public_key1) = sign_and_verify::create_keypair();
 
         let tx_out1: TxOut = TxOut {
             value: 500,
@@ -447,7 +448,7 @@ mod tests {
 
         //We create a new keypair corresponding to our new transaction which allows us to create its tx_out
 
-        let (private_key1, public_key1) = sign_and_verify::create_keypair();
+        let (_private_key1, public_key1) = sign_and_verify::create_keypair();
 
         let tx_out1: TxOut = TxOut {
             value: 700,
@@ -480,14 +481,14 @@ mod tests {
     }
 
     #[test]
-    fn test_utxo_verify_invalid_transaction__nomatch_signature() {
+    fn test_utxo_verify_invalid_transaction_nomatch_signature() {
         let (transaction, utxo) = create_invalid_transactions_nomatch_signature();
 
         assert!(!(utxo.verify_transaction(&transaction)));
     }
 
     #[test]
-    fn test_utxo_verify_invalid_transaction__input_nomatch_output() {
+    fn test_utxo_verify_invalid_transaction_input_nomatch_output() {
         let (transaction, utxo) = create_invalid_transactions_no_output_corresponding_to_input();
 
         assert!(!(utxo.verify_transaction(&transaction)));

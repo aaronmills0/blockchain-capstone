@@ -5,6 +5,7 @@ use crate::utxo::UTXO;
 use crate::{hash, simulation};
 
 use log::info;
+use rand::Rng;
 use rand::rngs::ThreadRng;
 use rand_distr::{Distribution, Exp};
 use serde::{Deserialize, Serialize};
@@ -13,6 +14,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::{thread, time};
 
 #[derive(Clone, Serialize, Deserialize)]
+
 pub struct Block {
     pub header: BlockHeader,
     pub merkle: Merkle,
@@ -41,10 +43,11 @@ impl Block {
      */
     pub fn block_generator(
         // block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx
-        block_tx: (Sender<Block>, Sender<UTXO>, Sender<KeyMap>),
+        block_tx: (Sender<Block>, Sender<UTXO>, Sender<KeyMap>, Sender<Block>),
         // transaction_block_transaction_keymap_rx
         block_rx: (Receiver<(Transaction, KeyMap)>,),
         mut utxo: UTXO,
+        mut blockchain: Vec<Block>,
         mean: f32,
         duration: u32,
     ) {
@@ -52,7 +55,7 @@ impl Block {
             panic!("Invalid input. A non-positive mean is invalid for an exponential distribution");
         }
 
-        let (block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx) = block_tx;
+        let (block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx, block_validator_block_tx) = block_tx;
         let (transaction_block_transaction_keymap_rx,) = block_rx;
 
         let lambda: f32 = 1.0 / mean;
@@ -61,23 +64,7 @@ impl Block {
         let mut sample: f32;
         let mut normalized: f32;
         let mut mining_time: time::Duration;
-        // Create genesis block
-        // Create the merkle tree for the genesis block
-        let genesis_merkle: Merkle = Merkle {
-            tree: Vec::from(["0".repeat(64).to_string()]),
-        };
-        let genesis_block: Block = Block {
-            header: BlockHeader {
-                previous_hash: "0".repeat(64).to_string(),
-                merkle_root: genesis_merkle.tree.first().unwrap().clone(),
-                nonce: 0,
-            },
-            merkle: genesis_merkle,
-            transactions: Vec::new(),
-        };
-        // Create the blockchain and add the genesis block to the chain
-        let mut blockchain: Vec<Block> = Vec::new();
-        blockchain.push(genesis_block);
+
         let mut block: Block;
         let mut counter: u32;
         let mut merkle: Merkle;
@@ -132,11 +119,20 @@ impl Block {
                 merkle,
                 transactions,
             };
-            block_sim_block_tx.send(block.clone());
+
+            let block_copy = block.clone();
+            //Randomly Injects Fork
+            if rng.gen_range(1..=10) == 1{
+                let block_copy2 = block_copy.clone();
+                block_validator_block_tx.send(block_copy2).unwrap();
+                }
+            block_sim_block_tx.send(block.clone()).unwrap();
             blockchain.push(block);
             Block::print_blockchain(&blockchain);
-            block_sim_utxo_tx.send(utxo.clone());
-            block_sim_keymap_tx.send(keymap.clone());
+            block_sim_utxo_tx.send(utxo.clone()).unwrap();
+            block_sim_keymap_tx.send(keymap.clone()).unwrap();
+            block_validator_block_tx.send(block_copy).unwrap();
+
         }
     }
 

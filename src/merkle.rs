@@ -4,6 +4,7 @@ use crate::hash::hash_as_string;
 use crate::transaction::Transaction;
 use std::collections::VecDeque;
 
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Merkle {
     pub tree: Vec<String>,
@@ -162,7 +163,7 @@ mod tests {
 
         //We create a new keypair corresponding to our new transaction which allows us to create its tx_out
 
-        let (private_key1, public_key1) = sign_and_verify::create_keypair();
+        let (_private_key1, public_key1) = sign_and_verify::create_keypair();
 
         let tx_out1: TxOut = TxOut {
             value: 500,
