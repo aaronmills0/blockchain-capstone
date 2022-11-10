@@ -1,6 +1,7 @@
 use crate::hash;
 use crate::sign_and_verify;
 use crate::sign_and_verify::{PrivateKey, PublicKey, Signature, Verifier};
+use crate::simulation::KeyMap;
 use crate::utxo::UTXO;
 
 use log::{info, warn};
@@ -8,19 +9,16 @@ use rand::rngs::ThreadRng;
 use rand::seq::SliceRandom;
 use rand::Rng;
 use rand_distr::{Distribution, Exp};
-use serde::Serialize;
-use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::Sender;
 use std::vec::Vec;
 use std::{thread, time};
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Transaction {
     pub tx_inputs: Vec<TxIn>,
-    pub txin_count: u32,
     pub tx_outputs: Vec<TxOut>,
-    pub txout_count: u32,
 }
 
 /**
@@ -48,11 +46,10 @@ impl Transaction {
     pub fn transaction_generator(
         max_num_outputs: usize,
         mean_transaction_rate: f32,
-        multiplier: u32,
-        transmitter: Sender<Transaction>,
-        receiver: Receiver<UTXO>,
+        duration: u32,
+        transmitter: Sender<(Transaction, KeyMap)>,
         mut utxo: UTXO,
-        mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)>,
+        mut key_map: KeyMap,
     ) {
         if max_num_outputs <= 0 {
             warn!("Invalid input. The max number of receivers must be larger than zero and no larger than {} but was {}", utxo.len(), max_num_outputs);
@@ -67,7 +64,6 @@ impl Transaction {
         let mut sample: f32;
         let mut normalized: f32;
         let mut transaction_rate: time::Duration;
-        let mut verified_utxo = utxo.clone();
         info!("Original UTXO:");
         for (key, value) in &utxo.0 {
             info!("{:#?}: {:#?}", key, value);
@@ -79,7 +75,7 @@ impl Transaction {
             // Since mean = 1 / lambda, multiply the sample by the mean to normalize.
             normalized = sample * mean_transaction_rate;
             // Get the time between transactions generated as a duration
-            transaction_rate = time::Duration::from_secs((multiplier * normalized as u32) as u64);
+            transaction_rate = time::Duration::from_secs((duration * normalized as u32) as u64);
             // Sleep to mimic the time between creation of transactions
             thread::sleep(transaction_rate);
 
@@ -92,18 +88,13 @@ impl Transaction {
             for (key, value) in &utxo.0 {
                 info!("{:#?}: {:#?}", key, value);
             }
-            transmitter.send(transaction).unwrap();
-
-            let new_utxo = receiver.try_recv();
-            if new_utxo.is_ok() {
-                verified_utxo = new_utxo.unwrap();
-            }
+            transmitter.send((transaction, key_map.clone())).unwrap();
         }
     }
 
     pub fn create_transaction(
         utxo: &UTXO,
-        key_map: &mut HashMap<Outpoint, (PrivateKey, PublicKey)>,
+        key_map: &mut KeyMap,
         rng: &mut ThreadRng,
         max_num_outputs: usize,
     ) -> Transaction {
@@ -194,9 +185,7 @@ impl Transaction {
         );
         let transaction = Transaction {
             tx_inputs: tx_inputs,
-            txin_count: num_inputs as u32,
             tx_outputs: tx_outputs,
-            txout_count: num_outputs as u32,
         };
 
         let txid: String = hash::hash_as_string(&transaction);
@@ -215,19 +204,19 @@ impl Transaction {
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct TxIn {
     pub outpoint: Outpoint,
     pub sig_script: SignatureScript,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct SignatureScript {
     pub signature: Signature,
     pub full_public_key: PublicKey,
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Serialize, Deserialize, Debug)]
 pub struct Outpoint {
     pub txid: String,
     pub index: u32,
@@ -240,25 +229,25 @@ impl Hash for Outpoint {
     }
 }
 
-#[derive(Clone, Serialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct TxOut {
     pub value: u32,
     pub pk_script: PublicKeyScript,
 }
 
-#[derive(Clone, Serialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct PublicKeyScript {
     pub public_key_hash: String,
     pub verifier: Verifier,
 }
 
+#[cfg(test)]
 mod tests {
     use super::hash;
     use crate::sign_and_verify;
     use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
     use crate::transaction::{Outpoint, PublicKeyScript, SignatureScript, TxIn, TxOut};
     use crate::{transaction::Transaction, utxo::UTXO};
-    use rand::rngs::ThreadRng;
     use std::collections::HashMap;
 
     static MAX_NUM_OUTPUTS: usize = 3;
@@ -324,9 +313,7 @@ mod tests {
 
         let mut transaction1: Transaction = Transaction {
             tx_inputs: Vec::from([tx_in1]),
-            txin_count: 1,
             tx_outputs: Vec::from([tx_out1]),
-            txout_count: 1,
         };
 
         assert!(
