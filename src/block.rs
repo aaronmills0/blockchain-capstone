@@ -1,6 +1,8 @@
 use crate::merkle::Merkle;
 use crate::simulation::KeyMap;
 use crate::transaction::Transaction;
+use crate::transaction::TxIn;
+use crate::transaction::TxOut;
 use crate::utxo::UTXO;
 use crate::{hash, simulation};
 
