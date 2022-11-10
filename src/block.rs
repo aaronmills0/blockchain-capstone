@@ -4,7 +4,6 @@ use crate::transaction::Transaction;
 use crate::utxo::UTXO;
 use crate::{hash, simulation};
 
-use bitcoin::hashes::sha1::Hash;
 use log::info;
 use rand::rngs::ThreadRng;
 use rand_distr::{Distribution, Exp};
@@ -41,18 +40,21 @@ impl Block {
      * tx.send(transactions);  
      */
     pub fn block_generator(
-        tx_receiver: Receiver<(Transaction, KeyMap)>,
-        utxo_transmitter: Sender<UTXO>,
-        block_transmitter: Sender<Block>,
-        utxo_sim_transmitter: Sender<UTXO>,
-        keymap_transmitter: Sender<KeyMap>,
+        // block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx
+        block_tx: (Sender<Block>, Sender<UTXO>, Sender<KeyMap>),
+        // transaction_block_transaction_keymap_rx
+        block_rx: (Receiver<(Transaction, KeyMap)>,),
         mut utxo: UTXO,
         mean: f32,
-        multiplier: u32,
+        duration: u32,
     ) {
         if mean <= 0.0 {
             panic!("Invalid input. A non-positive mean is invalid for an exponential distribution");
         }
+
+        let (block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx) = block_tx;
+        let (transaction_block_transaction_keymap_rx,) = block_rx;
+
         let lambda: f32 = 1.0 / mean;
         let exp: Exp<f32> = Exp::new(lambda).unwrap();
         let mut rng: ThreadRng = rand::thread_rng();
@@ -89,7 +91,7 @@ impl Block {
             keymap = KeyMap(HashMap::new());
             counter = 0;
             while counter < simulation::BLOCK_SIZE {
-                (tx, keymap) = tx_receiver.recv().unwrap();
+                (tx, keymap) = transaction_block_transaction_keymap_rx.recv().unwrap();
                 keymap_map.insert(hash::hash_as_string(&tx), keymap.clone());
                 transactions.push(tx);
                 counter += 1;
@@ -100,7 +102,7 @@ impl Block {
             // Since mean = 1/lambda, multiply the sample by the mean to normalize.
             normalized = sample * mean;
             // Get the 'mining' time as a duration
-            mining_time = time::Duration::from_secs((multiplier * normalized as u32) as u64);
+            mining_time = time::Duration::from_secs((duration * normalized as u32) as u64);
             // Sleep to mimic the 'mining' time
             thread::sleep(mining_time);
             // Create a new block
@@ -130,12 +132,11 @@ impl Block {
                 merkle,
                 transactions,
             };
-            block_transmitter.send(block.clone());
+            block_sim_block_tx.send(block.clone());
             blockchain.push(block);
             Block::print_blockchain(&blockchain);
-            utxo_transmitter.send(utxo.clone());
-            utxo_sim_transmitter.send(utxo.clone());
-            keymap_transmitter.send(keymap.clone());
+            block_sim_utxo_tx.send(utxo.clone());
+            block_sim_keymap_tx.send(keymap.clone());
         }
     }
 

@@ -20,11 +20,11 @@ use crate::{block::Block, utxo::UTXO};
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Config {
     pub block_mean: f32,
-    pub block_multiplier: u32,
+    pub block_duration: u32,
     pub block_size: u32,
     pub max_tx_outputs: usize,
     pub tx_mean: f32,
-    pub tx_multiplier: u32,
+    pub tx_duration: u32,
     pub invalid_tx_mean: f32,
     pub invalid_tx_sigma: f32,
 }
@@ -400,11 +400,11 @@ mod tests {
 
         let config: Config = Config {
             block_mean: 1.0,
-            block_multiplier: 10,
+            block_duration: 10,
             block_size: 1,
             max_tx_outputs: 4,
             tx_mean: 1.0,
-            tx_multiplier: 10,
+            tx_duration: 10,
             invalid_tx_mean: 1.0,
             invalid_tx_sigma: 1.0,
         };

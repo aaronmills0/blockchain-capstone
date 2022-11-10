@@ -10,9 +10,8 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 use rand_distr::{Distribution, Exp};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::Sender;
 use std::vec::Vec;
 use std::{thread, time};
 
@@ -47,9 +46,8 @@ impl Transaction {
     pub fn transaction_generator(
         max_num_outputs: usize,
         mean_transaction_rate: f32,
-        multiplier: u32,
+        duration: u32,
         transmitter: Sender<(Transaction, KeyMap)>,
-        receiver: Receiver<UTXO>,
         mut utxo: UTXO,
         mut key_map: KeyMap,
     ) {
@@ -66,7 +64,6 @@ impl Transaction {
         let mut sample: f32;
         let mut normalized: f32;
         let mut transaction_rate: time::Duration;
-        let mut verified_utxo = utxo.clone();
         info!("Original UTXO:");
         for (key, value) in &utxo.0 {
             info!("{:#?}: {:#?}", key, value);
@@ -78,7 +75,7 @@ impl Transaction {
             // Since mean = 1 / lambda, multiply the sample by the mean to normalize.
             normalized = sample * mean_transaction_rate;
             // Get the time between transactions generated as a duration
-            transaction_rate = time::Duration::from_secs((multiplier * normalized as u32) as u64);
+            transaction_rate = time::Duration::from_secs((duration * normalized as u32) as u64);
             // Sleep to mimic the time between creation of transactions
             thread::sleep(transaction_rate);
 
@@ -92,11 +89,6 @@ impl Transaction {
                 info!("{:#?}: {:#?}", key, value);
             }
             transmitter.send((transaction, key_map.clone())).unwrap();
-
-            let new_utxo = receiver.try_recv();
-            if new_utxo.is_ok() {
-                verified_utxo = new_utxo.unwrap();
-            }
         }
     }
 

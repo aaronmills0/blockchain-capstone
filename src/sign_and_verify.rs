@@ -1,11 +1,8 @@
-use crate::hash::hash_as_string;
 use secp256k1::ecdsa::Signature as SecpSignature;
 use secp256k1::hashes::sha256;
 use secp256k1::rand::rngs::OsRng;
 use secp256k1::{Message, Secp256k1};
 use secp256k1::{PublicKey as SecpPublicKey, SecretKey as SecpSecretKey};
-use serde::de::{Error, Visitor};
-use serde::Serializer;
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 use std::str;
@@ -92,6 +89,8 @@ pub fn create_keypair() -> (PrivateKey, PublicKey) {
 
 #[cfg(test)]
 mod tests {
+    use crate::hash::hash_as_string;
+
     use super::*;
 
     #[test]
