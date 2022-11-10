@@ -1,6 +1,7 @@
 mod block;
 mod hash;
 mod merkle;
+mod save_and_load;
 mod shell;
 mod sign_and_verify;
 mod simulation;
@@ -25,7 +26,6 @@ fn main() {
     info!("Welcome to the minimalist blockchain!\n");
 
     info!("For list of supported commands enter: 'help'");
-    loop {
-        shell();
-    }
+
+    shell();
 }

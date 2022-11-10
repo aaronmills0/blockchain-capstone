@@ -1,4 +1,5 @@
 use crate::merkle::Merkle;
+use crate::simulation::KeyMap;
 use crate::transaction::Transaction;
 use crate::utxo::UTXO;
 use crate::{hash, simulation};
@@ -8,18 +9,20 @@ use log::info;
 use rand::Rng;
 use rand::rngs::ThreadRng;
 use rand_distr::{Distribution, Exp};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::{thread, time};
 
-#[derive(Serialize, Clone)]
+#[derive(Clone, Serialize, Deserialize)]
+
 pub struct Block {
     pub header: BlockHeader,
     pub merkle: Merkle,
     pub transactions: Vec<Transaction>,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct BlockHeader {
     pub previous_hash: String,
     pub merkle_root: String,
@@ -40,17 +43,22 @@ impl Block {
      * tx.send(transactions);  
      */
     pub fn block_generator(
-        receiver: Receiver<Transaction>,
-        transmitter: Sender<UTXO>,
-        transmitter_verifier: Sender<Block>,
+        // block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx
+        block_tx: (Sender<Block>, Sender<UTXO>, Sender<KeyMap>),
+        // transaction_block_transaction_keymap_rx
+        block_rx: (Receiver<(Transaction, KeyMap)>,),
         mut utxo: UTXO,
         mut blockchain: Vec<Block>,
         mean: f32,
-        multiplier: u32,
+        duration: u32,
     ) {
         if mean <= 0.0 {
             panic!("Invalid input. A non-positive mean is invalid for an exponential distribution");
         }
+
+        let (block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx) = block_tx;
+        let (transaction_block_transaction_keymap_rx,) = block_rx;
+
         let lambda: f32 = 1.0 / mean;
         let exp: Exp<f32> = Exp::new(lambda).unwrap();
         let mut rng: ThreadRng = rand::thread_rng();
@@ -62,11 +70,18 @@ impl Block {
         let mut counter: u32;
         let mut merkle: Merkle;
         let mut transactions: Vec<Transaction>;
+        let mut keymap_map: HashMap<String, KeyMap>;
+        let mut keymap: KeyMap;
+        let mut tx: Transaction;
         loop {
             transactions = Vec::new();
+            keymap_map = HashMap::new();
+            keymap = KeyMap(HashMap::new());
             counter = 0;
             while counter < simulation::BLOCK_SIZE {
-                transactions.push(receiver.recv().unwrap());
+                (tx, keymap) = transaction_block_transaction_keymap_rx.recv().unwrap();
+                keymap_map.insert(hash::hash_as_string(&tx), keymap.clone());
+                transactions.push(tx);
                 counter += 1;
             }
 
@@ -75,13 +90,25 @@ impl Block {
             // Since mean = 1/lambda, multiply the sample by the mean to normalize.
             normalized = sample * mean;
             // Get the 'mining' time as a duration
-            mining_time = time::Duration::from_secs((multiplier * normalized as u32) as u64);
+            mining_time = time::Duration::from_secs((duration * normalized as u32) as u64);
             // Sleep to mimic the 'mining' time
             thread::sleep(mining_time);
             // Create a new block
             (transactions, utxo) = Block::verify_and_update(transactions, utxo);
             if transactions.len() == 0 {
                 continue;
+            }
+            let mut found = false;
+            for transaction in transactions.iter().rev() {
+                let hash = hash::hash_as_string(transaction);
+                if keymap_map.contains_key(&hash) {
+                    keymap = keymap_map.remove(&hash).unwrap();
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                panic!("KeyMap not found!");
             }
             merkle = Merkle::create_merkle_tree(&transactions);
             block = Block {
@@ -93,16 +120,20 @@ impl Block {
                 merkle,
                 transactions,
             };
+
             let block_copy = block.clone();
             //Randomly Injects Fork
             if rng.gen_range(1..=10) == 1{
                 let block_copy2 = block_copy.clone();
                 transmitter_verifier.send(block_copy2).unwrap();
                 }
+            block_sim_block_tx.send(block.clone());
             blockchain.push(block);
             Block::print_blockchain(&blockchain);
-            transmitter.send(utxo.clone()).unwrap();
+            block_sim_utxo_tx.send(utxo.clone());
+            block_sim_keymap_tx.send(keymap.clone());
             transmitter_verifier.send(block_copy).unwrap();
+
         }
     }
 

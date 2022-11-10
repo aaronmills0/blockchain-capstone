@@ -1,15 +1,14 @@
-use crate::hash::hash_as_string;
 use secp256k1::ecdsa::Signature as SecpSignature;
 use secp256k1::hashes::sha256;
 use secp256k1::rand::rngs::OsRng;
 use secp256k1::{Message, Secp256k1};
 use secp256k1::{PublicKey as SecpPublicKey, SecretKey as SecpSecretKey};
-use serde::Serialize;
-use serde::Serializer;
+use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
+use std::str;
 
-#[derive(Clone)]
-pub struct Signature(pub SecpSignature);
+#[derive(Clone, Deserialize, Serialize)]
+pub struct Signature(SecpSignature);
 
 impl Deref for Signature {
     type Target = SecpSignature;
@@ -23,8 +22,7 @@ impl DerefMut for Signature {
         return &mut self.0;
     }
 }
-
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct PublicKey(pub SecpPublicKey);
 
 impl Deref for PublicKey {
@@ -40,8 +38,8 @@ impl DerefMut for PublicKey {
     }
 }
 
-#[derive(Clone)]
-pub struct PrivateKey(pub SecpSecretKey);
+#[derive(Clone, Deserialize, Serialize)]
+pub struct PrivateKey(SecpSecretKey);
 
 impl Deref for PrivateKey {
     type Target = SecpSecretKey;
@@ -56,7 +54,7 @@ impl DerefMut for PrivateKey {
     }
 }
 
-#[derive(Clone, Serialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Verifier {}
 
 impl Verifier {
@@ -89,35 +87,10 @@ pub fn create_keypair() -> (PrivateKey, PublicKey) {
     return (PrivateKey(secret_key), PublicKey(public_key));
 }
 
-impl Serialize for Signature {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        return serializer.serialize_bytes(&self.serialize_compact());
-    }
-}
-
-impl Serialize for PrivateKey {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        return serializer.serialize_bytes(&self.secret_bytes());
-    }
-}
-
-impl Serialize for PublicKey {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        return serializer.serialize_bytes(&self.serialize_uncompressed());
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::hash::hash_as_string;
+
     use super::*;
 
     #[test]
