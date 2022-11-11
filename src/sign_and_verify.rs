@@ -51,9 +51,9 @@ impl Deref for PrivateKey {
     }
 }
 
-impl Into<ExpandedSecretKey> for &PrivateKey {
-    fn into(self) -> ExpandedSecretKey {
-        return ExpandedSecretKey::from(&self.0);
+impl From<&PrivateKey> for ExpandedSecretKey {
+    fn from(p: &PrivateKey) -> ExpandedSecretKey {
+        return ExpandedSecretKey::from(&p.0);
     }
 }
 
