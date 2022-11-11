@@ -9,6 +9,7 @@ mod simulation;
 mod transaction;
 mod utxo;
 mod validator;
+mod validate_blockchain;
 use log::info;
 use shell::shell;
 use std::env;

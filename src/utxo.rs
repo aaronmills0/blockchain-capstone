@@ -147,7 +147,7 @@ impl UTXO {
                 sig_vec.push(tx_in.sig_script.signature.0);
                 pk_vec.push(tx_in.sig_script.full_public_key.0);
                 msg_vec.push(Vec::from(
-                    (String::from(tx_in.outpoint.txid.clone())
+                    (tx_in.outpoint.txid.clone()
                         + &tx_in.outpoint.index.to_string()
                         + &tx_out.pk_script.public_key_hash)
                         .as_bytes(),
@@ -166,7 +166,7 @@ impl UTXO {
                 return (false, None);
             }
             // Update the utxo copy even though signature has not been checked yet
-            utxo.update(&transaction);
+            utxo.update(transaction);
         }
 
         let msg_bytes: Vec<&[u8]> = msg_vec.iter().map(|x| &x[..]).collect();
@@ -374,6 +374,20 @@ impl UTXO {
             };
             self.insert(outpoint, tx_out.clone());
         }
+    }
+
+    pub fn utxo_equals(&mut self, utxo: &UTXO) -> bool {
+        for (key, value) in self.iter() {
+            if utxo.contains_key(key)
+                && value.value == utxo.get(key).unwrap().value
+                && value.pk_script.public_key_hash
+                    == utxo.get(key).unwrap().pk_script.public_key_hash
+            {
+                continue;
+            }
+            return false;
+        }
+        return true;
     }
 }
 
