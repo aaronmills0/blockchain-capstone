@@ -241,98 +241,32 @@ mod tests {
 
         assert_eq!(transaction.tx_outputs.len(), 100000);
     } */
-
-    #[test]
-    fn test_verif_one_input_ten_outputs() {
-        let mut utxo: UTXO = UTXO(HashMap::new());
-        let mut transaction: Transaction;
-
-        (transaction, utxo) = one_input_diff_output_transaction_valid(10);
-
-        let start = Instant::now();
-        utxo.verify_transaction(&transaction);
-        let duration = start.elapsed();
-
-        println!("Time elapsed is: {:?}", duration);
-
-        assert_eq!(transaction.tx_outputs.len(), 10);
-    }
-
     #[test]
     fn test_verif_one_input_hundred_outputs() {
-        let mut utxo: UTXO = UTXO(HashMap::new());
-        let mut transaction: Transaction;
+        let base: u32 = 10;
 
-        (transaction, utxo) = one_input_diff_output_transaction_valid(100);
-        let start = Instant::now();
-        utxo.verify_transaction(&transaction);
-        let duration = start.elapsed();
+        let mut multiplicative_index = 0;
+        for n in 0..10 {
+            let mut utxo: UTXO = UTXO(HashMap::new());
+            let mut transaction: Transaction;
 
-        println!("Time elapsed is: {:?}", duration);
+            if ((base.pow(n.try_into().unwrap())) > 1000) {
+                multiplicative_index = 1000 * (n - 2);
+                (transaction, utxo) = one_input_diff_output_transaction_valid(multiplicative_index);
+            } else {
+                multiplicative_index = base.pow(n.try_into().unwrap());
+                (transaction, utxo) =
+                    one_input_diff_output_transaction_valid(base.pow(n.try_into().unwrap()));
+            }
 
-        assert_eq!(transaction.tx_outputs.len(), 100);
+            let start = Instant::now();
+            utxo.verify_transaction(&transaction);
+            let duration = start.elapsed();
+
+            println!(
+                "Time elapsed for {:#} is: {:?}",
+                multiplicative_index, duration
+            );
+        }
     }
-
-    #[test]
-    fn test_verif_one_input_thousand_outputs() {
-        let mut utxo: UTXO = UTXO(HashMap::new());
-        let mut transaction: Transaction;
-
-        (transaction, utxo) = one_input_diff_output_transaction_valid(1000);
-
-        let start = Instant::now();
-        utxo.verify_transaction(&transaction);
-        let duration = start.elapsed();
-
-        println!("Time elapsed is: {:?}", duration);
-
-        assert_eq!(transaction.tx_outputs.len(), 1000);
-    }
-
-    #[test]
-    fn test_verif_one_input_five_of_thousand_outputs() {
-        let mut utxo: UTXO = UTXO(HashMap::new());
-        let mut transaction: Transaction;
-
-        (transaction, utxo) = one_input_diff_output_transaction_valid(5000);
-
-        let start = Instant::now();
-        utxo.verify_transaction(&transaction);
-        let duration = start.elapsed();
-
-        println!("Time elapsed is: {:?}", duration);
-
-        assert_eq!(transaction.tx_outputs.len(), 5000);
-    }
-
-    #[test]
-    fn test_verif_one_input_tens_of_thousand_outputs() {
-        let mut utxo: UTXO = UTXO(HashMap::new());
-        let mut transaction: Transaction;
-
-        (transaction, utxo) = one_input_diff_output_transaction_valid(10000);
-
-        let start = Instant::now();
-        utxo.verify_transaction(&transaction);
-        let duration = start.elapsed();
-
-        println!("Time elapsed is: {:?}", duration);
-
-        assert_eq!(transaction.tx_outputs.len(), 10000);
-    }
-
-    /*
-    #[test]
-    fn test_one_input_one_output() {
-        let mut utxo: UTXO = UTXO(HashMap::new());
-        let mut transaction: Transaction;
-
-        let start = Instant::now();
-        (transaction, utxo) = diff_input_one_output_transaction_valid(1);
-        let duration = start.elapsed();
-
-        println!("Time elapsed is: {:?}", duration);
-
-        assert_eq!(transaction.tx_inputs.len(), 1);
-    }*/
 }
