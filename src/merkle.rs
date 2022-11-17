@@ -4,7 +4,6 @@ use crate::hash::hash_as_string;
 use crate::transaction::Transaction;
 use std::collections::VecDeque;
 
-
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Merkle {
     pub tree: Vec<String>,
@@ -137,21 +136,16 @@ mod tests {
         key_map.insert(outpoint0.clone(), (private_key0, public_key0));
         utxo.insert(outpoint0.clone(), tx_out0.clone());
 
-        //We create a signature script for the input of our new transaction
-        let sig_script1: SignatureScript;
-
         let old_private_key: PrivateKey;
         let old_public_key: PublicKey;
 
         (old_private_key, old_public_key) = key_map[&outpoint0].clone();
 
-        let message: String;
-
-        message = String::from(&outpoint0.txid)
+        let message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
             + &tx_out0.pk_script.public_key_hash;
 
-        sig_script1 = SignatureScript {
+        let sig_script1 = SignatureScript {
             signature: sign_and_verify::sign(&message, &old_private_key),
             full_public_key: old_public_key,
         };
@@ -194,12 +188,9 @@ mod tests {
     use super::*;
     #[test]
     fn test_create_merkle_tree_even_number_of_transactions() {
-        let transactions: Vec<Transaction>;
-        let used_transactions: Vec<Transaction>;
+        let transactions = create_three_transactions_valid();
 
-        transactions = create_three_transactions_valid();
-
-        used_transactions = Vec::from_iter(transactions[0..2].iter().cloned());
+        let used_transactions = Vec::from_iter(transactions[0..2].iter().cloned());
         let h0: String = hash_as_string(&used_transactions.get(0).unwrap());
         let h1: String = hash_as_string(&used_transactions.get(1).unwrap());
         let root_hash: String = hash_as_string(&format!("{}{}", h0, h1));
@@ -214,9 +205,7 @@ mod tests {
 
     #[test]
     fn test_create_merkle_tree_odd_number_of_transactions() {
-        let transactions: Vec<Transaction>;
-
-        transactions = create_three_transactions_valid();
+        let transactions = create_three_transactions_valid();
         let h0: String = hash_as_string(&transactions.get(0).unwrap());
         let h1: String = hash_as_string(&transactions.get(1).unwrap());
         let h2: String = hash_as_string(&transactions.get(2).unwrap());
