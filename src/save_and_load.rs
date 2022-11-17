@@ -15,6 +15,7 @@ use crate::sign_and_verify::PrivateKey;
 use crate::sign_and_verify::PublicKey;
 use crate::simulation::KeyMap;
 use crate::transaction::Outpoint;
+use crate::transaction::TxOut;
 use crate::{block::Block, utxo::UTXO};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -30,16 +31,23 @@ pub struct Config {
 }
 
 pub fn serialize_json(
+    initial_tx_outs: &Vec<TxOut>,
     blockchain: &Vec<Block>,
     utxo: &UTXO,
     keymap: &KeyMap,
     sim_config: &Config,
     file_prefix: Option<String>,
 ) {
+    let initial_tx_outs_json = serde_json::to_value(initial_tx_outs);
     let blockchain_json = serde_json::to_value(blockchain);
     let utxo_json = serde_json::to_value(utxo);
     let keymap_json = serde_json::to_value(keymap);
     let config_json = serde_json::to_value(sim_config);
+
+    if initial_tx_outs_json.is_err() {
+        error!("Failed to serialize initial tx outs!");
+        panic!();
+    }
 
     if blockchain_json.is_err() {
         error!("Failed to serialize blocks!");
@@ -62,6 +70,10 @@ pub fn serialize_json(
     }
 
     let mut map = Map::new();
+    map.insert(
+        String::from("initial tx outs"),
+        initial_tx_outs_json.unwrap(),
+    );
     map.insert(String::from("blockchain"), blockchain_json.unwrap());
     map.insert(String::from("utxo"), utxo_json.unwrap());
     map.insert(String::from("keymap"), keymap_json.unwrap());
@@ -74,7 +86,7 @@ pub fn serialize_json(
     } else {
         "/"
     };
-    if fs::create_dir("config".to_owned() + slash).is_err() {
+    if fs::create_dir_all("config".to_owned() + slash).is_err() {
         warn!("Failed to create directory! It may already exist, or permissions are needed.");
     }
 
@@ -87,8 +99,8 @@ pub fn serialize_json(
     let date_time = Local::now().format("%Y-%m-%d-%H-%M-%S").to_string();
     // The new file_name is timestamped
     let mut prefix = String::new();
-    if file_prefix.is_some() {
-        prefix.push_str(&file_prefix.unwrap());
+    if let Some(prefix1) = file_prefix {
+        prefix.push_str(&prefix1);
     }
     let file_name: &str = &format!("{}_{}.json", prefix, date_time);
 
@@ -108,15 +120,20 @@ pub fn serialize_json(
     }
 }
 
-pub fn deserialize_json(filepath: &str) -> (Vec<Block>, UTXO, KeyMap, Config) {
+pub fn deserialize_json(filepath: &str) -> (Vec<TxOut>, Vec<Block>, UTXO, KeyMap, Config) {
     let data = fs::read_to_string(filepath);
     if data.is_err() {
-        println!("Failed to load file. {:?}", data.err());
-        //error!("Failed to load file. {:?}", data.err());
+        error!("Failed to load file. {:?}", data.err());
         panic!();
     }
     let json: Value = serde_json::from_str(&data.unwrap()).unwrap();
 
+    let initial_tx_outs_json = json
+        .get("initial tx outs")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .to_owned();
     let blockchain_json = json
         .get("blockchain")
         .unwrap()
@@ -127,16 +144,20 @@ pub fn deserialize_json(filepath: &str) -> (Vec<Block>, UTXO, KeyMap, Config) {
     let keymap_json = json.get("keymap").unwrap().as_array().unwrap().to_owned();
     let config_json = json.get("config").unwrap().to_owned();
 
+    let mut initial_tx_outs: Vec<TxOut> = Vec::new();
+    for tx_out in initial_tx_outs_json {
+        initial_tx_outs.push(serde_json::from_value(tx_out).unwrap());
+    }
     let mut blockchain: Vec<Block> = Vec::new();
     for block in blockchain_json {
         blockchain.push(serde_json::from_value(block).unwrap());
     }
-    let utxo = serde_json::from_value(utxo_json.clone());
+    let utxo = serde_json::from_value(utxo_json);
     let mut keymap: Vec<(Outpoint, (PrivateKey, PublicKey))> = Vec::new();
-    for pair in keymap_json.clone() {
+    for pair in keymap_json {
         keymap.push(serde_json::from_value(pair).unwrap());
     }
-    let config = serde_json::from_value(config_json.clone());
+    let config = serde_json::from_value(config_json);
 
     if utxo.is_err() {
         error!("Failed to deserialize utxo! {:?}", utxo.err());
@@ -157,7 +178,13 @@ pub fn deserialize_json(filepath: &str) -> (Vec<Block>, UTXO, KeyMap, Config) {
         key_map.insert(outpoint, key_pair);
     }
 
-    return (blockchain, utxo.unwrap(), key_map, config.unwrap());
+    return (
+        initial_tx_outs,
+        blockchain,
+        utxo.unwrap(),
+        key_map,
+        config.unwrap(),
+    );
 }
 
 #[cfg(test)]
@@ -218,19 +245,14 @@ mod tests {
         // Create a single new transaction (2 inputs and 1 output)
         let mut tx_inputs1: Vec<TxIn> = Vec::new();
         let mut tx_outputs1: Vec<TxOut> = Vec::new();
-        let sig_script10: SignatureScript;
         let private_key10: PrivateKey;
         let public_key10: PublicKey;
-        let message10: String;
-        let pk_script10: PublicKeyScript;
-        let sig_script11: SignatureScript;
-        let message11: String;
 
-        message10 = String::from(&outpoint00.txid)
+        let message10 = String::from(&outpoint00.txid)
             + &outpoint00.index.to_string()
             + &utxo[&outpoint00].pk_script.public_key_hash;
 
-        sig_script10 = SignatureScript {
+        let sig_script10 = SignatureScript {
             signature: sign_and_verify::sign(&message10, &private_key00),
             full_public_key: public_key00,
         };
@@ -240,11 +262,11 @@ mod tests {
             sig_script: sig_script10,
         });
 
-        message11 = String::from(&outpoint01.txid)
+        let message11 = String::from(&outpoint01.txid)
             + &outpoint01.index.to_string()
             + &utxo[&outpoint01].pk_script.public_key_hash;
 
-        sig_script11 = SignatureScript {
+        let sig_script11 = SignatureScript {
             signature: sign_and_verify::sign(&message11, &private_key01),
             full_public_key: public_key01,
         };
@@ -256,7 +278,7 @@ mod tests {
 
         (private_key10, public_key10) = sign_and_verify::create_keypair();
 
-        pk_script10 = PublicKeyScript {
+        let pk_script10 = PublicKeyScript {
             public_key_hash: hash::hash_as_string(&public_key10),
             verifier: Verifier {},
         };
@@ -273,7 +295,7 @@ mod tests {
 
         let outpoint10 = Outpoint {
             txid: hash::hash_as_string(&transaction1),
-            index: 0 as u32,
+            index: 0_u32,
         };
 
         utxo.verify_transaction(&transaction1);
@@ -283,11 +305,11 @@ mod tests {
         // Create genesis block and first block
 
         let genesis_merkle: Merkle = Merkle {
-            tree: Vec::from(["0".repeat(64).to_string()]),
+            tree: Vec::from(["0".repeat(64)]),
         };
         let genesis_block: Block = Block {
             header: BlockHeader {
-                previous_hash: "0".repeat(64).to_string(),
+                previous_hash: "0".repeat(64),
                 merkle_root: genesis_merkle.tree.first().unwrap().clone(),
                 nonce: 0,
             },
@@ -315,20 +337,16 @@ mod tests {
 
         let mut tx_inputs2: Vec<TxIn> = Vec::new();
         let mut tx_outputs2: Vec<TxOut> = Vec::new();
-        let sig_script20: SignatureScript;
         let private_key20: PrivateKey;
         let public_key20: PublicKey;
-        let message20: String;
-        let pk_script20: PublicKeyScript;
-        let pk_script21: PublicKeyScript;
         let private_key21: PrivateKey;
         let public_key21: PublicKey;
 
-        message20 = String::from(&outpoint10.txid)
+        let message20 = String::from(&outpoint10.txid)
             + &outpoint10.index.to_string()
             + &utxo[&outpoint10].pk_script.public_key_hash;
 
-        sig_script20 = SignatureScript {
+        let sig_script20 = SignatureScript {
             signature: sign_and_verify::sign(&message20, &private_key10),
             full_public_key: public_key10,
         };
@@ -340,7 +358,7 @@ mod tests {
 
         (private_key20, public_key20) = sign_and_verify::create_keypair();
 
-        pk_script20 = PublicKeyScript {
+        let pk_script20 = PublicKeyScript {
             public_key_hash: hash::hash_as_string(&public_key20),
             verifier: Verifier {},
         };
@@ -352,7 +370,7 @@ mod tests {
 
         (private_key21, public_key21) = sign_and_verify::create_keypair();
 
-        pk_script21 = PublicKeyScript {
+        let pk_script21 = PublicKeyScript {
             public_key_hash: hash::hash_as_string(&public_key21),
             verifier: Verifier {},
         };
@@ -369,12 +387,12 @@ mod tests {
 
         let outpoint20 = Outpoint {
             txid: hash::hash_as_string(&transaction2),
-            index: 0 as u32,
+            index: 0_u32,
         };
 
         let outpoint21 = Outpoint {
             txid: hash::hash_as_string(&transaction2),
-            index: 1 as u32,
+            index: 1_u32,
         };
 
         utxo.verify_transaction(&transaction2);

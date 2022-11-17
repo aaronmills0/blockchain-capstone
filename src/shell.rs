@@ -1,5 +1,5 @@
-use crate::block::LENGTH;
-use crate::graph::render_to;
+use crate::graph::create_block_graph;
+use crate::save_and_load::deserialize_json;
 use crate::simulation::start;
 
 use chrono::Local;
@@ -39,14 +39,6 @@ pub fn shell() {
                     info!("\nSimulation has already begun!\n");
                 }
             },
-            "exit" | "Exit" | "EXIT" => {
-                info!("The user selected exit");
-
-                write_log();
-                create_graph();
-
-                exit(0);
-            }
             "save" => unsafe {
                 if SIM_STATUS && tx_sim_option.is_some() {
                     let tx_sim = tx_sim_option.unwrap();
@@ -58,6 +50,29 @@ pub fn shell() {
                     warn!("Simulation has not started");
                 }
             },
+            "graph" => {
+                info!("Please enter a file path");
+                let mut filepath = String::new();
+
+                io::stdin()
+                    .read_line(&mut filepath)
+                    .expect("Failed to read line");
+
+                let f = filepath.trim();
+                if !Path::new(f).exists() {
+                    warn!("The filepath {} doesn't exist. Going back to shell", f);
+                    continue;
+                }
+
+                let (initial_tx_outs, blockchain, _, _, _) = deserialize_json(f);
+                create_block_graph(initial_tx_outs, blockchain);
+            }
+            "exit" | "Exit" | "EXIT" => {
+                info!("The user selected exit");
+
+                write_log();
+                exit(0);
+            }
             _ => {
                 warn!("Invalid Command");
             }
@@ -68,6 +83,8 @@ pub fn shell() {
 fn display_commands() {
     info!("--> help: Displays the availble commands");
     info!("--> sim start: Allows the user to begin the simple 3 node blockchain simulation");
+    info!("--> save: Saves the configurations of the system to the config folder");
+    info!("--> graph: Creates a dot file graph that visualizes the blockchain for a given config file");
     info!("--> exit: Exits the program with error code 0");
 }
 
@@ -113,12 +130,4 @@ fn write_log() {
     }
     //we remove the old log file
     File::create(&dirpath_log).unwrap();
-}
-
-fn create_graph() {
-    let mut f = File::create("test.dot").unwrap();
-    unsafe {
-        info!("Length of blockchain is {}", LENGTH);
-        render_to(&mut f, LENGTH);
-    }
 }

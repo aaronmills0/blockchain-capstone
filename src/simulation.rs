@@ -74,6 +74,8 @@ pub fn start(rx_sim: Receiver<String>) {
     utxo.insert(outpoint0, tx_out0);
     utxo.insert(outpoint1, tx_out1);
 
+    let initial_tx_outs = utxo.values().cloned().collect();
+
     // Create genesis block
     // Create the merkle tree for the genesis block
     let genesis_merkle: Merkle = Merkle {
@@ -159,6 +161,7 @@ pub fn start(rx_sim: Receiver<String>) {
         if let Ok(command1) = command {
             if command1 == "save" {
                 save_and_load::serialize_json(
+                    &initial_tx_outs,
                     &blockchain,
                     &utxo,
                     &key_map,
