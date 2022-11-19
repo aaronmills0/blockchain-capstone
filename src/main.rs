@@ -5,6 +5,7 @@ mod merkle;
 mod shell;
 mod sign_and_verify;
 mod simulation;
+mod throughput;
 mod transaction;
 mod utxo;
 use log::info;
