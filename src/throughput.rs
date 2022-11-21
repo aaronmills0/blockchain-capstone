@@ -156,32 +156,34 @@ mod tests {
 
     #[test]
     fn test_transaction_throughput() {
-        let base: u32 = 10;
-        let mut multiplicative_index: u32 = 0;
+        for k in 0..3 {
+            let base: u32 = 10;
+            let mut multiplicative_index: u32 = 0;
 
-        for n in 0..10 {
-            let mut utxo: UTXO = UTXO(HashMap::new());
-            let mut transactions: Vec<Transaction>;
-            multiplicative_index = base.pow(n.try_into().unwrap());
-
-            if ((base.pow(n.try_into().unwrap())) > 100000) {
-                multiplicative_index = 100000 * (n - 4);
-                (transactions, utxo) = create_valid_transactions(multiplicative_index);
-            } else {
+            for n in 0..10 {
+                let mut utxo: UTXO = UTXO(HashMap::new());
+                let mut transactions: Vec<Transaction>;
                 multiplicative_index = base.pow(n.try_into().unwrap());
-                (transactions, utxo) = create_valid_transactions(multiplicative_index);
+
+                if ((base.pow(n.try_into().unwrap())) > 100000) {
+                    multiplicative_index = 100000 * (n - 4);
+                    (transactions, utxo) = create_valid_transactions(multiplicative_index);
+                } else {
+                    multiplicative_index = base.pow(n.try_into().unwrap());
+                    (transactions, utxo) = create_valid_transactions(multiplicative_index);
+                }
+
+                assert_eq!(transactions.len() as u32, multiplicative_index);
+
+                let start = Instant::now();
+                Block::verify_and_update(transactions, utxo);
+                let duration = start.elapsed();
+
+                println!(
+                    "Time elapsed for {:#} in Run {:#} is: {:?}",
+                    multiplicative_index, k, duration
+                );
             }
-
-            assert_eq!(transactions.len() as u32, multiplicative_index);
-
-            let start = Instant::now();
-            Block::verify_and_update(transactions, utxo);
-            let duration = start.elapsed();
-
-            println!(
-                "Time elapsed for {:#} is: {:?}",
-                multiplicative_index, duration
-            );
         }
     }
 }
