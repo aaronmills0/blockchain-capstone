@@ -65,7 +65,7 @@ pub fn shell() {
                     continue;
                 }
 
-                let (initial_tx_outs, blockchain, _, _, _) = deserialize_json(f);
+                let (initial_tx_outs, blockchain, _, _, _, _, _) = deserialize_json(f);
                 create_block_graph(initial_tx_outs, blockchain);
             }
             "exit" | "Exit" | "EXIT" => {
@@ -74,9 +74,9 @@ pub fn shell() {
                 write_log();
                 exit(0);
             }
-            "validate blockchain test" => {
+            "test" => {
                 info!("The user selected: validate blockchain test");
-                validate_chain_performance_test("perf_test_input");
+                validate_chain_performance_test("./config/blockchain_200.json");
             }
             _ => {
                 warn!("Invalid Command");
