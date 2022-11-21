@@ -9,6 +9,7 @@ use std::vec::Vec;
 
 pub fn chain_validator(receiver: Receiver<Block>, mut utxo: UTXO, mut chain: Vec<Block>) {
     let batch_size = (BLOCK_SIZE / 8) as usize;
+
     loop {
         let incoming_block = receiver.recv().unwrap();
 
@@ -17,7 +18,6 @@ pub fn chain_validator(receiver: Receiver<Block>, mut utxo: UTXO, mut chain: Vec
         }
 
         let merkle_tree = Merkle::create_merkle_tree(&incoming_block.transactions);
-
         if !merkle_tree
             .tree
             .first()
@@ -27,12 +27,14 @@ pub fn chain_validator(receiver: Receiver<Block>, mut utxo: UTXO, mut chain: Vec
             warn!("Validator received block with invalid transactions or invalid merkle root. Ignoring block.");
             continue;
         }
+
         let (valid, utxo_option) =
             utxo.parallel_batch_verify_and_update(&incoming_block.transactions, batch_size);
         if !valid {
             warn!("Validator received block containing invalid transactions. Ignoring block.");
             continue;
         }
+
         utxo = utxo_option.unwrap();
         chain.push(incoming_block);
     }
@@ -44,7 +46,7 @@ pub fn fork_exists(block: &Block, chain: &[Block]) -> bool {
     let head_hash = hash::hash_as_string(&chain.last().unwrap().header);
     if head_hash.eq(prev_hash) {
         info!(
-            "Block {} has been introduced, no fork detected",
+            "Validator: Block {} has been introduced, no fork detected",
             hash::hash_as_string(&block.header)
         );
         return false;
@@ -52,14 +54,14 @@ pub fn fork_exists(block: &Block, chain: &[Block]) -> bool {
         for b in chain.iter().rev() {
             if b.header.previous_hash.eq(prev_hash) {
                 warn!(
-                    "Fork has been detected! Fork root at block header {}",
+                    "Validator: Fork has been detected! Fork root at block header {}",
                     prev_hash
                 );
                 return true;
             }
         }
         warn!(
-            "Received new block containing previous hash ({}) to unknown block",
+            "Validator: Received new block containing previous hash ({}) to unknown block",
             prev_hash
         );
         return true;

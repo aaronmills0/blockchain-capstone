@@ -1,8 +1,8 @@
 use crate::block::Block;
 use crate::hash;
+use crate::merkle::Merkle;
 use crate::save_and_load::deserialize_json;
-use crate::sign_and_verify;
-use crate::sign_and_verify::Verifier;
+use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
 use crate::simulation::KeyMap;
 use crate::transaction::{Outpoint, PublicKeyScript, TxOut};
 use crate::utxo::UTXO;
@@ -12,43 +12,97 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 pub fn validate_chain_performance_test(config_path: &str) {
+    let (_, existing_chain, existing_utxo, _, pr_keys, pu_keys, _) = deserialize_json(config_path);
+    let (initial_utxo, _) = initial_state(pr_keys, pu_keys);
+    display_utxo(&existing_utxo);
+    println!("\n-------------------------------\n");
     let start_time = Instant::now();
-    let (_, existing_chain, existing_utxo, _, _) = deserialize_json(config_path);
-    if validate_existing_chain(&existing_chain, &existing_utxo) {
-        info!("Validate Blockchain Test Success!\n Chain was found to be valid in {:.2?}s for chain of size N = {} blocks.", start_time.elapsed(), existing_chain.len());
+    if validate_existing_chain(&existing_chain, &existing_utxo, initial_utxo) {
+        println!("Chain Validation Test: Validate Blockchain Test Success!\n Chain was found to be valid in {:.2?} for chain of size N = {} blocks.", start_time.elapsed(), existing_chain.len());
     } else {
-        info!("Validate Blockchain Test Success!\n Chain was found to be invalid in {:.2?}s for chain of size N = {} blocks.", start_time.elapsed(), existing_chain.len());
+        info!("Chain Validation Test: Validate Blockchain Test Success!\n Chain was found to be invalid in {:.2?} for chain of size N = {} blocks.", start_time.elapsed(), existing_chain.len());
     }
 }
-//STILL NEED TO WRITE UNIT TEST FOR UTXOEQUALS METHOD
-fn validate_existing_chain(existing_chain: &[Block], existing_utxo: &UTXO) -> bool {
+
+fn validate_existing_chain(
+    existing_chain: &[Block],
+    existing_utxo: &UTXO,
+    mut initial_utxo: UTXO,
+) -> bool {
     //Genesis UTXO and Keymap of the chain to be validated
-    let (mut utxo, _) = initial_state();
     for block in existing_chain.iter() {
-        for tx in block.transactions.iter() {
-            if !utxo.verify_transaction(tx) {
-                warn!("Existing Chain Contains Eroneus Transactions; test data unusable. Exiting Test");
-                panic!("Existing Chain Contains Eroneus Transactions; test data unusable");
-            }
-            utxo.update(tx);
+        //println!("prev hash: {}", block.header.previous_hash);
+        if block.header.previous_hash == "0".repeat(64)
+            || Merkle::create_merkle_tree(&block.transactions)
+                .tree
+                .first()
+                .unwrap()
+                != &block.header.merkle_root
+        {
+            warn!(
+                "Chain Validation Test: received a block with invalid merkle root. Ignoring block"
+            );
+            continue;
         }
+
+        (_, initial_utxo) = Block::verify_and_update(block.transactions.clone(), initial_utxo);
+        // let t = block.transactions.clone();
+        // for transaction in t {
+        //     if !utxo_copy.verify_transaction(&transaction) {
+        //         continue;
+        //     }
+        //     utxo_copy.update(&transaction);
+        // }
+
+        // for tx in block.transactions.iter() {
+        //     if !initial_utxo.verify_transaction(tx) {
+        //         warn!("Chain Validation Test: Existing Chain Contains Eroneus Transactions; test data unusable. Exiting Test");
+        //         panic!();
+        //     }
+        //     initial_utxo.update(tx);
+
+        // }
     }
-    if !utxo.utxo_equals(existing_utxo) {
+    //    if utxo_copy.utxo_equals(existing_utxo){
+    //         println!("they are equal");
+    //        return false;
+    //   }
+    //    if initial_utxo.utxo_equals(existing_utxo){
+    //         display_utxo(&initial_utxo);
+    //         println!("\n-----------------------------------------\n");
+    //         display_utxo(existing_utxo);
+    //         return false;
+    //     }
+    if !initial_utxo.utxo_equals(existing_utxo) {
+        display_utxo(&initial_utxo);
+        println!("\n-----------------------------------------\n");
+        display_utxo(existing_utxo);
         return false;
     }
+
     return true;
 }
 
-fn initial_state() -> (UTXO, KeyMap) {
+fn display_utxo(utxo: &UTXO) {
+    for (key, value) in utxo.iter() {
+        println!("Outpoint: {}\n TxOut: {}", key.txid, value.value);
+    }
+}
+fn initial_state(
+    pr_keys: (PrivateKey, PrivateKey),
+    pu_keys: (PublicKey, PublicKey),
+) -> (UTXO, KeyMap) {
     let mut utxo: UTXO = UTXO(HashMap::new());
     let mut key_map: KeyMap = KeyMap(HashMap::new());
 
-    let (private_key0, public_key0) = sign_and_verify::create_keypair();
+    let (private_key0, private_key1) = pr_keys;
+    let (public_key0, public_key1) = pu_keys;
+
     let outpoint0: Outpoint = Outpoint {
         txid: "0".repeat(64),
         index: 0,
     };
-    let (private_key1, public_key1) = sign_and_verify::create_keypair();
+
     let outpoint1: Outpoint = Outpoint {
         txid: "0".repeat(64),
         index: 1,

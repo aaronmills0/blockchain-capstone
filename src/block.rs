@@ -78,6 +78,7 @@ impl Block {
             keymap_map = HashMap::new();
             keymap = KeyMap(HashMap::new());
             counter = 0;
+
             while counter < simulation::BLOCK_SIZE {
                 (tx, keymap) = transaction_block_transaction_keymap_rx.recv().unwrap();
                 keymap_map.insert(hash::hash_as_string(&tx), keymap.clone());
@@ -92,7 +93,7 @@ impl Block {
             // Get the 'mining' time as a duration
             mining_time = time::Duration::from_secs((duration * normalized as u32) as u64);
             // Sleep to mimic the 'mining' time
-            thread::sleep(mining_time);
+            //thread::sleep(mining_time);
             // Create a new block
             (transactions, utxo) = Block::verify_and_update(transactions, utxo);
             if transactions.is_empty() {
@@ -166,7 +167,12 @@ impl Block {
             }
             block_sim_block_tx.send(block.clone()).unwrap();
             blockchain.push(block);
-            Block::print_blockchain(&blockchain);
+            println!("Blockchain Size: {}", blockchain.len());
+            if blockchain.len() == 350{
+                println!("______________REACHED 50________________");
+                return;
+            }
+            //Block::print_blockchain(&blockchain);
             block_sim_utxo_tx.send(utxo.clone()).unwrap();
             block_sim_keymap_tx.send(keymap.clone()).unwrap();
             block_validator_block_tx.send(block_copy).unwrap();
