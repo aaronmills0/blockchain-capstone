@@ -129,7 +129,7 @@ impl Transaction {
         }
 
         let num_inputs: usize = rng.gen_range(1..=utxo.len());
-        let num_outputs: usize = rng.gen_range(1..=max_num_outputs);
+        let mut num_outputs: usize = rng.gen_range(1..=max_num_outputs);
 
         let utxo_keys: Vec<Outpoint> = unspent_txos
             .choose_multiple(rng, num_inputs)
@@ -211,7 +211,13 @@ impl Transaction {
         }
 
         let mut key_vec: Vec<(PrivateKey, PublicKey)> = Vec::new();
-        for output_value in output_values.iter().take(num_outputs) {
+        for output_value in output_values.iter() {
+            if *output_value == 0 {
+                num_outputs -= 1;
+                info!("Output with 0 value was created. Discarding the output...");
+                continue;
+            }
+
             (new_private_key, new_public_key) = sign_and_verify::create_keypair();
 
             pk_script = PublicKeyScript {
@@ -238,7 +244,7 @@ impl Transaction {
         // Update the key_map but only if the transaction is valid
         if !invalid {
             let txid: String = hash::hash_as_string(&transaction);
-            for (k, key) in key_vec.iter().enumerate().take(num_outputs) {
+            for (k, key) in key_vec.iter().enumerate() {
                 outpoint = Outpoint {
                     txid: txid.clone(),
                     index: k as u32,
