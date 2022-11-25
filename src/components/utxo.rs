@@ -385,7 +385,6 @@ impl UTXO {
 
 #[cfg(test)]
 mod tests {
-
     use super::{HashMap, Transaction, UTXO};
     use crate::components::transaction::{Outpoint, PublicKeyScript, SignatureScript, TxIn, TxOut};
     use crate::utils::hash;
