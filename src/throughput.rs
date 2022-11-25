@@ -55,6 +55,8 @@ mod tests {
             full_public_key: old_public_key0,
         };
 
+        key_map.remove(&outpoint0);
+
         let tx_in1: TxIn = TxIn {
             outpoint: outpoint0,
             sig_script: sig_script1,
@@ -122,6 +124,8 @@ mod tests {
                     full_public_key: old_public_key0,
                 };
 
+                key_map.remove(&outpoint0);
+
                 let tx_in1: TxIn = TxIn {
                     outpoint: outpoint0,
                     sig_script: sig_script1,
@@ -146,7 +150,6 @@ mod tests {
                 };
 
                 let txid = hash::hash_as_string(&transaction1);
-
                 transactions.push(transaction1);
             }
         }
@@ -156,7 +159,7 @@ mod tests {
 
     #[test]
     fn test_transaction_throughput() {
-        for k in 0..3 {
+        for k in 0..5 {
             let base: u32 = 10;
             let mut multiplicative_index: u32 = 0;
 
@@ -183,6 +186,8 @@ mod tests {
                     "Time elapsed for {:#} in Run {:#} is: {:?}",
                     multiplicative_index, k, duration
                 );
+
+                println!();
             }
         }
     }
