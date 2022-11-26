@@ -50,7 +50,7 @@ impl UTXO {
         let mut tx_out: TxOut;
         let mut in_out_pairs: Vec<(TxIn, TxOut)> = Vec::new();
 
-        let start0 = Instant::now();
+        //let start0 = Instant::now();
         for tx_in in transaction.tx_inputs.iter() {
             // If the uxto doesn't contain the output associated with this input: invalid transaction
             if !utxo.contains_key(&tx_in.outpoint) {
@@ -59,8 +59,8 @@ impl UTXO {
                     &tx_in.outpoint
                 );
 
-                let duration0 = start0.elapsed();
-                println!("Time elapsed for txin for loop is: {:?}", duration0);
+                //let duration0 = start0.elapsed();
+                //println!("Time elapsed for txin for loop is: {:?}", duration0);
                 return false;
             }
             // Get the transaction output, add its value to the incoming balance
@@ -71,20 +71,21 @@ impl UTXO {
             utxo.remove(&tx_in.outpoint);
             in_out_pairs.push((tx_in.clone(), tx_out));
         }
-        let duration0 = start0.elapsed();
-        println!("Time elapsed for txin for loop is: {:?}", duration0);
+        //let duration0 = start0.elapsed();
+        //println!("Time elapsed for txin for loop is: {:?}", duration0);
         // At this point, double spending and existance of unspent transaction output has been verified (1.)
 
         // Obtain the total amount that is requested to be transferred
-        let start1 = Instant::now();
+        //let start1 = Instant::now();
         for new_tx_out in transaction.tx_outputs.iter() {
             outgoing_balance += new_tx_out.value;
         }
-        let duration1 = start1.elapsed();
+        //let duration1 = start1.elapsed();
 
-        println!("Time elapsed for txout for loop is: {:?}", duration1);
+        //println!("Time elapsed for txout for loop is: {:?}", duration1);
         // If we do not have the balance to fulfill this transaction, return false.
         if outgoing_balance > incoming_balance {
+            //println!("The outgoing balance is superior to the incoming balance!!!");
             return false;
         }
 
@@ -93,7 +94,7 @@ impl UTXO {
         let mut public_key: &PublicKey;
         // message concatenates txid, output index of the previous transaction, old public key script, new public key script, and the value for the next recipient
         // For now, a message contains the txid, output index of the previous transaction, old public key hash
-        let start2 = Instant::now();
+        //let start2 = Instant::now();
         let mut message: String;
         for (tx_in, tx_out) in in_out_pairs.iter() {
             signature = &tx_in.sig_script.signature;
@@ -106,11 +107,12 @@ impl UTXO {
                 .verifier
                 .verify(&message, &signature, &public_key))
             {
+                //println!("Signature don't match!!!");
                 return false;
             }
         }
-        let duration2 = start2.elapsed();
-        println!("Time elapsed for signature check is: {:?}", duration2);
+        //let duration2 = start2.elapsed();
+        //println!("Time elapsed for signature check is: {:?}", duration2);
 
         return true;
     }

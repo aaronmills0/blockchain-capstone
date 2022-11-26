@@ -55,8 +55,6 @@ mod tests {
             full_public_key: old_public_key0,
         };
 
-        key_map.remove(&outpoint0);
-
         let tx_in1: TxIn = TxIn {
             outpoint: outpoint0,
             sig_script: sig_script1,
@@ -80,7 +78,7 @@ mod tests {
             txout_count: 1,
         };
 
-        let txid = hash::hash_as_string(&transaction1);
+        let mut txid = hash::hash_as_string(&transaction1);
 
         transactions.push(transaction1);
 
@@ -107,24 +105,22 @@ mod tests {
                 let mut message: String;
 
                 //We reconstruct the txout1 as it does not implement the copy trait
-                let tx_out1: TxOut = TxOut {
+                let tx_out0: TxOut = TxOut {
                     value: 500,
                     pk_script: PublicKeyScript {
-                        public_key_hash: hash::hash_as_string(&public_key1),
+                        public_key_hash: hash::hash_as_string(&old_public_key0),
                         verifier: Verifier {},
                     },
                 };
 
                 message = String::from(&outpoint0.txid)
                     + &outpoint0.index.to_string()
-                    + &tx_out1.pk_script.public_key_hash;
+                    + &tx_out0.pk_script.public_key_hash;
 
                 sig_script1 = SignatureScript {
                     signature: sign_and_verify::sign(&message, &old_private_key0),
                     full_public_key: old_public_key0,
                 };
-
-                key_map.remove(&outpoint0);
 
                 let tx_in1: TxIn = TxIn {
                     outpoint: outpoint0,
@@ -149,7 +145,8 @@ mod tests {
                     txout_count: 1,
                 };
 
-                let txid = hash::hash_as_string(&transaction1);
+                txid = hash::hash_as_string(&transaction1);
+                utxo.update(&transaction1);
                 transactions.push(transaction1);
             }
         }

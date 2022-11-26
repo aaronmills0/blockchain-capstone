@@ -123,41 +123,41 @@ impl Block {
     ) -> (Vec<Transaction>, UTXO) {
         let mut utxo_copy = utxo.clone();
         let mut transactions_valid: Vec<Transaction> = Vec::new();
-        let start0 = Instant::now();
+        //let start0 = Instant::now();
         for transaction in transactions {
-            let start1 = Instant::now();
+            //let start1 = Instant::now();
             if !utxo_copy.verify_transaction(&transaction) {
-                let duration1 = start1.elapsed();
+                /*  let duration1 = start1.elapsed();
                 println!(
                     "The verificaton is false!!!!. Time elapsed for utxo.verify_transaction is: {:?}",
                     duration1
-                );
+                );*/
                 continue;
             }
-            let duration1 = start1.elapsed();
+            //let duration1 = start1.elapsed();
 
-            println!(
+            /*println!(
                 "Time elapsed for utxo.verify_transaction is: {:?}",
                 duration1
-            );
+            );*/
 
-            let start2 = Instant::now();
+            //let start2 = Instant::now();
             utxo_copy.update(&transaction);
-            let duration2 = start2.elapsed();
+            //let duration2 = start2.elapsed();
 
-            println!("Time elapsed for utxo_copy.update is: {:?}", duration2);
+            //println!("Time elapsed for utxo_copy.update is: {:?}", duration2);
 
-            let start3 = Instant::now();
+            //let start3 = Instant::now();
             transactions_valid.push(transaction);
-            let duration3 = start3.elapsed();
+            //let duration3 = start3.elapsed();
 
-            println!(
+            /*println!(
                 "Time elapsed for transactions_valid.push(transaction) is: {:?}",
                 duration3
-            );
+            );*/
         }
-        let duration0 = start0.elapsed();
-        println!("Time elapsed for transaction_loop is: {:?}", duration0);
+        //let duration0 = start0.elapsed();
+        //println!("Time elapsed for transaction_loop is: {:?}", duration0);
         return (transactions_valid, utxo_copy);
     }
 
