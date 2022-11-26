@@ -66,9 +66,9 @@ impl Block {
         let mut sample: f32;
         let mut normalized: f32;
         let mut mining_time: time::Duration;
-        let mut block: Block;
+        let block: Block;
         let mut counter: u32;
-        let mut merkle: Merkle;
+        let merkle: Merkle;
         let mut transactions: Vec<Transaction>;
         let mut keymap_map: HashMap<String, KeyMap>;
         let mut keymap: KeyMap;
@@ -93,7 +93,7 @@ impl Block {
             // Get the 'mining' time as a duration
             mining_time = time::Duration::from_secs((duration * normalized as u32) as u64);
             // Sleep to mimic the 'mining' time
-            //thread::sleep(mining_time);
+            thread::sleep(mining_time);
             // Create a new block
             (transactions, utxo) = Block::verify_and_update(transactions, utxo);
             if transactions.is_empty() {
@@ -167,15 +167,12 @@ impl Block {
             }
             block_sim_block_tx.send(block.clone()).unwrap();
             blockchain.push(block);
-            println!("Blockchain Size: {}", blockchain.len());
-            if blockchain.len() == 350{
-                println!("______________REACHED 50________________");
-                return;
-            }
-            //Block::print_blockchain(&blockchain);
-            block_sim_utxo_tx.send(utxo.clone()).unwrap();
-            block_sim_keymap_tx.send(keymap.clone()).unwrap();
+
+            Block::print_blockchain(&blockchain);
+            block_sim_utxo_tx.send(utxo).unwrap();
+            block_sim_keymap_tx.send(keymap).unwrap();
             block_validator_block_tx.send(block_copy).unwrap();
+            return;
         }
     }
 

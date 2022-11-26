@@ -5,6 +5,7 @@ use crate::simulation::BLOCK_SIZE;
 use crate::utxo::UTXO;
 use log::{info, warn};
 use std::sync::mpsc::Receiver;
+use std::time::Instant;
 use std::vec::Vec;
 
 pub fn chain_validator(receiver: Receiver<Block>, mut utxo: UTXO, mut chain: Vec<Block>) {
@@ -13,10 +14,13 @@ pub fn chain_validator(receiver: Receiver<Block>, mut utxo: UTXO, mut chain: Vec
     loop {
         let incoming_block = receiver.recv().unwrap();
 
+        let full_time = Instant::now();
+        let fork_time = Instant::now();
         if fork_exists(&incoming_block, &chain) {
             continue;
         }
-
+        println!("Fork Detection took {:.2?}", fork_time.elapsed());
+        let merkle_time = Instant::now();
         let merkle_tree = Merkle::create_merkle_tree(&incoming_block.transactions);
         if !merkle_tree
             .tree
@@ -70,6 +74,7 @@ pub fn fork_exists(block: &Block, chain: &[Block]) -> bool {
 
 #[cfg(test)]
 mod tests {
+
     use crate::block::{Block, BlockHeader};
     use crate::hash;
     use crate::merkle::Merkle;
