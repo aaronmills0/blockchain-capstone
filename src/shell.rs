@@ -76,7 +76,7 @@ pub fn shell() {
             }
             "test" => {
                 info!("The user selected: validate blockchain test");
-                validate_chain_performance_test("./config/blockchain_200.json");
+                validate_chain_performance_test("./test.json");
             }
             _ => {
                 warn!("Invalid Command");
