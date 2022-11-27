@@ -14,7 +14,7 @@ use std::ops::{Deref, DerefMut};
 use std::str;
 
 #[derive(Clone, Deserialize, Serialize)]
-pub struct Signature(DalekSignature);
+pub struct Signature(pub DalekSignature);
 
 impl Deref for Signature {
     type Target = DalekSignature;
@@ -86,6 +86,14 @@ impl Verifier {
         return public_key
             .verify(message.as_bytes(), signed_message)
             .is_ok();
+    }
+
+    pub fn verify_batch(
+        messages: &[&[u8]],
+        signatures: &[DalekSignature],
+        public_keys: &[DalekPublicKey],
+    ) -> bool {
+        return ed25519_dalek::verify_batch(messages, signatures, public_keys).is_ok();
     }
 }
 

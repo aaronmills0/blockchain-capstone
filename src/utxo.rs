@@ -1,11 +1,14 @@
 use crate::hash::hash_as_string;
-use crate::sign_and_verify::{PublicKey, Signature};
+use crate::sign_and_verify::{PublicKey, Signature, Verifier};
 use crate::transaction::{Outpoint, Transaction, TxIn, TxOut};
+use ed25519_dalek::{PublicKey as DalekPublicKey, Signature as DalekSignature};
 use log::warn;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
+use std::time::{Duration, Instant};
+use std::{thread, time};
 
 /**
  * The Utxo is a map containing the Unspent Transaction (X) Outputs.
@@ -109,6 +112,69 @@ impl UTXO {
         }
 
         return true;
+    }
+
+    pub fn batch_verify_and_update(&self, transactions: Vec<Transaction>) -> (bool, Option<UTXO>) {
+        let mut utxo: UTXO = self.clone();
+        let mut incoming_balance: u32;
+        let mut outgoing_balance: u32;
+        let mut tx_out: TxOut;
+        let mut in_out_pairs: Vec<(TxIn, TxOut)> = Vec::new();
+        let mut msg_vec: Vec<Vec<u8>> = Vec::new();
+        let mut sig_vec: Vec<DalekSignature> = Vec::new();
+        let mut pk_vec: Vec<DalekPublicKey> = Vec::new();
+        for transaction in transactions {
+            incoming_balance = 0;
+            outgoing_balance = 0;
+            for tx_in in transaction.tx_inputs.iter() {
+                // If the uxto doesn't contain the output associated with this input: invalid transaction
+                if !utxo.contains_key(&tx_in.outpoint) {
+                    warn!(
+                        "Discarding invalid transaction! UTXO does not contain unspent outpoint: {:#?}",
+                        &tx_in.outpoint
+                    );
+                    return (false, None);
+                }
+                // Get the transaction output, add its value to the incoming balance
+                // Store the TxIn, TxOut pair in in_out_pairs for verification later
+                // Remove the output from the uxto copy.
+                tx_out = utxo.get(&tx_in.outpoint).unwrap().clone();
+                incoming_balance += tx_out.value;
+
+                sig_vec.push(tx_in.sig_script.signature.0);
+                pk_vec.push(tx_in.sig_script.full_public_key.0);
+                msg_vec.push(Vec::from(
+                    (String::from(tx_in.outpoint.txid.clone())
+                        + &tx_in.outpoint.index.to_string()
+                        + &tx_out.pk_script.public_key_hash)
+                        .as_bytes(),
+                ));
+
+                utxo.remove(&tx_in.outpoint);
+                in_out_pairs.push((tx_in.clone(), tx_out));
+            }
+            for new_tx_out in transaction.tx_outputs.iter() {
+                outgoing_balance += new_tx_out.value;
+            }
+            if outgoing_balance > incoming_balance {
+                warn!(
+                    "Discarding invalid transaction! The total available balance cannot support this transaction."
+                );
+                return (false, None);
+            }
+            // Update the utxo copy even though signature has not been checked yet
+            utxo.update(&transaction);
+        }
+
+        let msg_bytes: Vec<&[u8]> = msg_vec.iter().map(|x| &x[..]).collect();
+
+        let sig_status = Verifier::verify_batch(&msg_bytes, &sig_vec, &pk_vec);
+
+        if sig_status {
+            return (true, Some(utxo));
+        } else {
+            return (false, None);
+        }
     }
 
     pub fn update(&mut self, transaction: &Transaction) {
