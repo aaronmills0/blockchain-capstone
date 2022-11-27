@@ -5,9 +5,9 @@ use crate::simulation::KeyMap;
 use crate::utxo::UTXO;
 
 use log::{info, warn};
-use rand::rngs::ThreadRng;
-use rand::seq::SliceRandom;
-use rand::Rng;
+use rand_1::rngs::ThreadRng;
+use rand_1::seq::SliceRandom;
+use rand_1::Rng;
 use rand_distr::{Distribution, Exp};
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
@@ -57,7 +57,7 @@ impl Transaction {
             warn!("Invalid input. A non-positive mean for transaction rate is invalid for an exponential distribution but the mean was {}", transaction_mean);
         }
 
-        let mut rng: ThreadRng = rand::thread_rng();
+        let mut rng: ThreadRng = rand_1::thread_rng();
         let mut invalid: bool;
         let lambda: f32 = 1.0 / transaction_mean;
         let exp: Exp<f32> = Exp::new(lambda).unwrap();
@@ -190,7 +190,7 @@ impl Transaction {
             }
 
             sig_script = SignatureScript {
-                signature: sign_and_verify::sign(&message, &old_private_key),
+                signature: sign_and_verify::sign(&message, &old_private_key, &public_key),
                 full_public_key: public_key,
             };
 
@@ -339,7 +339,7 @@ mod tests {
             + &tx_out0.pk_script.public_key_hash;
 
         let sig_script1 = SignatureScript {
-            signature: sign_and_verify::sign(&message, &old_private_key),
+            signature: sign_and_verify::sign(&message, &old_private_key, &old_public_key),
             full_public_key: old_public_key,
         };
 
