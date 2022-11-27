@@ -1,20 +1,14 @@
 use ed25519_dalek::{
     ExpandedSecretKey, Keypair, PublicKey as DalekPublicKey, SecretKey as DalekSecretKey,
-    Signature as DalekSignature, SignatureError, Signer, Verifier as DalekVerifer,
+    Signature as DalekSignature, Verifier as DalekVerifer,
 };
-use rand_2::distributions::Exp;
 use rand_2::rngs::OsRng;
-use secp256k1::ecdsa::Signature as SecpSignature;
-use secp256k1::hashes::sha256;
-use secp256k1::{Message, Secp256k1};
-use secp256k1::{PublicKey as SecpPublicKey, SecretKey as SecpSecretKey};
 use serde::{Deserialize, Serialize};
-use sha2::digest::typenum::private::PrivateIntegerAdd;
 use std::ops::{Deref, DerefMut};
 use std::str;
 
 #[derive(Clone, Deserialize, Serialize)]
-pub struct Signature(DalekSignature);
+pub struct Signature(pub DalekSignature);
 
 impl Deref for Signature {
     type Target = DalekSignature;
@@ -86,6 +80,14 @@ impl Verifier {
         return public_key
             .verify(message.as_bytes(), signed_message)
             .is_ok();
+    }
+
+    pub fn verify_batch(
+        messages: &[&[u8]],
+        signatures: &[DalekSignature],
+        public_keys: &[DalekPublicKey],
+    ) -> bool {
+        return ed25519_dalek::verify_batch(messages, signatures, public_keys).is_ok();
     }
 }
 

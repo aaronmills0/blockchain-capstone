@@ -4,7 +4,7 @@ use crate::transaction::Transaction;
 use crate::utxo::UTXO;
 use crate::{hash, simulation};
 
-use log::info;
+use log::{info, warn};
 use rand_1::rngs::ThreadRng;
 use rand_1::Rng;
 use rand_distr::{Distribution, Exp};
@@ -124,6 +124,7 @@ impl Block {
             let block_copy = block.clone();
             //Randomly Injects Fork
             if rng.gen_range(1..=10) == 1 {
+                warn!("Sending a duplicate block! Expecting a fork to be detected.");
                 let block_copy2 = block_copy.clone();
                 block_validator_block_tx.send(block_copy2).unwrap();
             }
