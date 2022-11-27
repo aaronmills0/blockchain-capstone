@@ -209,7 +209,7 @@ mod tests {
             + &tx_out0.pk_script.public_key_hash;
 
         let sig_script1 = SignatureScript {
-            signature: sign_and_verify::sign(&message, &old_private_key0),
+            signature: sign_and_verify::sign(&message, &old_private_key0, &old_public_key0),
             full_public_key: old_public_key0,
         };
 
@@ -223,7 +223,7 @@ mod tests {
             + &tx_out0_1.pk_script.public_key_hash;
 
         let sig_script1_1 = SignatureScript {
-            signature: sign_and_verify::sign(&message, &old_private_key0_1),
+            signature: sign_and_verify::sign(&message, &old_private_key0_1, &old_public_key0_1),
             full_public_key: old_public_key0_1,
         };
 
@@ -237,7 +237,7 @@ mod tests {
             + &tx_out0_2.pk_script.public_key_hash;
 
         let sig_script1_2 = SignatureScript {
-            signature: sign_and_verify::sign(&message, &old_private_key0_2),
+            signature: sign_and_verify::sign(&message, &old_private_key0_2, &old_public_key0_2),
             full_public_key: old_public_key0_2,
         };
 
@@ -298,7 +298,7 @@ mod tests {
             + &tx_out0.pk_script.public_key_hash;
 
         let sig_script1 = SignatureScript {
-            signature: sign_and_verify::sign(&message, &old_private_key),
+            signature: sign_and_verify::sign(&message, &old_private_key, &old_public_key),
             full_public_key: old_public_key,
         };
 
@@ -357,7 +357,7 @@ mod tests {
             + &tx_out0.pk_script.public_key_hash;
 
         let sig_script1 = SignatureScript {
-            signature: sign_and_verify::sign(&message, &old_private_key),
+            signature: sign_and_verify::sign(&message, &old_private_key, &old_public_key),
             full_public_key: old_public_key,
         };
 
@@ -418,7 +418,7 @@ mod tests {
             + &tx_out0.pk_script.public_key_hash;
 
         let sig_script1 = SignatureScript {
-            signature: sign_and_verify::sign(&message, &old_private_key),
+            signature: sign_and_verify::sign(&message, &old_private_key, &old_public_key),
             full_public_key: old_public_key,
         };
 

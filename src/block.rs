@@ -5,8 +5,8 @@ use crate::utxo::UTXO;
 use crate::{hash, simulation};
 
 use log::info;
-use rand::rngs::ThreadRng;
-use rand::Rng;
+use rand_1::rngs::ThreadRng;
+use rand_1::Rng;
 use rand_distr::{Distribution, Exp};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -61,7 +61,7 @@ impl Block {
 
         let lambda: f32 = 1.0 / mean;
         let exp: Exp<f32> = Exp::new(lambda).unwrap();
-        let mut rng: ThreadRng = rand::thread_rng();
+        let mut rng: ThreadRng = rand_1::thread_rng();
         let mut sample: f32;
         let mut normalized: f32;
         let mut mining_time: time::Duration;
