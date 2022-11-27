@@ -1,5 +1,6 @@
 use crate::block::Block;
 use crate::hash;
+use crate::merkle::Merkle;
 use crate::utxo::UTXO;
 use log::{info, warn};
 use std::sync::mpsc::Receiver;
@@ -13,9 +14,20 @@ pub fn chain_validator(receiver: Receiver<Block>, mut utxo: UTXO, mut chain: Vec
             continue;
         }
 
+        let merkle_tree = Merkle::create_merkle_tree(&incoming_block.transactions);
+
+        if !merkle_tree
+            .tree
+            .first()
+            .unwrap()
+            .eq(&incoming_block.header.merkle_root)
+        {
+            warn!("Validator received block with invalid transactions or invalid merkle root. Ignoring block.");
+            continue;
+        }
         let (valid, utxo_option) = utxo.batch_verify_and_update(&incoming_block.transactions);
         if !valid {
-            warn!("Validator received block containing invalid transactions. Ignoring block");
+            warn!("Validator received block containing invalid transactions. Ignoring block.");
             continue;
         }
         utxo = utxo_option.unwrap();

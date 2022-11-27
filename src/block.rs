@@ -50,6 +50,7 @@ impl Block {
         mut blockchain: Vec<Block>,
         mean: f32,
         duration: u32,
+        invalid_block_frequency: u32,
     ) {
         if mean <= 0.0 {
             panic!("Invalid input. A non-positive mean is invalid for an exponential distribution");
@@ -108,6 +109,41 @@ impl Block {
             }
             if !found {
                 panic!("KeyMap not found!");
+            }
+
+            if rng.gen_range(1..=invalid_block_frequency) == 1 {
+                let invalid_type = rng.gen_range(1..=3);
+                let mut transactions_copy = transactions.clone();
+                let merkle_copy: Merkle = Merkle::create_merkle_tree(&transactions);
+                let mut previous_hash_copy =
+                    hash::hash_as_string(&blockchain.last().unwrap().header);
+                let mut merkle_root_copy = merkle_copy.tree.first().unwrap().clone();
+                if invalid_type == 1 {
+                    warn!(
+                        "Sending invalid block! Expect a block containing an invalid transaction."
+                    );
+                    let random_index = rng.gen_range(0..transactions_copy.len());
+                    transactions_copy[random_index].tx_inputs[0].outpoint.txid =
+                        hash::hash_as_string(
+                            &transactions_copy[random_index].tx_inputs[0].outpoint.txid,
+                        );
+                } else if invalid_type == 2 {
+                    warn!("Sending invalid block! Expect a block with an incorrect previous hash.");
+                    previous_hash_copy = hash::hash_as_string(&previous_hash_copy);
+                } else {
+                    warn!("Sending invalid block! Expect a block with an incorrect merkle root.");
+                    merkle_root_copy = hash::hash_as_string(&merkle_root_copy);
+                }
+                let invalid_block = Block {
+                    header: BlockHeader {
+                        previous_hash: previous_hash_copy,
+                        merkle_root: merkle_root_copy,
+                        nonce: 0,
+                    },
+                    merkle: merkle_copy,
+                    transactions: transactions_copy,
+                };
+                block_validator_block_tx.send(invalid_block).unwrap();
             }
             info!("Creating block with {} transactions", transactions.len());
             merkle = Merkle::create_merkle_tree(&transactions);
