@@ -24,7 +24,8 @@ pub static BLOCK_SIZE: u32 = 8;
 static MAX_NUM_OUTPUTS: usize = 3;
 static TRANSACTION_MEAN: f32 = 1.0;
 static TRANSACTION_DURATION: u32 = 5;
-static MEAN_INVALID_RATIO: u32 = 50;
+static INVALID_TRANSACTION_FREQUENCY: u32 = 50;
+static INVALID_BLOCK_FREQUENCY: u32 = 3;
 
 pub fn start(rx_sim: Receiver<String>) {
     let mut blockchain: Vec<Block> = Vec::new();
@@ -113,7 +114,7 @@ pub fn start(rx_sim: Receiver<String>) {
             MAX_NUM_OUTPUTS,
             TRANSACTION_MEAN,
             TRANSACTION_DURATION,
-            MEAN_INVALID_RATIO,
+            INVALID_TRANSACTION_FREQUENCY,
             utxo,
             key_map,
         );
@@ -132,6 +133,7 @@ pub fn start(rx_sim: Receiver<String>) {
             blockchain_copy,
             BLOCK_MEAN,
             BLOCK_DURATION,
+            INVALID_BLOCK_FREQUENCY,
         );
     });
 

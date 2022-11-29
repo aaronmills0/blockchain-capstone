@@ -140,13 +140,12 @@ mod tests {
         let old_public_key: PublicKey;
 
         (old_private_key, old_public_key) = key_map[&outpoint0].clone();
-
         let message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
             + &tx_out0.pk_script.public_key_hash;
 
         let sig_script1 = SignatureScript {
-            signature: sign_and_verify::sign(&message, &old_private_key),
+            signature: sign_and_verify::sign(&message, &old_private_key, &old_public_key),
             full_public_key: old_public_key,
         };
 

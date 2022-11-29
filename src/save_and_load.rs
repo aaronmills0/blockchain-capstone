@@ -253,7 +253,7 @@ mod tests {
             + &utxo[&outpoint00].pk_script.public_key_hash;
 
         let sig_script10 = SignatureScript {
-            signature: sign_and_verify::sign(&message10, &private_key00),
+            signature: sign_and_verify::sign(&message10, &private_key00, &public_key00),
             full_public_key: public_key00,
         };
 
@@ -267,7 +267,7 @@ mod tests {
             + &utxo[&outpoint01].pk_script.public_key_hash;
 
         let sig_script11 = SignatureScript {
-            signature: sign_and_verify::sign(&message11, &private_key01),
+            signature: sign_and_verify::sign(&message11, &private_key01, &public_key01),
             full_public_key: public_key01,
         };
 
@@ -347,7 +347,7 @@ mod tests {
             + &utxo[&outpoint10].pk_script.public_key_hash;
 
         let sig_script20 = SignatureScript {
-            signature: sign_and_verify::sign(&message20, &private_key10),
+            signature: sign_and_verify::sign(&message20, &private_key10, &public_key10),
             full_public_key: public_key10,
         };
 
@@ -439,6 +439,6 @@ mod tests {
     fn test_deserialize_json() {
         let _path = "config/state_2022-11-06-14-40-29.json";
 
-        // let (blockchain, utxo, keymap, config) = deserialize_json(path);
+        //let (initial_txouts, blockchain, utxo, keymap, config) = deserialize_json(path);
     }
 }
