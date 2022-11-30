@@ -45,14 +45,7 @@ fn validate_existing_chain(
             continue;
         }
 
-        (_, initial_utxo) = Block::verify_and_update(block.transactions.clone(), initial_utxo);
-        // let t = block.transactions.clone();
-        // for transaction in t {
-        //     if !utxo_copy.verify_transaction(&transaction) {
-        //         continue;
-        //     }
-        //     utxo_copy.update(&transaction);
-        // }
+        //(_, initial_utxo) = Block::verify_and_update(block.transactions.clone(), initial_utxo);
 
         // for tx in block.transactions.iter() {
         //     if !initial_utxo.verify_transaction(tx) {
@@ -63,16 +56,6 @@ fn validate_existing_chain(
 
         // }
     }
-    //    if utxo_copy.utxo_equals(existing_utxo){
-    //         println!("they are equal");
-    //        return false;
-    //   }
-    //    if initial_utxo.utxo_equals(existing_utxo){
-    //         display_utxo(&initial_utxo);
-    //         println!("\n-----------------------------------------\n");
-    //         display_utxo(existing_utxo);
-    //         return false;
-    //     }
     if !initial_utxo.utxo_equals(existing_utxo) {
         display_utxo(&initial_utxo);
         println!("\n-----------------------------------------\n");
