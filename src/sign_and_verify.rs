@@ -1,15 +1,9 @@
 use ed25519_dalek::{
     ExpandedSecretKey, Keypair, PublicKey as DalekPublicKey, SecretKey as DalekSecretKey,
-    Signature as DalekSignature, SignatureError, Signer, Verifier as DalekVerifer,
+    Signature as DalekSignature, Verifier as DalekVerifer,
 };
-use rand_2::distributions::Exp;
 use rand_2::rngs::OsRng;
-use secp256k1::ecdsa::Signature as SecpSignature;
-use secp256k1::hashes::sha256;
-use secp256k1::{Message, Secp256k1};
-use secp256k1::{PublicKey as SecpPublicKey, SecretKey as SecpSecretKey};
 use serde::{Deserialize, Serialize};
-use sha2::digest::typenum::private::PrivateIntegerAdd;
 use std::ops::{Deref, DerefMut};
 use std::str;
 

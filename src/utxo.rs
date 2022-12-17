@@ -114,7 +114,7 @@ impl UTXO {
         return true;
     }
 
-    pub fn batch_verify_and_update(&self, transactions: Vec<Transaction>) -> (bool, Option<UTXO>) {
+    pub fn batch_verify_and_update(&self, transactions: &Vec<Transaction>) -> (bool, Option<UTXO>) {
         let mut utxo: UTXO = self.clone();
         let mut incoming_balance: u32;
         let mut outgoing_balance: u32;

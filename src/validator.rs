@@ -1,26 +1,36 @@
 use crate::block::Block;
 use crate::hash;
+use crate::merkle::Merkle;
 use crate::utxo::UTXO;
 use log::{info, warn};
 use std::sync::mpsc::Receiver;
 use std::vec::Vec;
 
 pub fn chain_validator(receiver: Receiver<Block>, mut utxo: UTXO, mut chain: Vec<Block>) {
-    'main: loop {
+    loop {
         let incoming_block = receiver.recv().unwrap();
 
         if fork_exists(&incoming_block, &chain) {
             continue;
         }
 
-        for tx in incoming_block.transactions.iter() {
-            if !utxo.verify_transaction(tx) {
-                warn!("Validator received block containing invalid transactions. Ignoring block");
-                continue 'main;
-            }
-            utxo.update(tx);
-        }
+        let merkle_tree = Merkle::create_merkle_tree(&incoming_block.transactions);
 
+        if !merkle_tree
+            .tree
+            .first()
+            .unwrap()
+            .eq(&incoming_block.header.merkle_root)
+        {
+            warn!("Validator received block with invalid transactions or invalid merkle root. Ignoring block.");
+            continue;
+        }
+        let (valid, utxo_option) = utxo.batch_verify_and_update(&incoming_block.transactions);
+        if !valid {
+            warn!("Validator received block containing invalid transactions. Ignoring block.");
+            continue;
+        }
+        utxo = utxo_option.unwrap();
         chain.push(incoming_block);
     }
 }

@@ -214,7 +214,6 @@ impl Transaction {
         for output_value in output_values.iter() {
             if *output_value == 0 {
                 num_outputs -= 1;
-                info!("Output with 0 value was created. Discarding the output...");
                 continue;
             }
 
