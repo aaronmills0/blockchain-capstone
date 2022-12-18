@@ -299,13 +299,9 @@ mod tests {
     use super::hash;
     use crate::sign_and_verify;
     use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
-    use crate::simulation::KeyMap;
     use crate::transaction::{Outpoint, PublicKeyScript, SignatureScript, TxIn, TxOut};
     use crate::{transaction::Transaction, utxo::UTXO};
-    use log::warn;
-    use rand_1::rngs::ThreadRng;
     use std::collections::HashMap;
-    use std::time::Instant;
 
     static MAX_NUM_OUTPUTS: usize = 3;
 

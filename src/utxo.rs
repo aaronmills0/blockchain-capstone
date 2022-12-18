@@ -7,8 +7,6 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
-use std::time::{Duration, Instant};
-use std::{thread, time};
 
 /**
  * The Utxo is a map containing the Unspent Transaction (X) Outputs.
