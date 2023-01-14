@@ -1,7 +1,6 @@
 use crate::graph::create_block_graph;
 use crate::save_and_load::deserialize_json;
 use crate::simulation::start;
-use crate::validate_blockchain::validate_chain_performance_test;
 
 use chrono::Local;
 use log::{info, warn};
@@ -73,10 +72,6 @@ pub fn shell() {
 
                 write_log();
                 exit(0);
-            }
-            "test" => {
-                info!("The user selected: validate blockchain test");
-                validate_chain_performance_test("./test.json");
             }
             _ => {
                 warn!("Invalid Command");

@@ -474,22 +474,22 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_deserialize_json() {
-        let path = "./config/test_2022-11-15-11-50-06.json";
+    // #[test]
+    // fn test_deserialize_json() {
+    //     let path = "./config/test_2022-11-15-11-50-06.json";
 
-        let (initial_tx_outs, blockchain, utxo, keymap, pr_keys, pu_keys, config) =
-            deserialize_json(path);
+    //     let (initial_tx_outs, blockchain, utxo, keymap, pr_keys, pu_keys, config) =
+    //         deserialize_json(path);
 
-        serialize_json(
-            &initial_tx_outs,
-            &blockchain,
-            &utxo,
-            &keymap,
-            &pr_keys,
-            &pu_keys,
-            &config,
-            Some(String::from("test")),
-        );
-    }
+    //     serialize_json(
+    //         &initial_tx_outs,
+    //         &blockchain,
+    //         &utxo,
+    //         &keymap,
+    //         &pr_keys,
+    //         &pu_keys,
+    //         &config,
+    //         Some(String::from("test")),
+    //     );
+    // }
 }

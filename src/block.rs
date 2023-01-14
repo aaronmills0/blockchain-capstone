@@ -66,9 +66,9 @@ impl Block {
         let mut sample: f32;
         let mut normalized: f32;
         let mut mining_time: time::Duration;
-        let block: Block;
+        let mut block: Block;
         let mut counter: u32;
-        let merkle: Merkle;
+        let mut merkle: Merkle;
         let mut transactions: Vec<Transaction>;
         let mut keymap_map: HashMap<String, KeyMap>;
         let mut keymap: KeyMap;
@@ -169,10 +169,9 @@ impl Block {
             blockchain.push(block);
 
             Block::print_blockchain(&blockchain);
-            block_sim_utxo_tx.send(utxo).unwrap();
-            block_sim_keymap_tx.send(keymap).unwrap();
+            block_sim_utxo_tx.send(utxo.clone()).unwrap();
+            block_sim_keymap_tx.send(keymap.clone()).unwrap();
             block_validator_block_tx.send(block_copy).unwrap();
-            return;
         }
     }
 
