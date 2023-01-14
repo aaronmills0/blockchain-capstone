@@ -3,7 +3,6 @@ use crate::hash;
 use crate::merkle::Merkle;
 use crate::save_and_load;
 use crate::save_and_load::Config;
-use log::warn;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_with::serde_as;
@@ -103,7 +102,6 @@ pub fn start(rx_sim: Receiver<String>) {
     let utxo_copy2 = utxo.clone();
 
     // senderfile_receiverfile_object(s)sent_tx/rx
-    let (simulation_transaction_string_tx, simulation_transaction_string_rx) = mpsc::channel();
     let (transaction_block_transaction_keymap_tx, transaction_block_transaction_keymap_rx) =
         mpsc::channel();
     let (block_sim_block_tx, block_sim_block_rx) = mpsc::channel();
@@ -114,7 +112,6 @@ pub fn start(rx_sim: Receiver<String>) {
     thread::spawn(|| {
         Transaction::transaction_generator(
             transaction_block_transaction_keymap_tx,
-            simulation_transaction_string_rx,
             MAX_NUM_OUTPUTS,
             TRANSACTION_MEAN,
             TRANSACTION_DURATION,
@@ -166,14 +163,6 @@ pub fn start(rx_sim: Receiver<String>) {
         let command = rx_sim.try_recv();
         if let Ok(command1) = command {
             if command1 == "save" {
-                if let Err(e) =
-                    simulation_transaction_string_tx.send(mpsc::TryRecvError::Disconnected)
-                {
-                    warn!(
-                        "Sending error to transaction generator failed with message {}",
-                        e
-                    )
-                };
                 save_and_load::serialize_json(
                     &initial_tx_outs,
                     &blockchain,

@@ -166,7 +166,7 @@ impl UTXO {
                 return (false, None);
             }
             // Update the utxo copy even though signature has not been checked yet
-            utxo.update(transaction);
+            utxo.update(&transaction);
         }
 
         let msg_bytes: Vec<&[u8]> = msg_vec.iter().map(|x| &x[..]).collect();
@@ -374,20 +374,6 @@ impl UTXO {
             };
             self.insert(outpoint, tx_out.clone());
         }
-    }
-
-    pub fn utxo_equals(&mut self, utxo: &UTXO) -> bool {
-        for (key, value) in self.iter() {
-            if utxo.contains_key(key)
-                && value.value == utxo.get(key).unwrap().value
-                && value.pk_script.public_key_hash
-                    == utxo.get(key).unwrap().pk_script.public_key_hash
-            {
-                continue;
-            }
-            return false;
-        }
-        return true;
     }
 }
 
@@ -711,104 +697,6 @@ mod tests {
         return (transaction1, utxo);
     }
 
-    fn create_two_equal_utxo() -> (UTXO, UTXO) {
-        let mut utxo: UTXO = UTXO(HashMap::new());
-        let mut utxo1: UTXO = UTXO(HashMap::new());
-
-        let (_, public_key0) = sign_and_verify::create_keypair();
-        let outpoint0: Outpoint = Outpoint {
-            txid: "0".repeat(64),
-            index: 0,
-        };
-        let (_, public_key1) = sign_and_verify::create_keypair();
-        let outpoint1: Outpoint = Outpoint {
-            txid: "0".repeat(64),
-            index: 1,
-        };
-
-        let tx_out0: TxOut = TxOut {
-            value: 500,
-            pk_script: PublicKeyScript {
-                public_key_hash: hash::hash_as_string(&public_key0),
-                verifier: Verifier {},
-            },
-        };
-
-        let tx_out1: TxOut = TxOut {
-            value: 850,
-            pk_script: PublicKeyScript {
-                public_key_hash: hash::hash_as_string(&public_key1),
-                verifier: Verifier {},
-            },
-        };
-
-        utxo.insert(outpoint0.clone(), tx_out0.clone());
-        utxo.insert(outpoint1.clone(), tx_out1.clone());
-
-        utxo1.insert(outpoint0, tx_out0);
-        utxo1.insert(outpoint1, tx_out1);
-
-        return (utxo, utxo1);
-    }
-
-    fn create_two_non_equal_utxo() -> (UTXO, UTXO) {
-        let mut utxo: UTXO = UTXO(HashMap::new());
-        let mut utxo1: UTXO = UTXO(HashMap::new());
-
-        let (_, public_key0) = sign_and_verify::create_keypair();
-        let outpoint0: Outpoint = Outpoint {
-            txid: "0".repeat(64),
-            index: 0,
-        };
-        let (_, public_key1) = sign_and_verify::create_keypair();
-        let outpoint1: Outpoint = Outpoint {
-            txid: "0".repeat(64),
-            index: 1,
-        };
-
-        let tx_out0: TxOut = TxOut {
-            value: 500,
-            pk_script: PublicKeyScript {
-                public_key_hash: hash::hash_as_string(&public_key0),
-                verifier: Verifier {},
-            },
-        };
-
-        let tx_out1: TxOut = TxOut {
-            value: 850,
-            pk_script: PublicKeyScript {
-                public_key_hash: hash::hash_as_string(&public_key1),
-                verifier: Verifier {},
-            },
-        };
-        let tx_out2: TxOut = TxOut {
-            value: 800,
-            pk_script: PublicKeyScript {
-                public_key_hash: hash::hash_as_string(&public_key1),
-                verifier: Verifier {},
-            },
-        };
-
-        utxo.insert(outpoint0.clone(), tx_out0.clone());
-        utxo.insert(outpoint1.clone(), tx_out1);
-
-        utxo1.insert(outpoint0, tx_out0);
-        utxo1.insert(outpoint1, tx_out2);
-
-        return (utxo, utxo1);
-    }
-    #[test]
-    fn test_utxo_equals() {
-        let (mut utxo1, utxo2) = create_two_equal_utxo();
-
-        assert!(utxo1.utxo_equals(&utxo2));
-    }
-    #[test]
-    fn test_utxo_equals_non_equal() {
-        let (mut utxo1, utxo2) = create_two_non_equal_utxo();
-
-        assert!(!utxo1.utxo_equals(&utxo2));
-    }
     #[test]
     fn test_utxo_verify_valid_transaction() {
         let (transaction, utxo) = create_valid_transactions();

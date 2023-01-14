@@ -11,7 +11,7 @@ use rand_1::Rng;
 use rand_distr::{Distribution, Exp};
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
-use std::sync::mpsc::{Receiver, Sender, TryRecvError};
+use std::sync::mpsc::Sender;
 use std::vec::Vec;
 use std::{thread, time};
 
@@ -43,10 +43,8 @@ impl Transaction {
      *
      * The transaction list created is constantly transmitted so that the block generator can receive it
      */
-    #[allow(clippy::too_many_arguments)]
     pub fn transaction_generator(
         transmitter: Sender<(Transaction, KeyMap)>,
-        receiver: Receiver<TryRecvError>,
         max_num_outputs: usize,
         transaction_mean: f32,
         transaction_duration: u32,
@@ -93,13 +91,6 @@ impl Transaction {
                 utxo.update(&transaction);
             }
 
-            match receiver.try_recv() {
-                Ok(_) | Err(TryRecvError::Disconnected) => {
-                    println!("Terminating.");
-                    break;
-                }
-                Err(TryRecvError::Empty) => {}
-            }
             transmitter.send((transaction, key_map.clone())).unwrap();
         }
     }
@@ -240,10 +231,10 @@ impl Transaction {
                 pk_script,
             });
         }
-        // info!(
-        //     "Transaction created with {} inputs and {} outputs.",
-        //     num_inputs, num_outputs
-        // );
+        info!(
+            "Transaction created with {} inputs and {} outputs.",
+            num_inputs, num_outputs
+        );
         let transaction = Transaction {
             tx_inputs,
             tx_outputs,
