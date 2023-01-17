@@ -1,3 +1,4 @@
+use bitcoin::network::message;
 use ed25519_dalek::{
     ExpandedSecretKey, Keypair, PublicKey as DalekPublicKey, SecretKey as DalekSecretKey,
     Signature as DalekSignature, Verifier as DalekVerifer,
@@ -6,8 +7,10 @@ use rand_2::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 use std::str;
+use std::sync::mpsc::Sender;
+use std::sync::Arc;
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct Signature(pub DalekSignature);
 
 impl Deref for Signature {
@@ -22,7 +25,7 @@ impl DerefMut for Signature {
         return &mut self.0;
     }
 }
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize, Debug)]
 pub struct PublicKey(pub DalekPublicKey);
 
 impl Deref for PublicKey {
@@ -88,6 +91,20 @@ impl Verifier {
         public_keys: &[DalekPublicKey],
     ) -> bool {
         return ed25519_dalek::verify_batch(messages, signatures, public_keys).is_ok();
+    }
+
+    pub fn parallel_batch_helper(
+        result_tx: Sender<bool>,
+        messages: &Arc<Vec<Vec<u8>>>,
+        signatures: &Arc<Vec<DalekSignature>>,
+        public_keys: &Arc<Vec<DalekPublicKey>>,
+    ) {
+        let msg_slices: Vec<&[u8]> = messages.iter().map(|x| &x[..]).collect();
+        result_tx.send(Verifier::verify_batch(
+            &msg_slices,
+            &signatures,
+            &public_keys,
+        ));
     }
 }
 

@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
 /**
@@ -178,7 +180,101 @@ impl UTXO {
         }
     }
 
-    fn topological_sort(&self, transactions: &Vec<Transaction>) -> Vec<Transaction> {
+    pub fn parallel_batch_verify_and_update(
+        &self,
+        transactions: &Vec<Transaction>,
+        batch_size: usize,
+    ) -> (bool, Option<UTXO>) {
+        let mut utxo: UTXO = self.clone();
+        let mut incoming_balance: u32;
+        let mut outgoing_balance: u32;
+        let mut tx_out: TxOut;
+        let mut in_out_pairs: Vec<(TxIn, TxOut)> = Vec::new();
+        let mut msg_vec: Vec<Vec<u8>> = Vec::new();
+        let mut sig_vec: Vec<DalekSignature> = Vec::new();
+        let mut pk_vec: Vec<DalekPublicKey> = Vec::new();
+        let sorted: Vec<Transaction> = self.topological_sort(transactions);
+        for transaction in sorted {
+            incoming_balance = 0;
+            outgoing_balance = 0;
+            for tx_in in transaction.tx_inputs.iter() {
+                // If the uxto doesn't contain the output associated with this input: invalid transaction
+                if !utxo.contains_key(&tx_in.outpoint) {
+                    warn!(
+                        "Discarding invalid transaction! UTXO does not contain unspent outpoint: {:#?}",
+                        &tx_in.outpoint
+                    );
+                    return (false, None);
+                }
+                // Get the transaction output, add its value to the incoming balance
+                // Store the TxIn, TxOut pair in in_out_pairs for verification later
+                // Remove the output from the uxto copy.
+                tx_out = utxo.get(&tx_in.outpoint).unwrap().clone();
+                incoming_balance += tx_out.value;
+
+                sig_vec.push(tx_in.sig_script.signature.0);
+                pk_vec.push(tx_in.sig_script.full_public_key.0);
+                msg_vec.push(Vec::from(
+                    (String::from(tx_in.outpoint.txid.clone())
+                        + &tx_in.outpoint.index.to_string()
+                        + &tx_out.pk_script.public_key_hash)
+                        .as_bytes(),
+                ));
+
+                utxo.remove(&tx_in.outpoint);
+                in_out_pairs.push((tx_in.clone(), tx_out));
+            }
+            for new_tx_out in transaction.tx_outputs.iter() {
+                outgoing_balance += new_tx_out.value;
+            }
+            if outgoing_balance > incoming_balance {
+                warn!(
+                    "Discarding invalid transaction! The total available balance cannot support this transaction."
+                );
+                return (false, None);
+            }
+            // Update the utxo copy even though signature has not been checked yet
+            utxo.update(&transaction);
+        }
+        let mut receivers: Vec<Receiver<bool>> = Vec::new();
+        let msg_batches: Vec<Vec<Vec<u8>>> = msg_vec.chunks(batch_size).map(|x| x.into()).collect();
+
+        let sig_batches: Vec<Vec<DalekSignature>> =
+            sig_vec.chunks(batch_size).map(|x| x.into()).collect();
+
+        let pk_batches: Vec<Vec<DalekPublicKey>> =
+            pk_vec.chunks(batch_size).map(|x| x.into()).collect();
+
+        for (msg_batch, sig_batch, pk_batch) in izip!(msg_batches, sig_batches, pk_batches) {
+            let m_batch = Arc::new(msg_batch);
+            let s_batch = Arc::new(sig_batch);
+            let p_batch = Arc::new(pk_batch);
+
+            let (sender, receiver) = mpsc::channel();
+            thread::spawn(move || {
+                Verifier::parallel_batch_helper(sender, &m_batch, &s_batch, &p_batch);
+            });
+            receivers.push(receiver);
+        }
+
+        let mut sig_status: bool = true;
+
+        for receiver in receivers {
+            let verified = receiver.recv();
+            sig_status = sig_status && verified.unwrap();
+            if !sig_status {
+                return (false, None);
+            }
+        }
+
+        if sig_status {
+            return (true, Some(utxo));
+        } else {
+            return (false, None);
+        }
+    }
+
+    pub fn topological_sort(&self, transactions: &Vec<Transaction>) -> Vec<Transaction> {
         // We know a transaction has no incoming edges if its vector of transaction inputs is zero
         // However, we 'start' transactions by already having content in the utxo
         let (g, g_r, mut g_in) = Self::reverse_graph(transactions);
@@ -210,7 +306,7 @@ impl UTXO {
         return sorted;
     }
 
-    fn reverse_graph(
+    pub fn reverse_graph(
         transactions: &Vec<Transaction>,
     ) -> (
         HashMap<String, Transaction>,
@@ -239,11 +335,13 @@ impl UTXO {
             // We need the line below to ensure that all vertices in the original graph appear in the reverse graph
             // If it is not included, then only vertices that have outgoing edges in the reverse graph will appear
             g_in.insert(txid.to_string(), 0);
-            g_r.insert(txid.to_string(), Vec::new());
+            if !g_r.contains_key(txid) {
+                g_r.insert(txid.to_string(), Vec::new());
+            }
             for txin in &tx.tx_inputs {
                 // get the transaction is points to as its previous transaction
                 let prev = &txin.outpoint.txid;
-                // If g constains prev, we know that this is an edge
+                // If g contains prev, we know that this is an edge
                 if keys.contains(prev) {
                     // in-degree increments
                     *g_in.get_mut(txid).unwrap() += 1;
@@ -254,8 +352,7 @@ impl UTXO {
                     }
                     // update entry
                     g_r.get_mut(prev).unwrap().push(txid.clone());
-                // Otherwise his vertex has no incoming edges!
-                } else {
+                    // Otherwise this vertex has no incoming edges!
                 }
             }
         }
@@ -282,10 +379,14 @@ impl UTXO {
 
 #[cfg(test)]
 mod tests {
+    use rand_1::rngs::ThreadRng;
+    use rand_1::seq::SliceRandom;
+
     use super::{HashMap, Transaction, UTXO};
     use crate::hash;
     use crate::sign_and_verify;
     use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
+    use crate::simulation::KeyMap;
     use crate::transaction::{Outpoint, PublicKeyScript, SignatureScript, TxIn, TxOut};
 
     fn create_valid_transactions() -> (Transaction, UTXO) {
