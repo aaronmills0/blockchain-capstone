@@ -15,7 +15,7 @@ use std::sync::mpsc::Sender;
 use std::vec::Vec;
 use std::{thread, time};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Transaction {
     pub tx_inputs: Vec<TxIn>,
     pub tx_outputs: Vec<TxOut>,
@@ -256,13 +256,13 @@ impl Transaction {
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct TxIn {
     pub outpoint: Outpoint,
     pub sig_script: SignatureScript,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SignatureScript {
     pub signature: Signature,
     pub full_public_key: PublicKey,

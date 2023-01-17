@@ -1,12 +1,14 @@
 use crate::block::Block;
 use crate::hash;
 use crate::merkle::Merkle;
+use crate::simulation::BLOCK_SIZE;
 use crate::utxo::UTXO;
 use log::{info, warn};
 use std::sync::mpsc::Receiver;
 use std::vec::Vec;
 
 pub fn chain_validator(receiver: Receiver<Block>, mut utxo: UTXO, mut chain: Vec<Block>) {
+    let batch_size = (BLOCK_SIZE / 8) as usize;
     loop {
         let incoming_block = receiver.recv().unwrap();
 
@@ -25,7 +27,8 @@ pub fn chain_validator(receiver: Receiver<Block>, mut utxo: UTXO, mut chain: Vec
             warn!("Validator received block with invalid transactions or invalid merkle root. Ignoring block.");
             continue;
         }
-        let (valid, utxo_option) = utxo.batch_verify_and_update(&incoming_block.transactions);
+        let (valid, utxo_option) =
+            utxo.parallel_batch_verify_and_update(&incoming_block.transactions, batch_size);
         if !valid {
             warn!("Validator received block containing invalid transactions. Ignoring block.");
             continue;
