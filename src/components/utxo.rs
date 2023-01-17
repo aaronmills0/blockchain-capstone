@@ -1,6 +1,6 @@
-use crate::hash::hash_as_string;
-use crate::sign_and_verify::{PublicKey, Signature, Verifier};
-use crate::transaction::{Outpoint, Transaction, TxIn, TxOut};
+use crate::components::transaction::{Outpoint, Transaction, TxIn, TxOut};
+use crate::utils::hash::hash_as_string;
+use crate::utils::sign_and_verify::{PublicKey, Signature, Verifier};
 use ed25519_dalek::{PublicKey as DalekPublicKey, Signature as DalekSignature};
 use itertools::izip;
 use log::warn;
@@ -52,11 +52,12 @@ impl UTXO {
      */
     pub fn verify_transaction(&self, transaction: &Transaction) -> bool {
         let mut utxo: UTXO = self.clone();
+
         // Note: If values are u32, then their sum can potentially overflow when summed. We should consider increasing the balances to u64
         let mut incoming_balance: u32 = 0;
         let mut outgoing_balance: u32 = 0;
-        let mut tx_out: TxOut;
         let mut in_out_pairs: Vec<(TxIn, TxOut)> = Vec::new();
+        let mut tx_out: TxOut;
         for tx_in in transaction.tx_inputs.iter() {
             // If the uxto doesn't contain the output associated with this input: invalid transaction
             if !utxo.contains_key(&tx_in.outpoint) {
@@ -66,6 +67,7 @@ impl UTXO {
                 );
                 return false;
             }
+
             // Get the transaction output, add its value to the incoming balance
             // Store the TxIn, TxOut pair in in_out_pairs for verification later
             // Remove the output from the uxto copy.
@@ -88,19 +90,20 @@ impl UTXO {
             );
             return false;
         }
-
         // At this point, incoming_balance being lesser than or equal to outgoing_balance has been verified (2.)
-        let mut signature: &Signature;
-        let mut public_key: &PublicKey;
+
         // message concatenates txid, output index of the previous transaction, old public key script, new public key script, and the value for the next recipient
         // For now, a message contains the txid, output index of the previous transaction, old public key hash
         let mut message: String;
+        let mut public_key: &PublicKey;
+        let mut signature: &Signature;
         for (tx_in, tx_out) in in_out_pairs.iter() {
             signature = &tx_in.sig_script.signature;
             public_key = &tx_in.sig_script.full_public_key;
             message = String::from(&tx_in.outpoint.txid)
                 + &tx_in.outpoint.index.to_string()
                 + &tx_out.pk_script.public_key_hash;
+
             if !(tx_out
                 .pk_script
                 .verifier
@@ -117,14 +120,14 @@ impl UTXO {
     }
 
     pub fn batch_verify_and_update(&self, transactions: &Vec<Transaction>) -> (bool, Option<UTXO>) {
-        let mut utxo: UTXO = self.clone();
         let mut incoming_balance: u32;
         let mut outgoing_balance: u32;
-        let mut tx_out: TxOut;
         let mut in_out_pairs: Vec<(TxIn, TxOut)> = Vec::new();
         let mut msg_vec: Vec<Vec<u8>> = Vec::new();
-        let mut sig_vec: Vec<DalekSignature> = Vec::new();
         let mut pk_vec: Vec<DalekPublicKey> = Vec::new();
+        let mut sig_vec: Vec<DalekSignature> = Vec::new();
+        let mut tx_out: TxOut;
+        let mut utxo: UTXO = self.clone();
         let sorted: Vec<Transaction> = self.topological_sort(transactions);
         for transaction in sorted {
             incoming_balance = 0;
@@ -138,6 +141,7 @@ impl UTXO {
                     );
                     return (false, None);
                 }
+
                 // Get the transaction output, add its value to the incoming balance
                 // Store the TxIn, TxOut pair in in_out_pairs for verification later
                 // Remove the output from the uxto copy.
@@ -156,23 +160,24 @@ impl UTXO {
                 utxo.remove(&tx_in.outpoint);
                 in_out_pairs.push((tx_in.clone(), tx_out));
             }
+
             for new_tx_out in transaction.tx_outputs.iter() {
                 outgoing_balance += new_tx_out.value;
             }
+
             if outgoing_balance > incoming_balance {
                 warn!(
                     "Discarding invalid transaction! The total available balance cannot support this transaction."
                 );
                 return (false, None);
             }
+
             // Update the utxo copy even though signature has not been checked yet
             utxo.update(&transaction);
         }
 
         let msg_bytes: Vec<&[u8]> = msg_vec.iter().map(|x| &x[..]).collect();
-
         let sig_status = Verifier::verify_batch(&msg_bytes, &sig_vec, &pk_vec);
-
         if sig_status {
             return (true, Some(utxo));
         } else {
@@ -365,8 +370,8 @@ impl UTXO {
             self.remove(&tx_in.outpoint);
         }
 
-        let txid: String = hash_as_string(transaction);
         // Iterate through the transfer quantity - receiver pairs
+        let txid: String = hash_as_string(transaction);
         for (i, tx_out) in transaction.tx_outputs.iter().enumerate() {
             let outpoint: Outpoint = Outpoint {
                 txid: txid.clone(),
@@ -381,14 +386,13 @@ impl UTXO {
 mod tests {
 
     use super::{HashMap, Transaction, UTXO};
-    use crate::hash;
-    use crate::sign_and_verify;
-    use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
-    use crate::transaction::{Outpoint, PublicKeyScript, SignatureScript, TxIn, TxOut};
+    use crate::components::transaction::{Outpoint, PublicKeyScript, SignatureScript, TxIn, TxOut};
+    use crate::utils::hash;
+    use crate::utils::sign_and_verify;
+    use crate::utils::sign_and_verify::{PrivateKey, PublicKey, Verifier};
 
     fn create_valid_transactions() -> (Transaction, UTXO) {
-        //We first insert an unspent output in the utxo to which we will
-        //refer later on.
+        // We first insert an unspent output in the utxo to which we will refer later on.
         let mut utxo: UTXO = UTXO(HashMap::new());
         let mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)> = HashMap::new();
         let (private_key0, public_key0) = sign_and_verify::create_keypair();
@@ -496,10 +500,8 @@ mod tests {
             sig_script: sig_script1_2,
         };
 
-        //We create a new keypair corresponding to our new transaction which allows us to create its tx_out
-
+        // We create a new keypair corresponding to our new transaction which allows us to create its tx_out
         let (_private_key1, public_key1) = sign_and_verify::create_keypair();
-
         let tx_out1: TxOut = TxOut {
             value: 500,
             pk_script: PublicKeyScript {
@@ -517,8 +519,7 @@ mod tests {
     }
 
     fn create_invalid_transactions_insufficient_balance() -> (Transaction, UTXO) {
-        //We first insert an unspent output in the utxo to which we will
-        //refer later on.
+        // We first insert an unspent output in the utxo to which we will refer later on.
         let mut utxo: UTXO = UTXO(HashMap::new());
         let mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)> = HashMap::new();
         let (private_key0, public_key0) = sign_and_verify::create_keypair();
@@ -538,11 +539,7 @@ mod tests {
         key_map.insert(outpoint0.clone(), (private_key0, public_key0));
         utxo.insert(outpoint0.clone(), tx_out0.clone());
 
-        let old_private_key: PrivateKey;
-        let old_public_key: PublicKey;
-
-        (old_private_key, old_public_key) = key_map[&outpoint0].clone();
-
+        let (old_private_key, old_public_key) = key_map[&outpoint0].clone();
         let message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
             + &tx_out0.pk_script.public_key_hash;
@@ -557,10 +554,8 @@ mod tests {
             sig_script: sig_script1,
         };
 
-        //We create a new keypair corresponding to our new transaction which allows us to create its tx_out
-
-        let (_private_key1, public_key1) = sign_and_verify::create_keypair();
-
+        // We create a new keypair corresponding to our new transaction which allows us to create its tx_out
+        let (_, public_key1) = sign_and_verify::create_keypair();
         let tx_out1: TxOut = TxOut {
             value: 700,
             pk_script: PublicKeyScript {
@@ -578,7 +573,7 @@ mod tests {
     }
 
     fn create_invalid_transactions_no_output_corresponding_to_input() -> (Transaction, UTXO) {
-        //We do not include the unspent transaction in the utxo. That way, we cannot access the previous unspent output
+        // We do not include the unspent transaction in the utxo. That way, we cannot access the previous unspent output
         let utxo: UTXO = UTXO(HashMap::new());
         let mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)> = HashMap::new();
         let (private_key0, public_key0) = sign_and_verify::create_keypair();
@@ -597,10 +592,7 @@ mod tests {
 
         key_map.insert(outpoint0.clone(), (private_key0, public_key0));
 
-        let old_private_key: PrivateKey;
-        let old_public_key: PublicKey;
-
-        (old_private_key, old_public_key) = key_map[&outpoint0].clone();
+        let (old_private_key, old_public_key) = key_map[&outpoint0].clone();
 
         let message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
@@ -616,10 +608,8 @@ mod tests {
             sig_script: sig_script1,
         };
 
-        //We create a new keypair corresponding to our new transaction which allows us to create its tx_out
-
-        let (_private_key1, public_key1) = sign_and_verify::create_keypair();
-
+        // We create a new keypair corresponding to our new transaction which allows us to create its tx_out
+        let (_, public_key1) = sign_and_verify::create_keypair();
         let tx_out1: TxOut = TxOut {
             value: 500,
             pk_script: PublicKeyScript {
@@ -637,8 +627,7 @@ mod tests {
     }
 
     fn create_invalid_transactions_nomatch_signature() -> (Transaction, UTXO) {
-        //We first insert an unspent output in the utxo to which we will
-        //refer later on.
+        // We first insert an unspent output in the utxo to which we will refer later on.
         let mut utxo: UTXO = UTXO(HashMap::new());
         let mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)> = HashMap::new();
         let (private_key0, public_key0) = sign_and_verify::create_keypair();
@@ -658,11 +647,7 @@ mod tests {
         key_map.insert(outpoint0.clone(), (private_key0, public_key0));
         utxo.insert(outpoint0.clone(), tx_out0.clone());
 
-        let old_private_key: PrivateKey;
-        let old_public_key: PublicKey;
-
-        (old_private_key, old_public_key) = sign_and_verify::create_keypair();
-
+        let (old_private_key, old_public_key) = sign_and_verify::create_keypair();
         let message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
             + &tx_out0.pk_script.public_key_hash;
@@ -677,10 +662,8 @@ mod tests {
             sig_script: sig_script1,
         };
 
-        //We create a new keypair corresponding to our new transaction which allows us to create its tx_out
-
-        let (_private_key1, public_key1) = sign_and_verify::create_keypair();
-
+        // We create a new keypair corresponding to our new transaction which allows us to create its tx_out
+        let (_, public_key1) = sign_and_verify::create_keypair();
         let tx_out1: TxOut = TxOut {
             value: 700,
             pk_script: PublicKeyScript {
@@ -700,35 +683,30 @@ mod tests {
     #[test]
     fn test_utxo_verify_valid_transaction() {
         let (transaction, utxo) = create_valid_transactions();
-
         assert!(utxo.verify_transaction(&transaction));
     }
 
     #[test]
     fn test_utxo_verify_invalid_transaction_insufficient_balance() {
         let (transaction, utxo) = create_invalid_transactions_insufficient_balance();
-
         assert!(!(utxo.verify_transaction(&transaction)));
     }
 
     #[test]
     fn test_utxo_verify_invalid_transaction_nomatch_signature() {
         let (transaction, utxo) = create_invalid_transactions_nomatch_signature();
-
         assert!(!(utxo.verify_transaction(&transaction)));
     }
 
     #[test]
     fn test_utxo_verify_invalid_transaction_input_nomatch_output() {
         let (transaction, utxo) = create_invalid_transactions_no_output_corresponding_to_input();
-
         assert!(!(utxo.verify_transaction(&transaction)));
     }
 
     #[test]
     fn test_utxo_update() {
         let (transaction, mut utxo) = create_valid_transactions();
-
         let old_outpoint = Outpoint {
             txid: hash::hash_as_string(&transaction),
             index: (0),

@@ -1,34 +1,17 @@
+use crate::components::block::Block;
+use crate::components::transaction::{Outpoint, TxOut};
+use crate::components::utxo::UTXO;
+use crate::simulation::KeyMap;
+use crate::utils::sign_and_verify::{PrivateKey, PublicKey};
 use chrono::Local;
-use log::error;
-use log::warn;
+use log::{error, warn};
 use serde::{Deserialize, Serialize};
-use serde_json::Map;
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::collections::HashMap;
-use std::env;
-use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-
-use crate::sign_and_verify::PrivateKey;
-use crate::sign_and_verify::PublicKey;
-use crate::simulation::KeyMap;
-use crate::transaction::Outpoint;
-use crate::transaction::TxOut;
-use crate::{block::Block, utxo::UTXO};
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct Config {
-    pub block_mean: f32,
-    pub block_duration: u32,
-    pub block_size: u32,
-    pub max_tx_outputs: usize,
-    pub tx_mean: f32,
-    pub tx_duration: u32,
-    pub invalid_tx_mean: f32,
-    pub invalid_tx_sigma: f32,
-}
+use std::{env, fs};
 
 #[allow(clippy::too_many_arguments)]
 pub fn serialize_json(
@@ -68,6 +51,7 @@ pub fn serialize_json(
         error!("Failed to serialize keymap!");
         panic!();
     }
+
     if pr_keys_json.is_err() {
         error!("Failed to serialize pr_keys!");
         panic!();
@@ -106,13 +90,11 @@ pub fn serialize_json(
     }
 
     let cwd = std::env::current_dir().unwrap();
-
     let mut dirpath = cwd.into_os_string().into_string().unwrap();
     dirpath.push_str("/config");
 
     let dir_path = Path::new(&dirpath);
     let date_time = Local::now().format("%Y-%m-%d-%H-%M-%S").to_string();
-    // The new file_name is timestamped
     let mut prefix = String::new();
     if let Some(prefix1) = file_prefix {
         prefix.push_str(&prefix1);
@@ -203,7 +185,6 @@ pub fn deserialize_json(
     }
 
     let mut key_map = KeyMap(HashMap::new());
-
     for (outpoint, key_pair) in keymap {
         key_map.insert(outpoint, key_pair);
     }
@@ -219,27 +200,33 @@ pub fn deserialize_json(
     );
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Config {
+    pub block_duration: u32,
+    pub block_mean: f32,
+    pub block_size: u32,
+    pub invalid_tx_mean_ratio: u32,
+    pub max_tx_outputs: usize,
+    pub tx_duration: u32,
+    pub tx_mean: f32,
+}
+
 #[cfg(test)]
 mod tests {
-
     use super::*;
-    use crate::block::{Block, BlockHeader};
-    use crate::hash;
-    use crate::merkle::Merkle;
-    use crate::sign_and_verify;
-    use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
-    use crate::transaction::{
+    use crate::components::block::{Block, BlockHeader};
+    use crate::components::merkle::Merkle;
+    use crate::components::transaction::{
         Outpoint, PublicKeyScript, SignatureScript, Transaction, TxIn, TxOut,
     };
+    use crate::utils::sign_and_verify::Verifier;
+    use crate::utils::{hash, sign_and_verify};
     use std::collections::HashMap;
+
     #[test]
     fn test_serialize_json() {
-        // Creation and initialization of the UTXO
-
         let mut utxo: UTXO = UTXO(HashMap::new());
-
         let mut keymap: KeyMap = KeyMap(HashMap::new());
-
         let (private_key00, public_key00) = sign_and_verify::create_keypair();
         let outpoint00: Outpoint = Outpoint {
             txid: "0".repeat(64),
@@ -258,7 +245,6 @@ mod tests {
                 verifier: Verifier {},
             },
         };
-
         let tx_out01: TxOut = TxOut {
             value: 850,
             pk_script: PublicKeyScript {
@@ -266,6 +252,7 @@ mod tests {
                 verifier: Verifier {},
             },
         };
+
         let pr_keys = (private_key00.clone(), private_key01.clone());
         let pu_keys = (public_key00.clone(), public_key01.clone());
 
@@ -281,8 +268,6 @@ mod tests {
         // Create a single new transaction (2 inputs and 1 output)
         let mut tx_inputs1: Vec<TxIn> = Vec::new();
         let mut tx_outputs1: Vec<TxOut> = Vec::new();
-        let private_key10: PrivateKey;
-        let public_key10: PublicKey;
 
         let message10 = String::from(&outpoint00.txid)
             + &outpoint00.index.to_string()
@@ -312,7 +297,7 @@ mod tests {
             sig_script: sig_script11,
         });
 
-        (private_key10, public_key10) = sign_and_verify::create_keypair();
+        let (private_key10, public_key10) = sign_and_verify::create_keypair();
 
         let pk_script10 = PublicKeyScript {
             public_key_hash: hash::hash_as_string(&public_key10),
@@ -339,7 +324,6 @@ mod tests {
         transactions1.push(transaction1);
 
         // Create genesis block and first block
-
         let genesis_merkle: Merkle = Merkle {
             tree: Vec::from(["0".repeat(64)]),
         };
@@ -356,7 +340,6 @@ mod tests {
         blockchain.push(genesis_block);
 
         let merkle1 = Merkle::create_merkle_tree(&transactions1);
-
         let block1 = Block {
             header: BlockHeader {
                 previous_hash: hash::hash_as_string(&blockchain.last().unwrap().header),
@@ -368,15 +351,9 @@ mod tests {
         };
         blockchain.push(block1);
 
-        // Create a second transaction and second block.
-        // Second transaction will have one input and two outputs.
-
+        // Create a second transaction and second block. Second transaction will have one input and two outputs.
         let mut tx_inputs2: Vec<TxIn> = Vec::new();
         let mut tx_outputs2: Vec<TxOut> = Vec::new();
-        let private_key20: PrivateKey;
-        let public_key20: PublicKey;
-        let private_key21: PrivateKey;
-        let public_key21: PublicKey;
 
         let message20 = String::from(&outpoint10.txid)
             + &outpoint10.index.to_string()
@@ -392,8 +369,7 @@ mod tests {
             sig_script: sig_script20,
         });
 
-        (private_key20, public_key20) = sign_and_verify::create_keypair();
-
+        let (private_key20, public_key20) = sign_and_verify::create_keypair();
         let pk_script20 = PublicKeyScript {
             public_key_hash: hash::hash_as_string(&public_key20),
             verifier: Verifier {},
@@ -404,8 +380,7 @@ mod tests {
             pk_script: pk_script20,
         });
 
-        (private_key21, public_key21) = sign_and_verify::create_keypair();
-
+        let (private_key21, public_key21) = sign_and_verify::create_keypair();
         let pk_script21 = PublicKeyScript {
             public_key_hash: hash::hash_as_string(&public_key21),
             verifier: Verifier {},
@@ -436,7 +411,6 @@ mod tests {
         transactions2.push(transaction2);
 
         let merkle2 = Merkle::create_merkle_tree(&transactions2);
-
         let block2 = Block {
             header: BlockHeader {
                 previous_hash: hash::hash_as_string(&blockchain.last().unwrap().header),
@@ -452,14 +426,13 @@ mod tests {
         keymap.insert(outpoint21, (private_key21, public_key21));
 
         let config: Config = Config {
-            block_mean: 1.0,
             block_duration: 10,
+            block_mean: 1.0,
             block_size: 1,
+            invalid_tx_mean_ratio: 50,
             max_tx_outputs: 4,
             tx_mean: 1.0,
             tx_duration: 10,
-            invalid_tx_mean: 1.0,
-            invalid_tx_sigma: 1.0,
         };
 
         serialize_json(
@@ -474,22 +447,23 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_deserialize_json() {
-    //     let path = "./config/test_2022-11-15-11-50-06.json";
+    #[ignore]
+    #[test]
+    fn test_deserialize_json() {
+        let path = "./config/test_2022-11-15-11-50-06.json";
 
-    //     let (initial_tx_outs, blockchain, utxo, keymap, pr_keys, pu_keys, config) =
-    //         deserialize_json(path);
+        let (initial_tx_outs, blockchain, utxo, keymap, pr_keys, pu_keys, config) =
+            deserialize_json(path);
 
-    //     serialize_json(
-    //         &initial_tx_outs,
-    //         &blockchain,
-    //         &utxo,
-    //         &keymap,
-    //         &pr_keys,
-    //         &pu_keys,
-    //         &config,
-    //         Some(String::from("test")),
-    //     );
-    // }
+        serialize_json(
+            &initial_tx_outs,
+            &blockchain,
+            &utxo,
+            &keymap,
+            &pr_keys,
+            &pu_keys,
+            &config,
+            Some(String::from("test")),
+        );
+    }
 }

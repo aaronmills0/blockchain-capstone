@@ -1,9 +1,8 @@
-use crate::hash;
-use crate::sign_and_verify;
-use crate::sign_and_verify::{PrivateKey, PublicKey, Signature, Verifier};
+use crate::components::utxo::UTXO;
 use crate::simulation::KeyMap;
-use crate::utxo::UTXO;
-
+use crate::utils::hash;
+use crate::utils::sign_and_verify;
+use crate::utils::sign_and_verify::{PrivateKey, PublicKey, Signature, Verifier};
 use log::{info, warn};
 use rand_1::rngs::ThreadRng;
 use rand_1::seq::SliceRandom;
@@ -56,14 +55,15 @@ impl Transaction {
             warn!("Invalid input. A non-positive mean for transaction rate is invalid for an exponential distribution but the mean was {}", transaction_mean);
         }
 
-        let mut rng: ThreadRng = rand_1::thread_rng();
-        let mut invalid: bool;
         let lambda: f32 = 1.0 / transaction_mean;
         let exp: Exp<f32> = Exp::new(lambda).unwrap();
-        let mut sample: f32;
+
+        let mut invalid: bool;
         let mut normalized: f32;
-        let mut transaction_rate: time::Duration;
+        let mut rng: ThreadRng = rand_1::thread_rng();
+        let mut sample: f32;
         let mut transaction_counter = 0;
+        let mut transaction_rate: time::Duration;
         loop {
             // Invalid transactions happen with a probability of 1 / mean_invalid_ratio
             // There is no chance of invalid transactions if mean_invalid ratio is set to 0
@@ -80,17 +80,16 @@ impl Transaction {
             // Get the time between transactions generated as a duration
             transaction_rate =
                 time::Duration::from_secs((transaction_duration * normalized as u32) as u64);
-            // Sleep to mimic the time between creation of transactions
-            thread::sleep(transaction_rate);
+            thread::sleep(transaction_rate); // Sleep to mimic the time between creation of transactions
 
             let transaction =
                 Self::create_transaction(&utxo, &mut key_map, &mut rng, max_num_outputs, invalid);
             transaction_counter += 1;
             info!("{} Transactions Created", transaction_counter);
+
             if !invalid {
                 utxo.update(&transaction);
             }
-
             transmitter.send((transaction, key_map.clone())).unwrap();
         }
     }
@@ -161,22 +160,20 @@ impl Transaction {
             output_values[0] += 1
         }
 
-        let mut tx_inputs: Vec<TxIn> = Vec::new();
-        let mut tx_outputs: Vec<TxOut> = Vec::new();
-        let mut outpoint: Outpoint;
-        let mut sig_script: SignatureScript;
+        let invalid_index: usize = rng.gen_range(0..num_inputs);
+        let mut message: String;
         let mut new_private_key: PrivateKey;
         let mut new_public_key: PublicKey;
         let mut old_private_key: PrivateKey;
         let mut old_public_key: PublicKey;
-        let mut message: String;
+        let mut outpoint: Outpoint;
         let mut pk_script: PublicKeyScript;
-        let invalid_index: usize = rng.gen_range(0..num_inputs);
+        let mut sig_script: SignatureScript;
+        let mut tx_inputs: Vec<TxIn> = Vec::new();
+        let mut tx_outputs: Vec<TxOut> = Vec::new();
         for (i, utxo_key) in utxo_keys.iter().enumerate().take(num_inputs) {
             outpoint = utxo_key.clone();
-
             (old_private_key, old_public_key) = key_map[&outpoint].clone();
-
             message = String::from(&outpoint.txid)
                 + &outpoint.index.to_string()
                 + &utxo[&outpoint].pk_script.public_key_hash;
@@ -218,23 +215,23 @@ impl Transaction {
             }
 
             (new_private_key, new_public_key) = sign_and_verify::create_keypair();
-
             pk_script = PublicKeyScript {
                 public_key_hash: hash::hash_as_string(&new_public_key),
                 verifier: Verifier {},
             };
 
             key_vec.push((new_private_key, new_public_key));
-
             tx_outputs.push(TxOut {
                 value: *output_value,
                 pk_script,
             });
         }
+
         info!(
             "Transaction created with {} inputs and {} outputs.",
             num_inputs, num_outputs
         );
+
         let transaction = Transaction {
             tx_inputs,
             tx_outputs,
@@ -297,18 +294,20 @@ pub struct PublicKeyScript {
 #[cfg(test)]
 mod tests {
     use super::hash;
-    use crate::sign_and_verify;
-    use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
-    use crate::transaction::{Outpoint, PublicKeyScript, SignatureScript, TxIn, TxOut};
-    use crate::{transaction::Transaction, utxo::UTXO};
+    use crate::components::transaction::{
+        Outpoint, PublicKeyScript, SignatureScript, Transaction, TxIn, TxOut,
+    };
+    use crate::components::utxo::UTXO;
+    use crate::utils::sign_and_verify;
+    use crate::utils::sign_and_verify::{PrivateKey, PublicKey, Verifier};
     use std::collections::HashMap;
 
     static MAX_NUM_OUTPUTS: usize = 3;
 
     #[test]
     fn test_create_transaction_valid() {
-        //We first insert an unspent output in the utxo to which we will
-        //refer later on.
+        // We first insert an unspent output in the utxo to which we will
+        // refer later on.
         let mut utxo: UTXO = UTXO(HashMap::new());
         let mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)> = HashMap::new();
         let (private_key0, public_key0) = sign_and_verify::create_keypair();
@@ -328,10 +327,7 @@ mod tests {
         key_map.insert(outpoint0.clone(), (private_key0, public_key0));
         utxo.insert(outpoint0.clone(), tx_out0.clone());
 
-        let old_private_key: PrivateKey;
-        let old_public_key: PublicKey;
-
-        (old_private_key, old_public_key) = key_map[&outpoint0].clone();
+        let (old_private_key, old_public_key) = key_map[&outpoint0].clone();
 
         let message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
@@ -347,10 +343,8 @@ mod tests {
             sig_script: sig_script1,
         };
 
-        //We create a new keypair corresponding to our new transaction which allows us to create its tx_out
-
-        let (_private_key1, public_key1) = sign_and_verify::create_keypair();
-
+        // We create a new keypair corresponding to our new transaction which allows us to create its tx_out
+        let (_, public_key1) = sign_and_verify::create_keypair();
         let tx_out1: TxOut = TxOut {
             value: 500,
             pk_script: PublicKeyScript {
@@ -364,12 +358,10 @@ mod tests {
             tx_outputs: Vec::from([tx_out1]),
         };
 
-        assert!(
-            transaction1.tx_outputs.len() == 1
-                && transaction1.tx_outputs.len() <= utxo.len()
-                && transaction1.tx_outputs.len() <= MAX_NUM_OUTPUTS
-                && transaction1.tx_outputs.get(0).unwrap().value == 500
-                && transaction1.tx_inputs.len() == 1
-        );
+        assert_eq!(transaction1.tx_inputs.len(), 1);
+        assert_eq!(transaction1.tx_outputs.len(), 1);
+        assert_eq!(transaction1.tx_outputs.get(0).unwrap().value, 500);
+        assert!(transaction1.tx_outputs.len() <= utxo.len());
+        assert!(transaction1.tx_outputs.len() <= MAX_NUM_OUTPUTS);
     }
 }
