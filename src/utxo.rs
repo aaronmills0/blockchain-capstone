@@ -1,12 +1,14 @@
 use crate::hash::hash_as_string;
-use crate::sign_and_verify::{PublicKey, Signature, Verifier};
-use crate::transaction::{Outpoint, Transaction, TxIn, TxOut};
+use crate::sign_and_verify::{self, PublicKey, Signature, Verifier};
+use crate::transaction::{Outpoint, PublicKeyScript, Transaction, TxIn, TxOut};
 use ed25519_dalek::{PublicKey as DalekPublicKey, Signature as DalekSignature};
+use itertools::{enumerate, izip};
 use log::warn;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
+use std::thread::{self, JoinHandle};
 
 /**
  * The Utxo is a map containing the Unspent Transaction (X) Outputs.
@@ -121,7 +123,8 @@ impl UTXO {
         let mut msg_vec: Vec<Vec<u8>> = Vec::new();
         let mut sig_vec: Vec<DalekSignature> = Vec::new();
         let mut pk_vec: Vec<DalekPublicKey> = Vec::new();
-        for transaction in transactions {
+        let sorted: Vec<Transaction> = self.topological_sort(transactions);
+        for transaction in sorted {
             incoming_balance = 0;
             outgoing_balance = 0;
             for tx_in in transaction.tx_inputs.iter() {
@@ -173,6 +176,91 @@ impl UTXO {
         } else {
             return (false, None);
         }
+    }
+
+    fn topological_sort(&self, transactions: &Vec<Transaction>) -> Vec<Transaction> {
+        // We know a transaction has no incoming edges if its vector of transaction inputs is zero
+        // However, we 'start' transactions by already having content in the utxo
+        let (g, g_r, mut g_in) = Self::reverse_graph(transactions);
+        // g: A mapping between txid to transactions
+        // g_r: Graph with older transactions pointing to newer transactions
+        // g_in: map of in-degree
+        let mut sorted: Vec<Transaction> = Vec::new();
+        let mut sources: HashSet<String> = HashSet::new();
+        for (txid, indegree) in &g_in {
+            // If the transaction points to no other transaction in the past, then it has no incoming edges
+            if *indegree == 0 {
+                sources.insert(txid.to_string());
+            }
+        }
+        // Kahn's Algorithm
+        while !sources.is_empty() {
+            let source = sources.iter().next().unwrap().clone();
+            sources.remove(&source);
+            sorted.push(g[&source].clone());
+
+            // Update our indegree
+            for txid in g_r[&source].as_slice() {
+                *g_in.get_mut(txid).unwrap() -= 1;
+                if *g_in.get_mut(txid).unwrap() == 0 {
+                    sources.insert(txid.to_string());
+                }
+            }
+        }
+        return sorted;
+    }
+
+    fn reverse_graph(
+        transactions: &Vec<Transaction>,
+    ) -> (
+        HashMap<String, Transaction>,
+        HashMap<String, Vec<String>>,
+        HashMap<String, u32>,
+    ) {
+        // Since transactions point to previous transactions, we need to reverse it.
+        // The transactions that do not point to any transaction in the list are our sources
+        // However, in the end, the sources must point to unspent transaction outputs in the utxo
+
+        // Hashmap of (id, transaction) pairs
+        // We need this to be able to determine which trasactions have 'incoming edges' w.r.t this list of transactions
+        let mut g: HashMap<String, Transaction> = HashMap::new();
+        let mut keys: HashSet<String> = HashSet::new();
+        for transaction in transactions {
+            let key: String = hash_as_string(transaction);
+            keys.insert(key.clone());
+            g.insert(key, transaction.to_owned());
+        }
+
+        // id, adjacency list pairing
+        let mut g_r: HashMap<String, Vec<String>> = HashMap::new();
+        let mut g_in: HashMap<String, u32> = HashMap::new();
+
+        for (txid, tx) in &g {
+            // We need the line below to ensure that all vertices in the original graph appear in the reverse graph
+            // If it is not included, then only vertices that have outgoing edges in the reverse graph will appear
+            g_in.insert(txid.to_string(), 0);
+            g_r.insert(txid.to_string(), Vec::new());
+            for txin in &tx.tx_inputs {
+                // get the transaction is points to as its previous transaction
+                let prev = &txin.outpoint.txid;
+                // If g constains prev, we know that this is an edge
+                if keys.contains(prev) {
+                    // in-degree increments
+                    *g_in.get_mut(txid).unwrap() += 1;
+                    // if the reversed graph already contains an entry with this key
+                    if !g_r.contains_key(prev) {
+                        // new entry
+                        g_r.insert(prev.to_string(), Vec::new());
+                    }
+                    // update entry
+                    g_r.get_mut(prev).unwrap().push(txid.clone());
+                // Otherwise his vertex has no incoming edges!
+                } else {
+                }
+            }
+        }
+
+        return (g, g_r, g_in);
     }
 
     pub fn update(&mut self, transaction: &Transaction) {
