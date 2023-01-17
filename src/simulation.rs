@@ -90,8 +90,9 @@ pub fn start(rx_sim: Receiver<String>) {
         transactions: Vec::new(),
     };
 
-    // Create the blockchain and add the genesis block to the chain
+    // Add the genesis block to the chain
     blockchain.push(genesis_block);
+
     let blockchain_copy = blockchain.clone();
     let blockchain_copy2 = blockchain.clone();
 
@@ -108,13 +109,13 @@ pub fn start(rx_sim: Receiver<String>) {
 
     thread::spawn(|| {
         Transaction::transaction_generator(
-            transaction_block_transaction_keymap_tx,
+            keymap,
             MAX_NUM_OUTPUTS,
+            INVALID_TRANSACTION_FREQUENCY,
             TRANSACTION_MEAN,
             TRANSACTION_DURATION,
-            INVALID_TRANSACTION_FREQUENCY,
+            transaction_block_transaction_keymap_tx,
             utxo,
-            keymap,
         );
     });
 
@@ -127,11 +128,11 @@ pub fn start(rx_sim: Receiver<String>) {
                 block_validator_block_tx,
             ),
             transaction_block_transaction_keymap_rx,
-            utxo_copy,
             blockchain_copy,
-            BLOCK_MEAN,
             BLOCK_DURATION,
             INVALID_BLOCK_FREQUENCY,
+            BLOCK_MEAN,
+            utxo_copy,
         );
     });
 
@@ -161,14 +162,14 @@ pub fn start(rx_sim: Receiver<String>) {
         if let Ok(command1) = command {
             if command1 == "save" {
                 save_and_load::serialize_json(
-                    &initial_tx_outs,
                     &blockchain,
-                    &utxo,
+                    Some(String::from("state")),
+                    &initial_tx_outs,
                     &keymap,
                     &pr_keys,
                     &pu_keys,
                     &sim_config,
-                    Some(String::from("state")),
+                    &utxo,
                 );
             }
         }

@@ -44,11 +44,11 @@ impl Block {
         // block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx, block_validator_block_tx
         block_tx: (Sender<Block>, Sender<UTXO>, Sender<KeyMap>, Sender<Block>),
         block_rx: Receiver<(Transaction, KeyMap)>, // transaction_block_transaction_keymap_rx
-        mut utxo: UTXO,
         mut blockchain: Vec<Block>,
-        mean: f32,
         duration: u32,
         invalid_block_frequency: u32,
+        mean: f32,
+        mut utxo: UTXO,
     ) {
         if mean <= 0.0 {
             panic!("Invalid input. A non-positive mean is invalid for an exponential distribution");
@@ -56,7 +56,6 @@ impl Block {
 
         let (block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx, block_validator_block_tx) =
             block_tx;
-        let transaction_block_transaction_keymap_rx = block_rx;
 
         let lambda: f32 = 1.0 / mean;
         let exp: Exp<f32> = Exp::new(lambda).unwrap();
@@ -78,7 +77,7 @@ impl Block {
             keymap = KeyMap(HashMap::new());
             counter = 0;
             while counter < simulation::BLOCK_SIZE {
-                (tx, keymap) = transaction_block_transaction_keymap_rx.recv().unwrap();
+                (tx, keymap) = block_rx.recv().unwrap();
                 keymap_map.insert(hash::hash_as_string(&tx), keymap.clone());
                 transactions.push(tx);
                 counter += 1;

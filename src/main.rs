@@ -1,4 +1,5 @@
 mod components;
+mod network;
 mod performance_tests;
 mod shell;
 mod simulation;

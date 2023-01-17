@@ -15,35 +15,35 @@ use std::{env, fs};
 
 #[allow(clippy::too_many_arguments)]
 pub fn serialize_json(
-    initial_tx_outs: &Vec<TxOut>,
     blockchain: &Vec<Block>,
-    utxo: &UTXO,
+    file_prefix: Option<String>,
+    initial_tx_outs: &Vec<TxOut>,
     keymap: &KeyMap,
     pr_keys: &(PrivateKey, PrivateKey),
     pu_keys: &(PublicKey, PublicKey),
     sim_config: &Config,
-    file_prefix: Option<String>,
+    utxo: &UTXO,
 ) {
-    let initial_tx_outs_json = serde_json::to_value(initial_tx_outs);
     let blockchain_json = serde_json::to_value(blockchain);
-    let utxo_json = serde_json::to_value(utxo);
+    let config_json = serde_json::to_value(sim_config);
+    let initial_tx_outs_json = serde_json::to_value(initial_tx_outs);
     let keymap_json = serde_json::to_value(keymap);
     let pr_keys_json = serde_json::to_value(pr_keys);
     let pu_keys_json = serde_json::to_value(pu_keys);
-    let config_json = serde_json::to_value(sim_config);
-
-    if initial_tx_outs_json.is_err() {
-        error!("Failed to serialize initial tx outs!");
-        panic!();
-    }
+    let utxo_json = serde_json::to_value(utxo);
 
     if blockchain_json.is_err() {
         error!("Failed to serialize blocks!");
         panic!();
     }
 
-    if utxo_json.is_err() {
-        error!("Failed to serialize utxo!");
+    if config_json.is_err() {
+        error!("Failed to serialize simulation configuration data!");
+        panic!();
+    }
+
+    if initial_tx_outs_json.is_err() {
+        error!("Failed to serialize initial tx outs!");
         panic!();
     }
 
@@ -56,27 +56,28 @@ pub fn serialize_json(
         error!("Failed to serialize pr_keys!");
         panic!();
     }
+
     if pu_keys_json.is_err() {
         error!("Failed to serialize pu_keys!");
         panic!();
     }
 
-    if config_json.is_err() {
-        error!("Failed to serialize simulation configuration data!");
+    if utxo_json.is_err() {
+        error!("Failed to serialize utxo!");
         panic!();
     }
 
     let mut map = Map::new();
+    map.insert(String::from("blockchain"), blockchain_json.unwrap());
+    map.insert(String::from("config"), config_json.unwrap());
     map.insert(
         String::from("initial tx outs"),
         initial_tx_outs_json.unwrap(),
     );
-    map.insert(String::from("blockchain"), blockchain_json.unwrap());
-    map.insert(String::from("utxo"), utxo_json.unwrap());
     map.insert(String::from("keymap"), keymap_json.unwrap());
     map.insert(String::from("pr_keys"), pr_keys_json.unwrap());
     map.insert(String::from("pu_keys"), pu_keys_json.unwrap());
-    map.insert(String::from("config"), config_json.unwrap());
+    map.insert(String::from("utxo"), utxo_json.unwrap());
 
     let json: Value = serde_json::Value::Object(map);
 
@@ -121,13 +122,13 @@ pub fn serialize_json(
 pub fn deserialize_json(
     filepath: &str,
 ) -> (
-    Vec<TxOut>,
     Vec<Block>,
-    UTXO,
+    Config,
+    Vec<TxOut>,
     KeyMap,
     (PrivateKey, PrivateKey),
     (PublicKey, PublicKey),
-    Config,
+    UTXO,
 ) {
     let data = fs::read_to_string(filepath);
     if data.is_err() {
@@ -136,45 +137,40 @@ pub fn deserialize_json(
     }
     let json: Value = serde_json::from_str(&data.unwrap()).unwrap();
 
-    let initial_tx_outs_json = json
-        .get("initial tx outs")
-        .unwrap()
-        .as_array()
-        .unwrap()
-        .to_owned();
     let blockchain_json = json
         .get("blockchain")
         .unwrap()
         .as_array()
         .unwrap()
         .to_owned();
-    let utxo_json = json.get("utxo").unwrap().to_owned();
+    let config_json = json.get("config").unwrap().to_owned();
+    let initial_tx_outs_json = json
+        .get("initial tx outs")
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .to_owned();
     let keymap_json = json.get("keymap").unwrap().as_array().unwrap().to_owned();
     let pr_keys_json = json.get("pr_keys").unwrap().to_owned();
     let pu_keys_json = json.get("pu_keys").unwrap().to_owned();
-    let config_json = json.get("config").unwrap().to_owned();
+    let utxo_json = json.get("utxo").unwrap().to_owned();
 
-    let mut initial_tx_outs: Vec<TxOut> = Vec::new();
-    for tx_out in initial_tx_outs_json {
-        initial_tx_outs.push(serde_json::from_value(tx_out).unwrap());
-    }
     let mut blockchain: Vec<Block> = Vec::new();
     for block in blockchain_json {
         blockchain.push(serde_json::from_value(block).unwrap());
     }
-    let utxo = serde_json::from_value(utxo_json);
+    let config = serde_json::from_value(config_json);
+    let mut initial_tx_outs: Vec<TxOut> = Vec::new();
+    for tx_out in initial_tx_outs_json {
+        initial_tx_outs.push(serde_json::from_value(tx_out).unwrap());
+    }
     let mut keymap: Vec<(Outpoint, (PrivateKey, PublicKey))> = Vec::new();
     for pair in keymap_json {
         keymap.push(serde_json::from_value(pair).unwrap());
     }
-    let config = serde_json::from_value(config_json);
     let pr_keys = serde_json::from_value(pr_keys_json);
     let pu_keys = serde_json::from_value(pu_keys_json);
-
-    if utxo.is_err() {
-        error!("Failed to deserialize utxo! {:?}", utxo.err());
-        panic!();
-    }
+    let utxo = serde_json::from_value(utxo_json);
 
     if config.is_err() {
         error!(
@@ -184,19 +180,24 @@ pub fn deserialize_json(
         panic!();
     }
 
+    if utxo.is_err() {
+        error!("Failed to deserialize utxo! {:?}", utxo.err());
+        panic!();
+    }
+
     let mut key_map = KeyMap(HashMap::new());
     for (outpoint, key_pair) in keymap {
         key_map.insert(outpoint, key_pair);
     }
 
     return (
-        initial_tx_outs,
         blockchain,
-        utxo.unwrap(),
+        config.unwrap(),
+        initial_tx_outs,
         key_map,
         pr_keys.unwrap(),
         pu_keys.unwrap(),
-        config.unwrap(),
+        utxo.unwrap(),
     );
 }
 
@@ -436,14 +437,14 @@ mod tests {
         };
 
         serialize_json(
-            &initial_tx_outs,
             &blockchain,
-            &utxo,
+            Some(String::from("test")),
+            &initial_tx_outs,
             &keymap,
             &pr_keys,
             &pu_keys,
             &config,
-            Some(String::from("test")),
+            &utxo,
         );
     }
 
@@ -452,18 +453,18 @@ mod tests {
     fn test_deserialize_json() {
         let path = "./config/test_2022-11-15-11-50-06.json";
 
-        let (initial_tx_outs, blockchain, utxo, keymap, pr_keys, pu_keys, config) =
+        let (blockchain, config, initial_tx_outs, keymap, pr_keys, pu_keys, utxo) =
             deserialize_json(path);
 
         serialize_json(
-            &initial_tx_outs,
             &blockchain,
-            &utxo,
+            Some(String::from("test")),
+            &initial_tx_outs,
             &keymap,
             &pr_keys,
             &pu_keys,
             &config,
-            Some(String::from("test")),
+            &utxo,
         );
     }
 }

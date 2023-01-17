@@ -32,7 +32,6 @@ mod tests {
 
         // We create a signature script for the input of our new transaction
         let (old_private_key, old_public_key) = key_map[&outpoint0].clone();
-
         let message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
             + &tx_out0.pk_script.public_key_hash;

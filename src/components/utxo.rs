@@ -119,6 +119,7 @@ impl UTXO {
         return true;
     }
 
+    #[allow(dead_code)]
     pub fn batch_verify_and_update(&self, transactions: &Vec<Transaction>) -> (bool, Option<UTXO>) {
         let mut incoming_balance: u32;
         let mut outgoing_balance: u32;
@@ -593,7 +594,6 @@ mod tests {
         key_map.insert(outpoint0.clone(), (private_key0, public_key0));
 
         let (old_private_key, old_public_key) = key_map[&outpoint0].clone();
-
         let message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
             + &tx_out0.pk_script.public_key_hash;
