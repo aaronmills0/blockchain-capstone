@@ -43,13 +43,13 @@ impl Transaction {
      * The transaction list created is constantly transmitted so that the block generator can receive it
      */
     pub fn transaction_generator(
-        transmitter: Sender<(Transaction, KeyMap)>,
+        mut keymap: KeyMap,
         max_num_outputs: usize,
+        mean_invalid_ratio: u32,
         transaction_mean: f32,
         transaction_duration: u32,
-        mean_invalid_ratio: u32,
+        transmitter: Sender<(Transaction, KeyMap)>,
         mut utxo: UTXO,
-        mut key_map: KeyMap,
     ) {
         if transaction_mean <= 0.0 {
             warn!("Invalid input. A non-positive mean for transaction rate is invalid for an exponential distribution but the mean was {}", transaction_mean);
@@ -83,14 +83,14 @@ impl Transaction {
             thread::sleep(transaction_rate); // Sleep to mimic the time between creation of transactions
 
             let transaction =
-                Self::create_transaction(&utxo, &mut key_map, &mut rng, max_num_outputs, invalid);
+                Self::create_transaction(&utxo, &mut keymap, &mut rng, max_num_outputs, invalid);
             transaction_counter += 1;
             info!("{} Transactions Created", transaction_counter);
 
             if !invalid {
                 utxo.update(&transaction);
             }
-            transmitter.send((transaction, key_map.clone())).unwrap();
+            transmitter.send((transaction, keymap.clone())).unwrap();
         }
     }
 
@@ -328,7 +328,6 @@ mod tests {
         utxo.insert(outpoint0.clone(), tx_out0.clone());
 
         let (old_private_key, old_public_key) = key_map[&outpoint0].clone();
-
         let message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
             + &tx_out0.pk_script.public_key_hash;

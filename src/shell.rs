@@ -63,13 +63,12 @@ pub fn shell() {
                     continue;
                 }
 
-                let (initial_tx_outs, blockchain, _, _, _, _, _) = deserialize_json(f);
+                let (blockchain, _, initial_tx_outs, _, _, _, _) = deserialize_json(f);
                 create_block_graph(initial_tx_outs, blockchain);
             }
 
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");
-
                 write_log();
                 exit(0);
             }

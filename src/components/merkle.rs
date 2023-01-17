@@ -26,6 +26,8 @@ impl Merkle {
      * into the front of a vector. Instead, the vector is reversed after the construction of the
      * reversed array is complete
      *
+     * Algorithm:
+     *
      * We start by loading the queue with the hashes of all the transactions.
      *
      * The queue represents a level in the tree bottom-up
@@ -45,6 +47,8 @@ impl Merkle {
      *   Unload the stack into the merkle tree vector
      *
      * Reverse the merkle tree vector because we interted everything in reverse for efficiency reasons
+     *
+     * Example:
      *
      * Let h_i be the hash of transaction Txi
      * Let h_ij be the hash of the concatenation of the hashes of transactions Txi and Txj
@@ -181,12 +185,10 @@ mod tests {
     #[test]
     fn test_create_merkle_tree_even_number_of_transactions() {
         let transactions = create_three_transactions_valid();
-
         let used_transactions = Vec::from_iter(transactions[0..2].iter().cloned());
         let h0: String = hash_as_string(&used_transactions.get(0).unwrap());
         let h1: String = hash_as_string(&used_transactions.get(1).unwrap());
         let root_hash: String = hash_as_string(&format!("{}{}", h0, h1));
-
         let merkle: Merkle = Merkle::create_merkle_tree(&used_transactions);
 
         assert_eq!(3, merkle.tree.len());
@@ -204,7 +206,6 @@ mod tests {
         let h01: String = hash_as_string(&format!("{}{}", h0, h1));
         let h22: String = hash_as_string(&format!("{}{}", h2, h2));
         let root_hash: String = hash_as_string(&format!("{}{}", h01, h22));
-
         let merkle: Merkle = Merkle::create_merkle_tree(&transactions);
 
         assert_eq!(7, merkle.tree.len());

@@ -59,7 +59,6 @@ mod tests {
             let genesis_merkle: Merkle = Merkle {
                 tree: Vec::from(["0".repeat(64)]),
             };
-
             let genesis_block: Block = Block {
                 header: BlockHeader {
                     previous_hash: "0".repeat(64),
