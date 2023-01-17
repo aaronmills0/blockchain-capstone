@@ -1,8 +1,8 @@
-use bitcoin::network::message;
 use ed25519_dalek::{
     ExpandedSecretKey, Keypair, PublicKey as DalekPublicKey, SecretKey as DalekSecretKey,
     Signature as DalekSignature, Verifier as DalekVerifer,
 };
+use log::warn;
 use rand_2::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
@@ -100,11 +100,16 @@ impl Verifier {
         public_keys: &Arc<Vec<DalekPublicKey>>,
     ) {
         let msg_slices: Vec<&[u8]> = messages.iter().map(|x| &x[..]).collect();
-        result_tx.send(Verifier::verify_batch(
+
+        let result = result_tx.send(Verifier::verify_batch(
             &msg_slices,
             &signatures,
             &public_keys,
         ));
+
+        if result.is_err() {
+            warn!("Verification error!");
+        }
     }
 }
 

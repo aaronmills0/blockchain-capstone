@@ -1,16 +1,16 @@
 use crate::hash::hash_as_string;
-use crate::sign_and_verify::{self, PublicKey, Signature, Verifier};
-use crate::transaction::{Outpoint, PublicKeyScript, Transaction, TxIn, TxOut};
+use crate::sign_and_verify::{PublicKey, Signature, Verifier};
+use crate::transaction::{Outpoint, Transaction, TxIn, TxOut};
 use ed25519_dalek::{PublicKey as DalekPublicKey, Signature as DalekSignature};
-use itertools::{enumerate, izip};
+use itertools::izip;
 use log::warn;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, DerefMut};
-use std::sync::mpsc::{Receiver, Sender};
-use std::sync::{mpsc, Arc, Mutex};
-use std::thread::{self, JoinHandle};
+use std::sync::mpsc::Receiver;
+use std::sync::{mpsc, Arc};
+use std::thread::{self};
 
 /**
  * The Utxo is a map containing the Unspent Transaction (X) Outputs.
@@ -342,6 +342,7 @@ impl UTXO {
                 // get the transaction is points to as its previous transaction
                 let prev = &txin.outpoint.txid;
                 // If g contains prev, we know that this is an edge
+                // Otherwise this vertex has no incoming edges!
                 if keys.contains(prev) {
                     // in-degree increments
                     *g_in.get_mut(txid).unwrap() += 1;
@@ -352,7 +353,6 @@ impl UTXO {
                     }
                     // update entry
                     g_r.get_mut(prev).unwrap().push(txid.clone());
-                    // Otherwise this vertex has no incoming edges!
                 }
             }
         }
@@ -379,14 +379,11 @@ impl UTXO {
 
 #[cfg(test)]
 mod tests {
-    use rand_1::rngs::ThreadRng;
-    use rand_1::seq::SliceRandom;
 
     use super::{HashMap, Transaction, UTXO};
     use crate::hash;
     use crate::sign_and_verify;
     use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
-    use crate::simulation::KeyMap;
     use crate::transaction::{Outpoint, PublicKeyScript, SignatureScript, TxIn, TxOut};
 
     fn create_valid_transactions() -> (Transaction, UTXO) {
