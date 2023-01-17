@@ -1,26 +1,24 @@
 #[cfg(test)]
 mod tests {
+    use crate::components::block::{Block, BlockHeader};
+    use crate::components::merkle::Merkle;
+    use crate::components::transaction::{Outpoint, PublicKeyScript, Transaction, TxOut};
+    use crate::components::utxo::UTXO;
+    use crate::simulation::KeyMap;
+    use crate::utils::sign_and_verify::Verifier;
+    use crate::utils::validator::fork_exists;
+    use crate::utils::{hash, sign_and_verify};
+    use rand_1::rngs::ThreadRng;
     use std::collections::HashMap;
     use std::time::Instant;
 
-    use rand_1::rngs::ThreadRng;
-
-    use crate::block::{Block, BlockHeader};
-    use crate::merkle::Merkle;
-    use crate::sign_and_verify::Verifier;
-    use crate::simulation::KeyMap;
-    use crate::transaction::{Outpoint, PublicKeyScript, Transaction, TxOut};
-    use crate::utxo::UTXO;
-    use crate::validator::fork_exists;
-    use crate::{hash, sign_and_verify};
-
+    #[ignore]
     #[test]
     fn test_block_validation_time() {
         let base: u32 = 10;
         let mut multiplicative_index: u32;
         for k in 0..7 {
             multiplicative_index = base.pow(k.try_into().unwrap());
-
             let mut utxo: UTXO = UTXO(HashMap::new());
             let mut key_map: KeyMap = KeyMap(HashMap::new());
             let mut transactions: Vec<Transaction> = Vec::new();
@@ -29,6 +27,7 @@ mod tests {
                 txid: "0".repeat(64),
                 index: 0,
             };
+
             let tx_out0: TxOut = TxOut {
                 value: 500,
                 pk_script: PublicKeyScript {
@@ -39,8 +38,8 @@ mod tests {
 
             key_map.insert(outpoint0.clone(), (private_key0, public_key0));
             utxo.insert(outpoint0, tx_out0);
-            let utxo_copy = utxo.clone();
 
+            let utxo_copy = utxo.clone();
             let mut rng: ThreadRng = rand_1::thread_rng();
             let max_num_outputs = 1;
             for _ in 0..multiplicative_index {
@@ -52,7 +51,6 @@ mod tests {
                     false,
                 );
                 utxo.update(&transaction);
-
                 transactions.push(transaction);
             }
 
@@ -61,6 +59,7 @@ mod tests {
             let genesis_merkle: Merkle = Merkle {
                 tree: Vec::from(["0".repeat(64)]),
             };
+
             let genesis_block: Block = Block {
                 header: BlockHeader {
                     previous_hash: "0".repeat(64),
@@ -72,7 +71,6 @@ mod tests {
             };
 
             let merkle = Merkle::create_merkle_tree(&transactions);
-
             let block: Block = Block {
                 header: BlockHeader {
                     previous_hash: hash::hash_as_string(&genesis_block.header),

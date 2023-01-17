@@ -1,8 +1,8 @@
-use crate::block::Block;
-use crate::hash;
-use crate::merkle::Merkle;
+use crate::components::block::Block;
+use crate::components::merkle::Merkle;
+use crate::components::utxo::UTXO;
 use crate::simulation::BLOCK_SIZE;
-use crate::utxo::UTXO;
+use crate::utils::hash;
 use log::{info, warn};
 use std::sync::mpsc::Receiver;
 use std::vec::Vec;
@@ -12,7 +12,6 @@ pub fn chain_validator(receiver: Receiver<Block>, mut utxo: UTXO, mut chain: Vec
 
     loop {
         let incoming_block = receiver.recv().unwrap();
-
         if fork_exists(&incoming_block, &chain) {
             continue;
         }
@@ -41,7 +40,7 @@ pub fn chain_validator(receiver: Receiver<Block>, mut utxo: UTXO, mut chain: Vec
 }
 
 pub fn fork_exists(block: &Block, chain: &[Block]) -> bool {
-    //Check prev block hash against newest validated block
+    // Check prev block hash against newest validated block
     let prev_hash = &block.header.previous_hash;
     let head_hash = hash::hash_as_string(&chain.last().unwrap().header);
     if head_hash.eq(prev_hash) {
@@ -60,20 +59,22 @@ pub fn fork_exists(block: &Block, chain: &[Block]) -> bool {
                 return true;
             }
         }
+
         warn!(
             "Validator: Received new block containing previous hash ({}) to unknown block",
             prev_hash
         );
+
         return true;
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::block::{Block, BlockHeader};
-    use crate::hash;
-    use crate::merkle::Merkle;
-    use crate::validator::fork_exists;
+    use crate::components::block::{Block, BlockHeader};
+    use crate::components::merkle::Merkle;
+    use crate::utils::hash;
+    use crate::utils::validator::fork_exists;
 
     #[test]
     fn force_fork() {
@@ -115,6 +116,7 @@ mod tests {
             merkle: merkle2,
             transactions: Vec::new(),
         };
+
         let blockchain: Vec<Block> = vec![genesis_block];
         let mut blockchain_copy = blockchain.clone();
         let block1_copy = block1.clone();

@@ -1,14 +1,8 @@
-mod block;
-mod graph;
-mod hash;
-mod merkle;
-mod save_and_load;
+mod components;
+mod performance_tests;
 mod shell;
-mod sign_and_verify;
 mod simulation;
-mod transaction;
-mod utxo;
-mod validator;
+mod utils;
 use log::info;
 use shell::shell;
 use std::env;
@@ -24,7 +18,6 @@ fn main() {
     log4rs::init_file(cwd_string, Default::default()).unwrap();
 
     info!("Welcome to the minimalist blockchain!\n");
-
     info!("For list of supported commands enter: 'help'");
 
     shell();

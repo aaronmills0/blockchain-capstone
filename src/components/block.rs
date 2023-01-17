@@ -1,9 +1,9 @@
-use crate::merkle::Merkle;
+use crate::components::merkle::Merkle;
+use crate::components::transaction::Transaction;
+use crate::components::utxo::UTXO;
+use crate::simulation;
 use crate::simulation::KeyMap;
-use crate::transaction::Transaction;
-use crate::utxo::UTXO;
-use crate::{hash, simulation};
-
+use crate::utils::hash;
 use log::{info, warn};
 use rand_1::rngs::ThreadRng;
 use rand_1::Rng;
@@ -14,7 +14,6 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::{thread, time};
 
 #[derive(Clone, Serialize, Deserialize)]
-
 pub struct Block {
     pub header: BlockHeader,
     pub merkle: Merkle,
@@ -42,10 +41,9 @@ impl Block {
      * tx.send(transactions);  
      */
     pub fn block_generator(
-        // block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx
+        // block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx, block_validator_block_tx
         block_tx: (Sender<Block>, Sender<UTXO>, Sender<KeyMap>, Sender<Block>),
-        // transaction_block_transaction_keymap_rx
-        block_rx: (Receiver<(Transaction, KeyMap)>,),
+        block_rx: Receiver<(Transaction, KeyMap)>, // transaction_block_transaction_keymap_rx
         mut utxo: UTXO,
         mut blockchain: Vec<Block>,
         mean: f32,
@@ -58,27 +56,27 @@ impl Block {
 
         let (block_sim_block_tx, block_sim_utxo_tx, block_sim_keymap_tx, block_validator_block_tx) =
             block_tx;
-        let (transaction_block_transaction_keymap_rx,) = block_rx;
+        let transaction_block_transaction_keymap_rx = block_rx;
 
         let lambda: f32 = 1.0 / mean;
         let exp: Exp<f32> = Exp::new(lambda).unwrap();
-        let mut rng: ThreadRng = rand_1::thread_rng();
-        let mut sample: f32;
-        let mut normalized: f32;
-        let mut mining_time: time::Duration;
+
         let mut block: Block;
         let mut counter: u32;
-        let mut merkle: Merkle;
-        let mut transactions: Vec<Transaction>;
-        let mut keymap_map: HashMap<String, KeyMap>;
         let mut keymap: KeyMap;
+        let mut keymap_map: HashMap<String, KeyMap>;
+        let mut merkle: Merkle;
+        let mut mining_time: time::Duration;
+        let mut normalized: f32;
+        let mut rng: ThreadRng = rand_1::thread_rng();
+        let mut sample: f32;
+        let mut transactions: Vec<Transaction>;
         let mut tx: Transaction;
         loop {
             transactions = Vec::new();
             keymap_map = HashMap::new();
             keymap = KeyMap(HashMap::new());
             counter = 0;
-
             while counter < simulation::BLOCK_SIZE {
                 (tx, keymap) = transaction_block_transaction_keymap_rx.recv().unwrap();
                 keymap_map.insert(hash::hash_as_string(&tx), keymap.clone());
@@ -92,13 +90,13 @@ impl Block {
             normalized = sample * mean;
             // Get the 'mining' time as a duration
             mining_time = time::Duration::from_secs((duration * normalized as u32) as u64);
-            // Sleep to mimic the 'mining' time
-            thread::sleep(mining_time);
-            // Create a new block
+            thread::sleep(mining_time); // Sleep to mimic the 'mining' time
+
             (transactions, utxo) = Block::verify_and_update(transactions, utxo);
             if transactions.is_empty() {
                 continue;
             }
+
             let mut found = false;
             for transaction in transactions.iter().rev() {
                 let hash = hash::hash_as_string(transaction);
@@ -114,11 +112,12 @@ impl Block {
 
             if rng.gen_range(1..=invalid_block_frequency) == 1 {
                 let invalid_type = rng.gen_range(1..=3);
-                let mut transactions_copy = transactions.clone();
                 let merkle_copy: Merkle = Merkle::create_merkle_tree(&transactions);
+                let mut merkle_root_copy = merkle_copy.tree.first().unwrap().clone();
                 let mut previous_hash_copy =
                     hash::hash_as_string(&blockchain.last().unwrap().header);
-                let mut merkle_root_copy = merkle_copy.tree.first().unwrap().clone();
+                let mut transactions_copy = transactions.clone();
+
                 if invalid_type == 1 {
                     warn!(
                         "Sending invalid block! Expect a block containing an invalid transaction."
@@ -135,6 +134,7 @@ impl Block {
                     warn!("Sending invalid block! Expect a block with an incorrect merkle root.");
                     merkle_root_copy = hash::hash_as_string(&merkle_root_copy);
                 }
+
                 let invalid_block = Block {
                     header: BlockHeader {
                         previous_hash: previous_hash_copy,
@@ -146,6 +146,7 @@ impl Block {
                 };
                 block_validator_block_tx.send(invalid_block).unwrap();
             }
+
             info!("Creating block with {} transactions", transactions.len());
             merkle = Merkle::create_merkle_tree(&transactions);
             block = Block {
@@ -159,19 +160,21 @@ impl Block {
             };
 
             let block_copy = block.clone();
-            //Randomly Injects Fork
+
+            // Randomly Injects Fork
             if rng.gen_range(1..=10) == 1 {
                 warn!("Sending a duplicate block! Expecting a fork to be detected.");
                 let block_copy2 = block_copy.clone();
                 block_validator_block_tx.send(block_copy2).unwrap();
             }
-            block_sim_block_tx.send(block.clone()).unwrap();
-            blockchain.push(block);
 
-            Block::print_blockchain(&blockchain);
+            block_sim_block_tx.send(block.clone()).unwrap();
             block_sim_utxo_tx.send(utxo.clone()).unwrap();
             block_sim_keymap_tx.send(keymap.clone()).unwrap();
             block_validator_block_tx.send(block_copy).unwrap();
+            blockchain.push(block);
+
+            Block::print_blockchain(&blockchain);
         }
     }
 
@@ -190,7 +193,6 @@ impl Block {
                 continue;
             }
             utxo1.update(&transaction);
-
             transactions_valid.push(transaction);
         }
         return (transactions_valid, utxo1);

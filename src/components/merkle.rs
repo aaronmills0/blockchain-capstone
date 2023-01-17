@@ -1,7 +1,6 @@
+use crate::components::transaction::Transaction;
+use crate::utils::hash::hash_as_string;
 use serde::{Deserialize, Serialize};
-
-use crate::hash::hash_as_string;
-use crate::transaction::Transaction;
 use std::collections::VecDeque;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -11,58 +10,56 @@ pub struct Merkle {
 
 impl Merkle {
     /**
-    * Creates a merkle tree from a list of transactions
-    * Uses a queue and a stack to create a merkle tree in array representation
-    *
-    * Logic:
-    *
-    * Build one layer of the tree at a time in a bottom-up apprach
-    * The queue stores the (pairs of) hashes that have yet to be hashed into their parents
-    *
-    * The stack is filled after a pair of hashes have been hashed to form their parent
-    * We use the stack to reverse the set of hashes for a given and obtain the correct ordering
-    * for our array implementation
-    *
-    * Elements are entered into the merkle tree in reverse order to prevent inefficent insertion
-    * into the front of a vector. Instead, the vector is reversed after the construction of the
-    * reversed array is complete
-    *
-    * We start by loading the queue with the hashes of all the transactions.
-
-    * The queue represents a level in the tree bottom-up
-
-    * for each level in the tree (while the queue.size > 1 i.e not at the root yet):
-
-    *  Ensure that we have an even number of hashes
-
-    *  Then for each pair of hashes we:
-
-    *      pop them from the queue
-
-    *      put the hash of their concatenation into the queue
-
-    *      push them onto the stack
-
-    *  Unload the stack into the merkle tree vector
-    * Reverse the merkle tree vector because we interted everything in reverse for efficiency reasons
-    *
-    *  Let h_i be the hash of transaction Txi
-    *
-    *  Let h_ij be the hash of the concatenation of the hashes of transactions Txi and Txj
-    *
-    *  Then, for a transaction list: Tx0, Tx1, Tx2, Tx3, Tx4 we expect the following tree
-    *
-    *                          h_01234444
-    *                      /                \
-    *                h_0123                  h_4444
-    *              /        \              /        \
-    *          h_01          h_23      h_44          h_44
-    *         /    \        /    \    /    \
-    *       h_0     h_1   h_2    h_3 h_4   h_4
-    *
-    *  h_01234444 is the merkle root of this tree
-    *
-    */
+     * Creates a merkle tree from a list of transactions
+     * Uses a queue and a stack to create a merkle tree in array representation
+     *
+     * Logic:
+     *
+     * Build one layer of the tree at a time in a bottom-up apprach
+     * The queue stores the (pairs of) hashes that have yet to be hashed into their parents
+     *
+     * The stack is filled after a pair of hashes have been hashed to form their parent
+     * We use the stack to reverse the set of hashes for a given and obtain the correct ordering
+     * for our array implementation
+     *
+     * Elements are entered into the merkle tree in reverse order to prevent inefficent insertion
+     * into the front of a vector. Instead, the vector is reversed after the construction of the
+     * reversed array is complete
+     *
+     * We start by loading the queue with the hashes of all the transactions.
+     *
+     * The queue represents a level in the tree bottom-up
+     *
+     * For each level in the tree (while the queue.size > 1 i.e not at the root yet):
+     *
+     *   Ensure that we have an even number of hashes
+     *
+     *   Then for each pair of hashes we:
+     *
+     *      pop them from the queue
+     *
+     *      put the hash of their concatenation into the queue
+     *
+     *      push them onto the stack
+     *
+     *   Unload the stack into the merkle tree vector
+     *
+     * Reverse the merkle tree vector because we interted everything in reverse for efficiency reasons
+     *
+     * Let h_i be the hash of transaction Txi
+     * Let h_ij be the hash of the concatenation of the hashes of transactions Txi and Txj
+     * Then, for a transaction list: Tx0, Tx1, Tx2, Tx3, Tx4 we expect the following tree
+     *
+     *                          h_01234444
+     *                      /                \
+     *                h_0123                  h_4444
+     *              /        \              /        \
+     *          h_01          h_23      h_44          h_44
+     *         /    \        /    \    /    \
+     *       h_0     h_1   h_2    h_3 h_4   h_4
+     *
+     * h_01234444 is the merkle root of this tree
+     */
     pub fn create_merkle_tree(transactions: &Vec<Transaction>) -> Merkle {
         let mut merkle_tree: Vec<String> = Vec::new();
         let mut queue: VecDeque<String> = VecDeque::new();
@@ -97,26 +94,27 @@ impl Merkle {
                 merkle_tree.push(stack.pop_back().unwrap());
             }
         }
+
         merkle_tree.push(queue.pop_front().unwrap());
         merkle_tree.reverse();
-        let merkle: Merkle = Merkle { tree: merkle_tree };
-        return merkle;
+        return Merkle { tree: merkle_tree };
     }
 }
 
 #[cfg(test)]
 mod tests {
-
-    use crate::hash;
-    use crate::sign_and_verify;
-    use crate::sign_and_verify::{PrivateKey, PublicKey, Verifier};
-    use crate::transaction::{Outpoint, PublicKeyScript, SignatureScript, TxIn, TxOut};
-    use crate::{transaction::Transaction, utxo::UTXO};
+    use super::*;
+    use crate::components::transaction::{
+        Outpoint, PublicKeyScript, SignatureScript, Transaction, TxIn, TxOut,
+    };
+    use crate::components::utxo::UTXO;
+    use crate::utils::hash;
+    use crate::utils::sign_and_verify;
+    use crate::utils::sign_and_verify::{PrivateKey, PublicKey, Verifier};
     use std::collections::HashMap;
 
     fn create_three_transactions_valid() -> std::vec::Vec<Transaction> {
-        //We first insert an unspent output in the utxo to which we will
-        //refer later on.
+        // We first insert an unspent output in the utxo to which we will refer later on.
         let mut utxo: UTXO = UTXO(HashMap::new());
         let mut key_map: HashMap<Outpoint, (PrivateKey, PublicKey)> = HashMap::new();
         let (private_key0, public_key0) = sign_and_verify::create_keypair();
@@ -136,10 +134,7 @@ mod tests {
         key_map.insert(outpoint0.clone(), (private_key0, public_key0));
         utxo.insert(outpoint0.clone(), tx_out0.clone());
 
-        let old_private_key: PrivateKey;
-        let old_public_key: PublicKey;
-
-        (old_private_key, old_public_key) = key_map[&outpoint0].clone();
+        let (old_private_key, old_public_key) = key_map[&outpoint0].clone();
         let message = String::from(&outpoint0.txid)
             + &outpoint0.index.to_string()
             + &tx_out0.pk_script.public_key_hash;
@@ -154,9 +149,8 @@ mod tests {
             sig_script: sig_script1,
         };
 
-        //We create a new keypair corresponding to our new transaction which allows us to create its tx_out
-
-        let (_private_key1, public_key1) = sign_and_verify::create_keypair();
+        // We create a new keypair corresponding to our new transaction which allows us to create its tx_out
+        let (_, public_key1) = sign_and_verify::create_keypair();
 
         let tx_out1: TxOut = TxOut {
             value: 500,
@@ -184,7 +178,6 @@ mod tests {
         return Vec::from([transaction1, transaction2, transaction3]);
     }
 
-    use super::*;
     #[test]
     fn test_create_merkle_tree_even_number_of_transactions() {
         let transactions = create_three_transactions_valid();

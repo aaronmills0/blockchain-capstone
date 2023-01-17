@@ -1,12 +1,12 @@
+use crate::components::block::Block;
+use crate::components::transaction::TxOut;
+use crate::utils::hash;
 use chrono::Local;
 use log::{error, info, warn};
 use std::fs::File;
 use std::io::{Error, Write};
 use std::path::Path;
 use std::{env, fs};
-
-use crate::transaction::TxOut;
-use crate::{block::Block, hash};
 
 /**
  * Creates a new dot file in a config folder based on the input configuration file.
@@ -83,6 +83,7 @@ fn write_edges(file: &Result<File, Error>, initial_tx_outs: Vec<TxOut>, blockcha
         if i == 0 {
             continue;
         }
+
         let mut block_edge = format!("\t\"i{}\" -> \"i{}\"", i, i - 1);
         block_edge += &format!("[ltail=cluster{} lhead=cluster{} color=green]", i, i - 1);
         write_line(file, &block_edge);
@@ -91,7 +92,6 @@ fn write_edges(file: &Result<File, Error>, initial_tx_outs: Vec<TxOut>, blockcha
             for (j, input) in transaction.tx_inputs.iter().enumerate() {
                 let p_txid = &input.outpoint.txid;
                 let p_idx = input.outpoint.index;
-
                 let mut edge_string = format!("\t\"{}\" -> \"", hash::hash_as_string(&transaction));
                 if *p_txid == "0".repeat(64) {
                     edge_string += &format!("i0\"[label=\"out: {}, in: {}", p_idx, j);

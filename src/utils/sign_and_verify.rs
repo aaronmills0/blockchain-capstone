@@ -51,12 +51,6 @@ impl Deref for PrivateKey {
     }
 }
 
-impl From<&PrivateKey> for ExpandedSecretKey {
-    fn from(p: &PrivateKey) -> ExpandedSecretKey {
-        return ExpandedSecretKey::from(&p.0);
-    }
-}
-
 impl DerefMut for PrivateKey {
     fn deref_mut(&mut self) -> &mut DalekSecretKey {
         return &mut self.0;
@@ -69,11 +63,17 @@ impl Clone for PrivateKey {
     }
 }
 
+impl From<&PrivateKey> for ExpandedSecretKey {
+    fn from(p: &PrivateKey) -> ExpandedSecretKey {
+        return ExpandedSecretKey::from(&p.0);
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Verifier {}
 
 impl Verifier {
-    //We verify whether the hash of a signed transaction correpsonds to the public key passed as a parameter
+    // We verify whether the hash of a signed transaction correpsonds to the public key passed as a parameter
     pub fn verify(
         &self,
         message: &str,
@@ -113,7 +113,7 @@ impl Verifier {
     }
 }
 
-//We sign a message and return its signed hash + the public key that was generated
+// We sign a message and return its signed hash + the public key that was generated
 pub fn sign(message: &str, private_key: &PrivateKey, public_key: &PublicKey) -> Signature {
     let expanded: ExpandedSecretKey = private_key.into();
     return Signature(expanded.sign(message.as_bytes(), &public_key.0));
@@ -127,9 +127,8 @@ pub fn create_keypair() -> (PrivateKey, PublicKey) {
 
 #[cfg(test)]
 mod tests {
-
-    use crate::hash::hash_as_string;
-    use crate::sign_and_verify::{create_keypair, sign, Verifier};
+    use crate::utils::hash::hash_as_string;
+    use crate::utils::sign_and_verify::{create_keypair, sign, Verifier};
 
     #[test]
     fn test_verify_signature() {
