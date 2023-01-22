@@ -5,10 +5,13 @@ mod shell;
 mod simulation;
 mod utils;
 use log::info;
+use network::client;
+use network::server;
 use shell::shell;
 use std::env;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cwd = std::env::current_dir().unwrap();
     let mut cwd_string = cwd.into_os_string().into_string().unwrap();
     if env::consts::OS == "windows" {
@@ -21,5 +24,7 @@ fn main() {
     info!("Welcome to the minimalist blockchain!\n");
     info!("For list of supported commands enter: 'help'");
 
-    shell();
+    //client::setup_client().await;
+    server::setup_server().await;
+    //shell();
 }
