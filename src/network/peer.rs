@@ -30,23 +30,25 @@ pub async fn spawn_listener() {
 
     let listener = TcpListener::bind(&socket).await.unwrap();
     info!("Successfully setup listener at {}", socket);
+    loop {
+        let (socket, _) = listener.accept().await.unwrap();
 
-    let (socket, _) = listener.accept().await.unwrap();
-
-    info!("{:?}", &socket);
-    // A new task is spawned for each inbound socket. The socket is
-    // moved to the new task and processed there.
-    tokio::spawn(async move {
-        process(socket).await;
-    });
+        info!("{:?}", &socket);
+        // A new task is spawned for each inbound socket. The socket is
+        // moved to the new task and processed there.
+        tokio::spawn(async move {
+            process(socket).await;
+        });
+    }
 }
 
 async fn process(socket: TcpStream) {
     // The `Connection` lets us read/write redis **frames** instead of
     // byte streams. The `Connection` type is defined by mini-redis.
     let mut connection = Connection::new(socket);
-
-    if let Some(frame) = connection.read_frame().await.unwrap() {
-        info!("GOT: {:?}", frame);
+    loop {
+        if let Some(frame) = connection.read_frame().await.unwrap() {
+            info!("GOT: {:?}", frame);
+        }
     }
 }

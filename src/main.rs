@@ -25,6 +25,6 @@ async fn main() {
 
     // peer::spawn_listener().await;
 
-    // peer::spawn_connection("10.121.226.81:6780").await;
+    peer::spawn_connection("10.121.226.81:6780").await;
     //shell();
 }
