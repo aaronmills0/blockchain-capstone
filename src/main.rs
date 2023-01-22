@@ -5,10 +5,9 @@ mod shell;
 mod simulation;
 mod utils;
 use log::info;
-use network::client;
-use network::server;
+use network::peer;
 use shell::shell;
-use std::env;
+use std::{env, thread};
 
 #[tokio::main]
 async fn main() {
@@ -24,7 +23,8 @@ async fn main() {
     info!("Welcome to the minimalist blockchain!\n");
     info!("For list of supported commands enter: 'help'");
 
-    //client::setup_client().await;
-    server::setup_server().await;
+    // peer::spawn_listener().await;
+
+    // peer::spawn_connection("10.121.226.81:6780").await;
     //shell();
 }
