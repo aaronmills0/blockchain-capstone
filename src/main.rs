@@ -9,6 +9,10 @@ use network::peer;
 use shell::shell;
 use std::{env, thread};
 
+use crate::peer::Peer;
+
+static ARCHIVE_SERVER_ADDR: &str = "192.168.0.12:6780";
+
 #[tokio::main]
 async fn main() {
     let cwd = std::env::current_dir().unwrap();
@@ -23,8 +27,10 @@ async fn main() {
     info!("Welcome to the minimalist blockchain!\n");
     info!("For list of supported commands enter: 'help'");
 
-    // peer::spawn_listener().await;
+    tokio::spawn(async move {
+        peer::spawn_listener().await;
+    });
 
-    peer::spawn_connection("10.121.226.81:6780").await;
+    tokio::spawn(async move { peer::spawn_connection("192.168.0.12:6780").await });
     //shell();
 }
