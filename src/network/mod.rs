@@ -1,4 +1,4 @@
 mod block_headers;
 mod get_data;
-mod inv;
+mod inventory;
 mod message_header;
