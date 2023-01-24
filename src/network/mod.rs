@@ -1,2 +1,2 @@
 mod parser;
-pub mod tx_headers;
+pub mod block_headers;

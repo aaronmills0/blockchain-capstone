@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Binary;
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct TxHeaders;
+pub struct BlockHeaders;
 
-impl TxHeaders {
+impl BlockHeaders {
     pub fn generate_message_header() -> String {
         let command_name = String::from("000");
         return command_name;
