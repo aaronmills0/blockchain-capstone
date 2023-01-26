@@ -105,6 +105,10 @@ impl Peer {
         return peer;
     }
 
+    pub fn shutdown(peer: Peer){
+        Peer::save_peer(&peer);
+        return;
+    }
     pub async fn spawn_connection(socket: &str) {
         info!("External: {}", &socket);
         // The 'await' expression suspends the operation until it is ready to be processed. It continues to the next operation.
