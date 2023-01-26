@@ -1,3 +1,4 @@
+use core::arch;
 use std::{
     collections::HashMap,
     env,
@@ -6,19 +7,45 @@ use std::{
     path::Path,
 };
 
+use bytes::Bytes;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
-use mini_redis::Connection;
+use mini_redis::{Connection, Frame};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::{
+    net::{TcpListener, TcpStream},
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        oneshot,
+    },
+};
 
 use super::peer::Peer;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Archive {
     peer: Peer,
     next_peerid: u32,
+}
+
+enum Command {
+    Get {
+        key: String,
+        resp: Responder<Option<String>>,
+        payload: Option<String>,
+    },
+}
+
+type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
+
+// notation for functions that return message typesis get_name_response()
+
+fn get_peerid_response(next_peerid: u32) -> Frame {
+    let mut response_vec: Vec<Frame> = Vec::new();
+    let bulk = Frame::Integer(next_peerid as u64);
+    response_vec.push(bulk);
+    return Frame::Array(response_vec);
 }
 
 impl Archive {
@@ -30,6 +57,27 @@ impl Archive {
             },
             next_peerid: 2,
         };
+    }
+
+    async fn archive_manager(mut archive: Archive, mut rx: Receiver<Command>) {
+        let command = rx.recv().await.unwrap();
+        match command {
+            Command::Get { key, resp, payload } => {
+                if key == "id" {
+                    if payload.is_none() {
+                        error!("Invalid command")
+                    } else {
+                        archive
+                            .peer
+                            .socketmap
+                            .insert(archive.next_peerid, payload.unwrap());
+                        resp.send(Ok(Some(String::from(archive.next_peerid.to_string()))));
+                        archive.next_peerid += 1;
+                        Archive::save_archive(&archive);
+                    }
+                }
+            }
+        }
     }
 
     pub async fn launch() {
@@ -47,6 +95,11 @@ impl Archive {
             Archive::save_archive(&archive);
         }
 
+        let (tx, rx) = mpsc::channel(32);
+        tokio::spawn(async move {
+            Archive::archive_manager(archive, rx).await;
+        });
+
         let local_ip = local_ip().unwrap();
         let address = local_ip.to_string();
         let socket = address + ":6780";
@@ -58,24 +111,54 @@ impl Archive {
         // Each time it gets a request it should update its socketmap accordingly
 
         loop {
-            let (socket, _) = listener.accept().await.unwrap();
+            let (stream, socket) = listener.accept().await.unwrap();
 
-            info!("{:?}", &socket);
+            info!("{:?}", &stream);
             // A new task is spawned for each inbound socket. The socket is
             // moved to the new task and processed there.
+            let tx_clone = tx.clone();
             tokio::spawn(async move {
-                Archive::process(socket).await;
+                Archive::process_connection(stream, socket.to_string(), tx_clone).await;
             });
         }
     }
 
-    async fn process(socket: TcpStream) {
-        // The `Connection` lets us read/write redis **frames** instead of
-        // byte streams. The `Connection` type is defined by mini-redis.
-        let mut connection = Connection::new(socket);
+    async fn process_connection(stream: TcpStream, socket: String, tx: Sender<Command>) {
+        let mut connection = Connection::new(stream);
         loop {
-            if let Some(frame) = connection.read_frame().await.unwrap() {
-                info!("GOT: {:?}", frame);
+            match connection.read_frame().await {
+                Ok(opt_frame) => {
+                    if let Some(frame) = opt_frame {
+                        info!("GOT: {:?}", frame);
+                        // if-else to determine what the command actual is.
+                        // For now just assuming it is peerid command
+                        let (resp_tx, resp_rx) = oneshot::channel();
+                        let cmd = Command::Get {
+                            key: "id".to_string(),
+                            resp: resp_tx,
+                            payload: Some(socket.clone()),
+                        };
+                        tx.send(cmd).await;
+                        let peerid_result = resp_rx.await;
+                        let peerunwrap1 = peerid_result.unwrap();
+                        let peerunwrap2 = peerunwrap1.unwrap();
+                        let peerunwrap3 = peerunwrap2.unwrap();
+                        let peerid = peerunwrap3.parse::<u32>().unwrap();
+                        // let peerid = peerid_result
+                        //     .unwrap()
+                        //     .unwrap()
+                        //     .unwrap()
+                        //     .parse::<u32>()
+                        //     .unwrap();
+
+                        let response = get_peerid_response(peerid);
+                        connection.write_frame(&response).await;
+                    }
+                }
+                Err(e) => {
+                    warn!("{}", e);
+                    break;
+                }
             }
         }
     }

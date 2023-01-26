@@ -8,7 +8,7 @@ use crate::{network::archive::Archive, shell::shell};
 use log::info;
 use std::env::{self};
 
-static IS_ARCHIVE: bool = false;
+static IS_ARCHIVE: bool = true;
 
 #[tokio::main]
 async fn main() {

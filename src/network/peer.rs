@@ -12,10 +12,10 @@ use tokio::net::{TcpListener, TcpStream};
 
 static ARCHIVE_SERVER_ADDR: &str = "192.168.0.12:6780";
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Peer {
     pub peerid: u32,
-    pub socketmap: HashMap<String, String>, // Socket addresses of neighbors
+    pub socketmap: HashMap<u32, String>, // Socket addresses of neighbors
 }
 
 fn get_peerid_msg() -> Frame {
@@ -45,18 +45,18 @@ fn get_sockets_msg() -> Frame {
     return Frame::Array(Vec::new());
 }
 
-fn unwrap_sockets_response(response: Frame) -> HashMap<String, String> {
+fn unwrap_sockets_response(response: Frame) -> HashMap<u32, String> {
     return HashMap::new();
 }
 
-async fn send_sockets_msg(msg: Frame) -> HashMap<String, String> {
+async fn send_sockets_msg(msg: Frame) -> HashMap<u32, String> {
     let stream = TcpStream::connect(&ARCHIVE_SERVER_ADDR).await.unwrap();
     info!("Successfully connected to {}", ARCHIVE_SERVER_ADDR);
     let mut connection = Connection::new(stream);
 
     connection.write_frame(&msg).await;
 
-    let mut response: HashMap<String, String> = HashMap::new();
+    let mut response: HashMap<u32, String> = HashMap::new();
     if let Some(frame) = connection.read_frame().await.unwrap() {
         response = unwrap_sockets_response(frame);
     }
