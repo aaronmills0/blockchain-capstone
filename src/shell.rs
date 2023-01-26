@@ -1,3 +1,4 @@
+use crate::network::peer::Peer;
 use crate::simulation::start;
 use crate::utils::graph::create_block_graph;
 use crate::utils::save_and_load::deserialize_json;
@@ -13,8 +14,9 @@ use std::{env, fs, io};
 
 static mut SIM_STATUS: bool = false;
 
-pub fn shell() {
+pub async fn shell() {
     let mut tx_sim_option: Option<Sender<String>> = None;
+    let peer = Peer::launch().await;
     loop {
         let mut command = String::new();
         io::stdin()
