@@ -1,3 +1,4 @@
+use bytes::Bytes;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use mini_redis::{Connection, Frame};
@@ -18,11 +19,23 @@ pub struct Peer {
     pub socketmap: HashMap<u32, String>, // Socket addresses of neighbors
 }
 
-fn get_peerid_msg() -> Frame {
-    return Frame::Array(Vec::new());
+fn query_peerid_msg() -> Frame {
+    let header = Bytes::from(&b"00000000"[..]);
+    let wrapper_header = Frame::Bulk(header);
+    return Frame::Array(Vec::from([wrapper_header]));
 }
 
 fn unwrap_peerid_response(response: Frame) -> u32 {
+    /*
+    match response {
+        Frame::Array(x) => match x[1] {
+            Frame::Bulk(b) => b.get_f32(),
+
+            _ => warn!("Bytes not found"),
+        },
+
+        _ => warn!("Wrong format for peerid response"),
+    }*/
     return 0;
 }
 
@@ -41,8 +54,10 @@ async fn send_peerid_msg(msg: Frame) -> u32 {
     return response;
 }
 
-fn get_sockets_msg() -> Frame {
-    return Frame::Array(Vec::new());
+fn query_sockets_msg() -> Frame {
+    let header = Bytes::from(&b"00000001"[..]);
+    let wrapper_header = Frame::Bulk(header);
+    return Frame::Array(Vec::from([wrapper_header]));
 }
 
 fn unwrap_sockets_response(response: Frame) -> HashMap<u32, String> {
@@ -86,7 +101,7 @@ impl Peer {
             peer = Peer::new();
             info!("Peer doesn't exist! Creating new peer.");
             // Get peerid from the archive server
-            let msg = get_peerid_msg();
+            let msg = query_peerid_msg();
             let response = send_peerid_msg(msg).await;
             peer.peerid = response;
             // Set the id obtained as a response to the peer id
@@ -95,7 +110,7 @@ impl Peer {
 
         // Query the archive server
         info!("{:?}", peer.socketmap);
-        let msg = get_sockets_msg();
+        let msg = query_sockets_msg();
         let response = send_sockets_msg(msg).await;
 
         for (id, socket) in response {
@@ -105,7 +120,7 @@ impl Peer {
         return peer;
     }
 
-    pub fn shutdown(peer: Peer){
+    pub fn shutdown(peer: Peer) {
         Peer::save_peer(&peer);
         return;
     }
