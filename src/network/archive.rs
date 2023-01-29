@@ -1,3 +1,4 @@
+use crate::network::messages::Messages;
 use bytes::Bytes;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
@@ -37,22 +38,6 @@ enum Command {
 }
 
 type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
-
-// notation for functions that return message type is get_name_response()
-
-fn get_peerid_response(next_peerid: u32) -> Frame {
-    let mut response_vec: Vec<Frame> = Vec::new();
-
-    let header = Bytes::from(&b"00000010"[..]);
-    let wrapper_header = Frame::Bulk(header);
-    response_vec.push(wrapper_header);
-
-    let binary_peerid = format!("{next_peerid:b}");
-    let peerid = Frame::Bulk(Bytes::from(binary_peerid));
-    response_vec.push(peerid);
-
-    return Frame::Array(response_vec);
-}
 
 impl Archive {
     pub fn new() -> Archive {
@@ -157,7 +142,7 @@ impl Archive {
                         //     .parse::<u32>()
                         //     .unwrap();
 
-                        let response = get_peerid_response(peerid);
+                        let response = Messages::get_peerid_response(peerid);
                         connection.write_frame(&response).await;
                     }
                 }
