@@ -37,7 +37,7 @@ enum Command {
 
 type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
 
-// notation for functions that return message typesis get_name_response()
+// notation for functions that return message type is get_name_response()
 
 fn get_peerid_response(next_peerid: u32) -> Frame {
     let mut response_vec: Vec<Frame> = Vec::new();
@@ -137,9 +137,19 @@ impl Archive {
                             payload: Some(socket.clone()),
                         };
                         tx.send(cmd).await;
-                        let peerid_result = resp_rx.await.unwrap().unwrap().unwrap().parse::<u32>().unwrap();
+                        let peerid_result = resp_rx.await;
+                        let peerunwrap1 = peerid_result.unwrap();
+                        let peerunwrap2 = peerunwrap1.unwrap();
+                        let peerunwrap3 = peerunwrap2.unwrap();
+                        let peerid = peerunwrap3.parse::<u32>().unwrap();
+                        // let peerid = peerid_result
+                        //     .unwrap()
+                        //     .unwrap()
+                        //     .unwrap()
+                        //     .parse::<u32>()
+                        //     .unwrap();
 
-                        let response = get_peerid_response(peerid_result);
+                        let response = get_peerid_response(peerid);
                         connection.write_frame(&response).await;
                     }
                 }
