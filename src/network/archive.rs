@@ -1,4 +1,3 @@
-use core::arch;
 use std::{
     collections::HashMap,
     env,
@@ -7,7 +6,6 @@ use std::{
     path::Path,
 };
 
-use bytes::Bytes;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use mini_redis::{Connection, Frame};
