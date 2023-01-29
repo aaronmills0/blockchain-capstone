@@ -19,7 +19,7 @@ pub struct Peer {
     pub socketmap: HashMap<u32, String>, // Socket addresses of neighbors
 }
 
-fn query_peerid_msg() -> Frame {
+fn get_peerid_query() -> Frame {
     let header = Bytes::from(&b"00000000"[..]);
     let wrapper_header = Frame::Bulk(header);
     return Frame::Array(Vec::from([wrapper_header]));
@@ -39,7 +39,7 @@ fn unwrap_peerid_response(response: Frame) -> u32 {
     return 0;
 }
 
-async fn send_peerid_msg(msg: Frame) -> u32 {
+async fn send_peerid_query(msg: Frame) -> u32 {
     let stream = TcpStream::connect(&ARCHIVE_SERVER_ADDR).await.unwrap();
     info!("Successfully connected to {}", ARCHIVE_SERVER_ADDR);
     let mut connection = Connection::new(stream);
@@ -54,7 +54,7 @@ async fn send_peerid_msg(msg: Frame) -> u32 {
     return response;
 }
 
-fn query_sockets_msg() -> Frame {
+fn get_sockets_query() -> Frame {
     let header = Bytes::from(&b"00000001"[..]);
     let wrapper_header = Frame::Bulk(header);
     return Frame::Array(Vec::from([wrapper_header]));
@@ -64,7 +64,7 @@ fn unwrap_sockets_response(response: Frame) -> HashMap<u32, String> {
     return HashMap::new();
 }
 
-async fn send_sockets_msg(msg: Frame) -> HashMap<u32, String> {
+async fn send_sockets_query(msg: Frame) -> HashMap<u32, String> {
     let stream = TcpStream::connect(&ARCHIVE_SERVER_ADDR).await.unwrap();
     info!("Successfully connected to {}", ARCHIVE_SERVER_ADDR);
     let mut connection = Connection::new(stream);
@@ -101,8 +101,8 @@ impl Peer {
             peer = Peer::new();
             info!("Peer doesn't exist! Creating new peer.");
             // Get peerid from the archive server
-            let msg = query_peerid_msg();
-            let response = send_peerid_msg(msg).await;
+            let msg = get_peerid_query();
+            let response = send_peerid_query(msg).await;
             peer.peerid = response;
             // Set the id obtained as a response to the peer id
             Peer::save_peer(&peer);
@@ -110,8 +110,8 @@ impl Peer {
 
         // Query the archive server
         info!("{:?}", peer.socketmap);
-        let msg = query_sockets_msg();
-        let response = send_sockets_msg(msg).await;
+        let msg = get_sockets_query();
+        let response = send_sockets_query(msg).await;
 
         for (id, socket) in response {
             peer.socketmap.insert(id, socket);
