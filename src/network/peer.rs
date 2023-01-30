@@ -1,5 +1,5 @@
-use crate::network::decoder::Decoder;
-use crate::network::messages::Messages;
+use crate::network::decoder;
+use crate::network::messages;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use mini_redis::{Connection, Frame};
@@ -25,11 +25,11 @@ async fn send_peerid_query(msg: Frame) -> u32 {
     info!("Successfully connected to {}", ARCHIVE_SERVER_ADDR);
     let mut connection = Connection::new(stream);
 
-    connection.write_frame(&msg).await;
+    connection.write_frame(&msg).await.ok();
 
     let mut response: u32 = 0;
     if let Some(frame) = connection.read_frame().await.unwrap() {
-        response = Decoder::unwrap_peerid_response(frame);
+        response = decoder::decode_peerid_response(frame);
     }
 
     return response;
@@ -40,11 +40,11 @@ async fn send_sockets_query(msg: Frame) -> HashMap<u32, String> {
     info!("Successfully connected to {}", ARCHIVE_SERVER_ADDR);
     let mut connection = Connection::new(stream);
 
-    connection.write_frame(&msg).await;
+    connection.write_frame(&msg).await.ok();
 
     let mut response: HashMap<u32, String> = HashMap::new();
     if let Some(frame) = connection.read_frame().await.unwrap() {
-        response = Decoder::unwrap_sockets_response(frame);
+        response = decoder::decode_sockets_response(frame);
     }
 
     return response;
@@ -64,7 +64,7 @@ impl Peer {
         } else {
             "/"
         };
-        let mut peer: Peer = Peer::new();
+        let mut peer: Peer;
         // First load the peer from system/peer.json if it exists.
         if Path::new(&("system".to_owned() + slash + "peer.json")).exists() {
             peer = Peer::load_peer();
@@ -72,7 +72,7 @@ impl Peer {
             peer = Peer::new();
             info!("Peer doesn't exist! Creating new peer.");
             // Get peerid from the archive server
-            let msg = Messages::get_peerid_query();
+            let msg = messages::get_peerid_query();
             let response = send_peerid_query(msg).await;
             peer.peerid = response;
             // Set the id obtained as a response to the peer id
@@ -81,7 +81,7 @@ impl Peer {
 
         // Query the archive server
         info!("{:?}", peer.socketmap);
-        let msg = Messages::get_sockets_query();
+        let msg = messages::get_sockets_query();
         let response = send_sockets_query(msg).await;
 
         for (id, socket) in response {

@@ -17,6 +17,7 @@ local-ip-address = "0.5.1"
 log = "0.4.17"
 log4rs = "1.2.0"
 mini-redis = "0.4"
+phf = {version = "0.11.1", features = ["macros"]}
 rand_1 = {package = "rand", version = "0.8.5"}
 rand_2 = {package = "rand", version = "0.7"}
 rand_distr = "0.4.3"

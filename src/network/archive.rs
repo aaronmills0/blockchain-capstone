@@ -1,14 +1,12 @@
-use crate::network::messages::Messages;
-use bytes::Bytes;
+use crate::network::{decoder::decode_command, messages};
 use local_ip_address::local_ip;
 use log::{error, info, warn};
-use mini_redis::{Connection, Frame};
+use mini_redis::Connection;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{
     collections::HashMap,
     env,
-    fmt::Binary,
     fs::{self, File},
     io::Write,
     path::Path,
@@ -33,7 +31,7 @@ enum Command {
     Get {
         key: String,
         resp: Responder<Option<String>>,
-        payload: Option<String>,
+        payload: Option<Vec<String>>,
     },
 }
 
@@ -53,21 +51,46 @@ impl Archive {
     async fn archive_manager(mut archive: Archive, mut rx: Receiver<Command>) {
         let command = rx.recv().await.unwrap();
         match command {
-            Command::Get { key, resp, payload } => {
-                if key == "id" {
+            Command::Get { key, resp, payload } => match key.as_str() {
+                "id_query" => {
                     if payload.is_none() {
-                        error!("Invalid command")
+                        error!("Invalid command: missing payload");
                     } else {
+                        let payload_vec = payload.unwrap();
+                        if payload_vec.len() != 1 {
+                            error!("Invalid command: payload is of unexpected size");
+                        }
                         archive
                             .peer
                             .socketmap
-                            .insert(archive.next_peerid, payload.unwrap());
-                        resp.send(Ok(Some(String::from(archive.next_peerid.to_string()))));
+                            .insert(archive.next_peerid, payload_vec[0].clone());
+                        resp.send(Ok(Some(String::from(archive.next_peerid.to_string()))))
+                            .ok();
                         archive.next_peerid += 1;
                         Archive::save_archive(&archive);
                     }
                 }
-            }
+                "sockets_query" => {
+                    if payload.is_none() {
+                        error!("Invalid command: missing payload");
+                    } else {
+                        let payload_vec = payload.unwrap();
+                        if payload_vec.len() != 2 {
+                            error!("Invalid command: payload is of unexpected size");
+                        }
+                        let sourceid: u32 = payload_vec[0].parse().unwrap();
+                        let socket = payload_vec[1].clone();
+                        // Update the archive socketmap
+                        archive.peer.socketmap.insert(sourceid, socket);
+                        resp.send(Ok(Some(
+                            serde_json::to_string(&archive.peer.socketmap).unwrap(),
+                        )))
+                        .ok();
+                        Archive::save_archive(&archive);
+                    }
+                }
+                _ => {}
+            },
         }
     }
 
@@ -77,7 +100,7 @@ impl Archive {
         } else {
             "/"
         };
-        let mut archive: Archive = Archive::new();
+        let archive: Archive;
         // First load the archive peer from system/peer.json if it exists.
         if Path::new(&("system".to_owned() + slash + "archive.json")).exists() {
             archive = Archive::load_archive();
@@ -120,30 +143,46 @@ impl Archive {
             match connection.read_frame().await {
                 Ok(opt_frame) => {
                     if let Some(frame) = opt_frame {
+                        let cmd;
                         info!("GOT: {:?}", frame);
-                        // if-else to determine what the command actual is.
-                        // For now just assuming it is peerid command
-                        let (resp_tx, resp_rx) = oneshot::channel();
-                        let cmd = Command::Get {
-                            key: "id".to_string(),
-                            resp: resp_tx,
-                            payload: Some(socket.clone()),
-                        };
-                        tx.send(cmd).await;
-                        let peerid_result = resp_rx.await;
-                        let peerunwrap1 = peerid_result.unwrap();
-                        let peerunwrap2 = peerunwrap1.unwrap();
-                        let peerunwrap3 = peerunwrap2.unwrap();
-                        let peerid = peerunwrap3.parse::<u32>().unwrap();
-                        // let peerid = peerid_result
-                        //     .unwrap()
-                        //     .unwrap()
-                        //     .unwrap()
-                        //     .parse::<u32>()
-                        //     .unwrap();
+                        let (command, sourceid, destid) = decode_command(&frame);
 
-                        let response = Messages::get_peerid_response(peerid);
-                        connection.write_frame(&response).await;
+                        if destid != 1 {
+                            warn!("Destination id does not match archive server id");
+                            return;
+                        }
+                        let (resp_tx, resp_rx) = oneshot::channel();
+                        let mut payload_vec = Vec::new();
+                        if command == "id_query" {
+                            payload_vec.push(socket.clone());
+                            cmd = Command::Get {
+                                key: command,
+                                resp: resp_tx,
+                                payload: Some(payload_vec),
+                            };
+                            tx.send(cmd).await.ok();
+                            let result = resp_rx.await;
+                            let peerid = result.unwrap().unwrap().unwrap().parse().unwrap();
+                            let response = messages::get_peerid_response(peerid);
+                            connection.write_frame(&response).await.ok();
+                        } else if command == "sockets_query" {
+                            payload_vec.push(sourceid.to_string());
+                            payload_vec.push(socket.clone());
+                            cmd = Command::Get {
+                                key: command,
+                                resp: resp_tx,
+                                payload: Some(payload_vec),
+                            };
+                            tx.send(cmd).await.ok();
+                            let result = resp_rx.await;
+                            let socketmap: HashMap<u32, String> =
+                                serde_json::from_str(&result.unwrap().unwrap().unwrap()).unwrap();
+                            let response = messages::get_sockets_response(socketmap, sourceid);
+                            connection.write_frame(&response).await.ok();
+                        } else {
+                            warn!("invalid command for archive server");
+                            return;
+                        }
                     }
                 }
                 Err(e) => {
