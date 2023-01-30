@@ -46,9 +46,13 @@ pub fn get_peerid_response(next_peerid: u32) -> Frame {
     return Frame::Array(response_vec);
 }
 
-pub fn get_sockets_query() -> Frame {
+pub fn get_sockets_query(peerid: u32) -> Frame {
     let command = String::from("00000010");
-    let peerid_sender = String::from("0".repeat(32));
+    let peerid_sender_unprocessed = format!("{peerid:#034b}");
+    let mut peerid_sender = String::new();
+    if let Some(part) = peerid_sender_unprocessed.get(2..) {
+        peerid_sender = part.to_string();
+    }
     let peerid_receiver = String::from("0".repeat(31) + "1");
 
     let mut header = command.clone();

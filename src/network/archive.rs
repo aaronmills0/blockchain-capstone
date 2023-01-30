@@ -51,8 +51,8 @@ impl Archive {
     async fn archive_manager(mut archive: Archive, mut rx: Receiver<Command>) {
         let command = rx.recv().await.unwrap();
         match command {
-            Command::Get { key, resp, payload } => match key.as_str() {
-                "id_query" => {
+            Command::Get { key, resp, payload } => {
+                if key.as_str() == "id_query" {
                     if payload.is_none() {
                         error!("Invalid command: missing payload");
                     } else {
@@ -69,8 +69,7 @@ impl Archive {
                         archive.next_peerid += 1;
                         Archive::save_archive(&archive);
                     }
-                }
-                "sockets_query" => {
+                } else if key.as_str() == "sockets_query" {
                     if payload.is_none() {
                         error!("Invalid command: missing payload");
                     } else {
@@ -89,8 +88,7 @@ impl Archive {
                         Archive::save_archive(&archive);
                     }
                 }
-                _ => {}
-            },
+            }
         }
     }
 
@@ -125,6 +123,7 @@ impl Archive {
         // Each time it gets a request it should update its socketmap accordingly
 
         loop {
+            info!("waiting for connection...");
             let (stream, socket) = listener.accept().await.unwrap();
 
             info!("{:?}", &stream);
@@ -148,7 +147,10 @@ impl Archive {
                         let (command, sourceid, destid) = decode_command(&frame);
 
                         if destid != 1 {
-                            warn!("Destination id does not match archive server id");
+                            warn!(
+                                "Destination id does not match archive server id: {}",
+                                destid
+                            );
                             return;
                         }
                         let (resp_tx, resp_rx) = oneshot::channel();
@@ -175,8 +177,15 @@ impl Archive {
                             };
                             tx.send(cmd).await.ok();
                             let result = resp_rx.await;
+                            let result_unwraped = result.unwrap();
+                            let result_unwrapped_unwrapped = result_unwraped.unwrap();
+                            if result_unwrapped_unwrapped.is_none() {
+                                error!("Empty result from archive manager");
+                            }
+                            let socketmap_json = result_unwrapped_unwrapped.unwrap();
+                            info!("Sending socketmap: {:?}", socketmap_json);
                             let socketmap: HashMap<u32, String> =
-                                serde_json::from_str(&result.unwrap().unwrap().unwrap()).unwrap();
+                                serde_json::from_str(&socketmap_json).unwrap();
                             let response = messages::get_sockets_response(socketmap, sourceid);
                             connection.write_frame(&response).await.ok();
                         } else {

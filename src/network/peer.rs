@@ -81,12 +81,12 @@ impl Peer {
 
         // Query the archive server
         info!("{:?}", peer.socketmap);
-        let msg = messages::get_sockets_query();
+        let msg = messages::get_sockets_query(peer.peerid);
         let response = send_sockets_query(msg).await;
-
         for (id, socket) in response {
             peer.socketmap.insert(id, socket);
         }
+        Peer::save_peer(&peer);
 
         return peer;
     }

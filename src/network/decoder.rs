@@ -21,13 +21,13 @@ pub fn decode_command(msg: &Frame) -> (String, u32, u32) {
             Frame::Bulk(b) => {
                 array_maker = b.to_vec();
                 let cmd_bits =
-                    std::str::from_utf8(&array_maker[..1]).expect("invalid utf-8 sequence");
+                    std::str::from_utf8(&array_maker[..8]).expect("invalid utf-8 sequence");
 
                 let sourceid_bits =
-                    std::str::from_utf8(&array_maker[1..5]).expect("invalid utf-8 sequence");
+                    std::str::from_utf8(&array_maker[8..40]).expect("invalid utf-8 sequence");
                 sourceid = isize::from_str_radix(sourceid_bits, 2).unwrap() as u32;
                 let destid_bits =
-                    std::str::from_utf8(&array_maker[5..9]).expect("invalid utf-8 sequence");
+                    std::str::from_utf8(&array_maker[40..72]).expect("invalid utf-8 sequence");
                 destid = isize::from_str_radix(destid_bits, 2).unwrap() as u32;
                 if !COMMANDS.contains_key(cmd_bits) {
                     warn!("command not found");

@@ -17,6 +17,7 @@ static mut SIM_STATUS: bool = false;
 pub async fn shell() {
     let mut tx_sim_option: Option<Sender<String>> = None;
     let peer = Peer::launch().await;
+    info!("Successfully launched peer!");
     loop {
         let mut command = String::new();
         io::stdin()
@@ -68,7 +69,6 @@ pub async fn shell() {
             //     let (blockchain, _, initial_tx_outs, _, _, _, _) = deserialize_json(f);
             //     create_block_graph(initial_tx_outs, blockchain);
             // }
-
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");
                 Peer::shutdown(peer);
