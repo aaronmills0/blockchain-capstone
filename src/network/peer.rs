@@ -3,6 +3,7 @@ use crate::network::messages;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use mini_redis::{Connection, Frame};
+use port_scanner::scan_port;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
@@ -18,6 +19,8 @@ static ARCHIVE_SERVER_ADDR: &str = "192.168.0.12:6780";
 pub struct Peer {
     pub peerid: u32,
     pub socketmap: HashMap<u32, String>, // Socket addresses of neighbors
+    pub address: String,
+    pub port: Option<String>,
 }
 
 async fn send_peerid_query(msg: Frame) -> u32 {
@@ -55,6 +58,8 @@ impl Peer {
         return Peer {
             peerid: 0,
             socketmap: HashMap::new(),
+            address: local_ip().expect("Failed to obtain local ip").to_string(),
+            port: None,
         };
     }
 
@@ -70,6 +75,8 @@ impl Peer {
             peer = Peer::load_peer();
         } else {
             peer = Peer::new();
+            // Binding with port 0 tells the OS to find a suitable port. We will save this port.
+            peer.set_new_port().await;
             info!("Peer doesn't exist! Creating new peer.");
             // Get peerid from the archive server
             let msg = messages::get_peerid_query();
@@ -78,10 +85,12 @@ impl Peer {
             // Set the id obtained as a response to the peer id
             Peer::save_peer(&peer);
         }
-
+        // We need to check if our saved socket is available. If not we need to change it.
         // Query the archive server
         info!("{:?}", peer.socketmap);
-        let msg = messages::get_sockets_query(peer.peerid);
+        //TODO
+        let socket = peer.get_socket().await;
+        let msg = messages::get_sockets_query(peer.peerid, socket);
         let response = send_sockets_query(msg).await;
         for (id, socket) in response {
             peer.socketmap.insert(id, socket);
@@ -91,9 +100,42 @@ impl Peer {
         return peer;
     }
 
+    pub async fn set_new_port(&mut self) -> String {
+        let listener = TcpListener::bind(self.address.clone() + ":0")
+            .await
+            .unwrap();
+        return listener
+            .local_addr()
+            .expect("Failed to unwrap listener socket address")
+            .port()
+            .to_string();
+    }
+
+    pub async fn get_socket(&mut self) -> String {
+        let mut current_port;
+        if self.port.is_none() {
+            info!("Port is not set. Setting new port...");
+            current_port = self.set_new_port().await;
+        } else {
+            info!("Checking port availability...");
+            current_port = self.port.clone().unwrap();
+            if !scan_port(current_port.parse::<u16>().unwrap() as u16) {
+                info!("Current port unavailable. Setting new port...");
+                current_port = self.set_new_port().await;
+            } else {
+                info!("Current port available.")
+            }
+        }
+        self.port = Some(current_port.clone());
+        let mut result = String::new();
+        result.push_str(&self.address);
+        result.push_str(":");
+        result.push_str(&current_port);
+        return result;
+    }
+
     pub fn shutdown(peer: Peer) {
         Peer::save_peer(&peer);
-        return;
     }
     pub async fn spawn_connection(socket: &str) {
         info!("External: {}", &socket);

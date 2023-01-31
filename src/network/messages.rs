@@ -46,7 +46,7 @@ pub fn get_peerid_response(next_peerid: u32) -> Frame {
     return Frame::Array(response_vec);
 }
 
-pub fn get_sockets_query(peerid: u32) -> Frame {
+pub fn get_sockets_query(peerid: u32, socket: String) -> Frame {
     let command = String::from("00000010");
     let peerid_sender_unprocessed = format!("{peerid:#034b}");
     let mut peerid_sender = String::new();
@@ -60,9 +60,11 @@ pub fn get_sockets_query(peerid: u32) -> Frame {
     header.push_str(&peerid_receiver);
 
     let header_bytes = Bytes::from(header);
+    let payload_bytes = Bytes::from(socket);
 
     let wrapper_header = Frame::Bulk(header_bytes);
-    return Frame::Array(Vec::from([wrapper_header]));
+    let wrapper_payload = Frame::Bulk(payload_bytes);
+    return Frame::Array(Vec::from([wrapper_header, wrapper_payload]));
 }
 
 pub fn get_sockets_response(socketmap: HashMap<u32, String>, receiver_id: u32) -> Frame {

@@ -43,6 +43,25 @@ pub fn decode_command(msg: &Frame) -> (String, u32, u32) {
     return (cmd, sourceid, destid);
 }
 
+pub fn decode_sockets_query(msg: &Frame) -> String {
+    let mut socket = String::new();
+    let array_maker: Vec<u8>;
+    match msg {
+        Frame::Array(x) => match &x[1] {
+            Frame::Bulk(b) => {
+                array_maker = b.to_vec();
+                let s = std::str::from_utf8(&array_maker[..]).expect("invalid utf-8 sequence");
+                socket = String::from(s);
+            }
+
+            _ => warn!("Wrong formatting for response"),
+        },
+
+        _ => warn!("Wrong formatting for response"),
+    };
+    return socket;
+}
+
 pub fn decode_peerid_response(response: Frame) -> u32 {
     let mut peerid: u32 = 0;
     let array_maker: Vec<u8>;

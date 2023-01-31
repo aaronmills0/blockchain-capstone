@@ -1,4 +1,4 @@
-use crate::network::{decoder::decode_command, messages};
+use crate::network::{decoder, messages};
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use mini_redis::Connection;
@@ -27,6 +27,7 @@ pub struct Archive {
     next_peerid: u32,
 }
 
+#[derive(Debug)]
 enum Command {
     Get {
         key: String,
@@ -43,49 +44,51 @@ impl Archive {
             peer: Peer {
                 peerid: 1,
                 socketmap: HashMap::new(),
+                address: local_ip()
+                    .expect("Failed to obtain local ip address")
+                    .to_string(),
+                port: Some(String::from("6780")),
             },
             next_peerid: 2,
         };
     }
 
     async fn archive_manager(mut archive: Archive, mut rx: Receiver<Command>) {
-        let command = rx.recv().await.unwrap();
-        match command {
-            Command::Get { key, resp, payload } => {
-                if key.as_str() == "id_query" {
-                    if payload.is_none() {
-                        error!("Invalid command: missing payload");
-                    } else {
-                        let payload_vec = payload.unwrap();
-                        if payload_vec.len() != 1 {
-                            error!("Invalid command: payload is of unexpected size");
+        loop {
+            let command = rx.recv().await.unwrap();
+            match command {
+                Command::Get { key, resp, payload } => {
+                    if key.as_str() == "id_query" {
+                        if payload.is_none() {
+                            error!("Invalid command: missing payload");
+                        } else {
+                            let payload_vec = payload.unwrap();
+                            if payload_vec.len() != 1 {
+                                error!("Invalid command: payload is of unexpected size");
+                            }
+                            resp.send(Ok(Some(String::from(archive.next_peerid.to_string()))))
+                                .ok();
+                            archive.next_peerid += 1;
+                            Archive::save_archive(&archive);
                         }
-                        archive
-                            .peer
-                            .socketmap
-                            .insert(archive.next_peerid, payload_vec[0].clone());
-                        resp.send(Ok(Some(String::from(archive.next_peerid.to_string()))))
+                    } else if key.as_str() == "sockets_query" {
+                        if payload.is_none() {
+                            error!("Invalid command: missing payload");
+                        } else {
+                            let payload_vec = payload.unwrap();
+                            if payload_vec.len() != 2 {
+                                error!("Invalid command: payload is of unexpected size");
+                            }
+                            let sourceid: u32 = payload_vec[0].parse().unwrap();
+                            let socket = payload_vec[1].clone();
+                            // Update the archive socketmap
+                            archive.peer.socketmap.insert(sourceid, socket);
+                            resp.send(Ok(Some(
+                                serde_json::to_string(&archive.peer.socketmap).unwrap(),
+                            )))
                             .ok();
-                        archive.next_peerid += 1;
-                        Archive::save_archive(&archive);
-                    }
-                } else if key.as_str() == "sockets_query" {
-                    if payload.is_none() {
-                        error!("Invalid command: missing payload");
-                    } else {
-                        let payload_vec = payload.unwrap();
-                        if payload_vec.len() != 2 {
-                            error!("Invalid command: payload is of unexpected size");
+                            Archive::save_archive(&archive);
                         }
-                        let sourceid: u32 = payload_vec[0].parse().unwrap();
-                        let socket = payload_vec[1].clone();
-                        // Update the archive socketmap
-                        archive.peer.socketmap.insert(sourceid, socket);
-                        resp.send(Ok(Some(
-                            serde_json::to_string(&archive.peer.socketmap).unwrap(),
-                        )))
-                        .ok();
-                        Archive::save_archive(&archive);
                     }
                 }
             }
@@ -104,6 +107,7 @@ impl Archive {
             archive = Archive::load_archive();
         } else {
             archive = Archive::new();
+            // Binding with port 0 tells the OS to find a suitable port. We will save this port.
             Archive::save_archive(&archive);
         }
 
@@ -123,7 +127,7 @@ impl Archive {
         // Each time it gets a request it should update its socketmap accordingly
 
         loop {
-            info!("waiting for connection...");
+            info!("Waiting for connection...");
             let (stream, socket) = listener.accept().await.unwrap();
 
             info!("{:?}", &stream);
@@ -144,7 +148,7 @@ impl Archive {
                     if let Some(frame) = opt_frame {
                         let cmd;
                         info!("GOT: {:?}", frame);
-                        let (command, sourceid, destid) = decode_command(&frame);
+                        let (command, sourceid, destid) = decoder::decode_command(&frame);
 
                         if destid != 1 {
                             warn!(
@@ -168,8 +172,9 @@ impl Archive {
                             let response = messages::get_peerid_response(peerid);
                             connection.write_frame(&response).await.ok();
                         } else if command == "sockets_query" {
+                            let listening_socket = decoder::decode_sockets_query(&frame);
                             payload_vec.push(sourceid.to_string());
-                            payload_vec.push(socket.clone());
+                            payload_vec.push(listening_socket);
                             cmd = Command::Get {
                                 key: command,
                                 resp: resp_tx,
