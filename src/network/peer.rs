@@ -13,7 +13,7 @@ use std::{env, fs};
 use std::{fs::File, io, path::Path};
 use tokio::net::{TcpListener, TcpStream};
 
-static ARCHIVE_SERVER_ADDR: &str = "127.0.0.1:6780";
+static SERVER_ADDR: &str = "127.0.0.1:6780";
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Peer {
@@ -24,8 +24,8 @@ pub struct Peer {
 }
 
 async fn send_peerid_query(msg: Frame) -> u32 {
-    let stream = TcpStream::connect(&ARCHIVE_SERVER_ADDR).await.unwrap();
-    info!("Successfully connected to {}", ARCHIVE_SERVER_ADDR);
+    let stream = TcpStream::connect(&SERVER_ADDR).await.unwrap();
+    info!("Successfully connected to {}", SERVER_ADDR);
     let mut connection = Connection::new(stream);
 
     connection.write_frame(&msg).await.ok();
@@ -39,8 +39,8 @@ async fn send_peerid_query(msg: Frame) -> u32 {
 }
 
 async fn send_sockets_query(msg: Frame) -> HashMap<u32, String> {
-    let stream = TcpStream::connect(&ARCHIVE_SERVER_ADDR).await.unwrap();
-    info!("Successfully connected to {}", ARCHIVE_SERVER_ADDR);
+    let stream = TcpStream::connect(&SERVER_ADDR).await.unwrap();
+    info!("Successfully connected to {}", SERVER_ADDR);
     let mut connection = Connection::new(stream);
 
     connection.write_frame(&msg).await.ok();
@@ -78,7 +78,7 @@ impl Peer {
             // Binding with port 0 tells the OS to find a suitable port. We will save this port.
             peer.set_new_port().await;
             info!("Peer doesn't exist! Creating new peer.");
-            // Get peerid from the archive server
+            // Get peerid from the server
             let msg = messages::get_peerid_query();
             let response = send_peerid_query(msg).await;
             peer.peerid = response;
@@ -86,7 +86,7 @@ impl Peer {
             Peer::save_peer(&peer);
         }
         // We need to check if our saved socket is available. If not we need to change it.
-        // Query the archive server
+        // Query the server
         info!("{:?}", peer.socketmap);
         //TODO
         let socket = peer.get_socket().await;

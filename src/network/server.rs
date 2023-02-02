@@ -22,7 +22,7 @@ use tokio::{
 use super::peer::Peer;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct Archive {
+pub struct Server {
     peer: Peer,
     next_peerid: u32,
 }
@@ -38,9 +38,9 @@ enum Command {
 
 type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
 
-impl Archive {
-    pub fn new() -> Archive {
-        return Archive {
+impl Server {
+    pub fn new() -> Server {
+        return Server {
             peer: Peer {
                 peerid: 1,
                 socketmap: HashMap::new(),
@@ -53,7 +53,7 @@ impl Archive {
         };
     }
 
-    async fn archive_manager(mut archive: Archive, mut rx: Receiver<Command>) {
+    async fn server_manager(mut server: Server, mut rx: Receiver<Command>) {
         loop {
             let command = rx.recv().await.unwrap();
             match command {
@@ -66,10 +66,10 @@ impl Archive {
                             if payload_vec.len() != 1 {
                                 error!("Invalid command: payload is of unexpected size");
                             }
-                            resp.send(Ok(Some(String::from(archive.next_peerid.to_string()))))
+                            resp.send(Ok(Some(String::from(server.next_peerid.to_string()))))
                                 .ok();
-                            archive.next_peerid += 1;
-                            Archive::save_archive(&archive);
+                            server.next_peerid += 1;
+                            Server::save_server(&server);
                         }
                     } else if key.as_str() == "sockets_query" {
                         if payload.is_none() {
@@ -81,13 +81,13 @@ impl Archive {
                             }
                             let sourceid: u32 = payload_vec[0].parse().unwrap();
                             let socket = payload_vec[1].clone();
-                            // Update the archive socketmap
-                            archive.peer.socketmap.insert(sourceid, socket);
+                            // Update the server socketmap
+                            server.peer.socketmap.insert(sourceid, socket);
                             resp.send(Ok(Some(
-                                serde_json::to_string(&archive.peer.socketmap).unwrap(),
+                                serde_json::to_string(&server.peer.socketmap).unwrap(),
                             )))
                             .ok();
-                            Archive::save_archive(&archive);
+                            Server::save_server(&server);
                         }
                     }
                 }
@@ -101,19 +101,19 @@ impl Archive {
         } else {
             "/"
         };
-        let archive: Archive;
-        // First load the archive peer from system/peer.json if it exists.
-        if Path::new(&("system".to_owned() + slash + "archive.json")).exists() {
-            archive = Archive::load_archive();
+        let server: Server;
+        // First load the server peer from system/peer.json if it exists.
+        if Path::new(&("system".to_owned() + slash + "server.json")).exists() {
+            server = Server::load_server();
         } else {
-            archive = Archive::new();
+            server = Server::new();
             // Binding with port 0 tells the OS to find a suitable port. We will save this port.
-            Archive::save_archive(&archive);
+            Server::save_server(&server);
         }
 
         let (tx, rx) = mpsc::channel(32);
         tokio::spawn(async move {
-            Archive::archive_manager(archive, rx).await;
+            Server::server_manager(server, rx).await;
         });
 
         let local_ip = local_ip().unwrap();
@@ -123,7 +123,7 @@ impl Archive {
         let listener = TcpListener::bind(&socket).await.unwrap();
         info!("Successfully setup listener at {}", socket);
 
-        // The archive server should now continuously listen and respond to queries
+        // The server should now continuously listen and respond to queries
         // Each time it gets a request it should update its socketmap accordingly
 
         loop {
@@ -135,7 +135,7 @@ impl Archive {
             // moved to the new task and processed there.
             let tx_clone = tx.clone();
             tokio::spawn(async move {
-                Archive::process_connection(stream, socket.to_string(), tx_clone).await;
+                Server::process_connection(stream, socket.to_string(), tx_clone).await;
             });
         }
     }
@@ -151,10 +151,7 @@ impl Archive {
                         let (command, sourceid, destid) = decoder::decode_command(&frame);
 
                         if destid != 1 {
-                            warn!(
-                                "Destination id does not match archive server id: {}",
-                                destid
-                            );
+                            warn!("Destination id does not match server id: {}", destid);
                             return;
                         }
                         let (resp_tx, resp_rx) = oneshot::channel();
@@ -185,7 +182,7 @@ impl Archive {
                             let result_unwraped = result.unwrap();
                             let result_unwrapped_unwrapped = result_unwraped.unwrap();
                             if result_unwrapped_unwrapped.is_none() {
-                                error!("Empty result from archive manager");
+                                error!("Empty result from server manager");
                             }
                             let socketmap_json = result_unwrapped_unwrapped.unwrap();
                             info!("Sending socketmap: {:?}", socketmap_json);
@@ -194,7 +191,7 @@ impl Archive {
                             let response = messages::get_sockets_response(socketmap, sourceid);
                             connection.write_frame(&response).await.ok();
                         } else {
-                            warn!("invalid command for archive server");
+                            warn!("invalid command for server");
                             return;
                         }
                     }
@@ -207,18 +204,18 @@ impl Archive {
         }
     }
 
-    pub fn save_archive(archive: &Archive) {
+    pub fn save_server(server: &Server) {
         let mut map = Map::new();
-        let archive_json = serde_json::to_value(archive);
+        let server_json = serde_json::to_value(server);
 
-        if archive_json.is_err() {
-            error!("Failed to serialize archive peer");
+        if server_json.is_err() {
+            error!("Failed to serialize server peer");
             panic!();
         }
 
-        let mut json = archive_json.unwrap();
+        let mut json = server_json.unwrap();
 
-        map.insert(String::from("archive"), json);
+        map.insert(String::from("server"), json);
 
         json = serde_json::Value::Object(map);
 
@@ -237,7 +234,7 @@ impl Archive {
 
         let dir_path = Path::new(&dirpath);
 
-        let file_name: &str = &format!("archive.json");
+        let file_name: &str = &format!("server.json");
 
         let file_path = dir_path.join(file_name);
         let file = File::create(file_path);
@@ -255,19 +252,19 @@ impl Archive {
         }
     }
 
-    pub fn load_archive() -> Archive {
+    pub fn load_server() -> Server {
         let slash = if env::consts::OS == "windows" {
             "\\"
         } else {
             "/"
         };
-        let data = fs::read_to_string("system".to_owned() + slash + "archive.json");
+        let data = fs::read_to_string("system".to_owned() + slash + "server.json");
         if data.is_err() {
             error!("Failed to load file. {:?}", data.err());
             panic!();
         }
         let json: Value = serde_json::from_str(&data.unwrap()).unwrap();
-        let archive = serde_json::from_value(json.get("archive").unwrap().to_owned());
-        return archive.unwrap();
+        let server = serde_json::from_value(json.get("server").unwrap().to_owned());
+        return server.unwrap();
     }
 }
