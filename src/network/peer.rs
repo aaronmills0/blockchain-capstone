@@ -32,7 +32,8 @@ async fn send_peerid_query(msg: Frame) -> u32 {
 
     let mut response: u32 = 0;
     if let Some(frame) = connection.read_frame().await.unwrap() {
-        response = decoder::decode_peerid_response(frame);
+        response =
+            decoder::decode_peerid_response(frame).expect("Failed to decode peerid response");
     }
 
     return response;
@@ -47,7 +48,8 @@ async fn send_sockets_query(msg: Frame) -> HashMap<u32, String> {
 
     let mut response: HashMap<u32, String> = HashMap::new();
     if let Some(frame) = connection.read_frame().await.unwrap() {
-        response = decoder::decode_sockets_response(frame);
+        response =
+            decoder::decode_sockets_response(frame).expect("Failed to decode sockets response");
     }
 
     return response;

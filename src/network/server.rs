@@ -169,7 +169,8 @@ impl Server {
                             let response = messages::get_peerid_response(peerid);
                             connection.write_frame(&response).await.ok();
                         } else if command == "sockets_query" {
-                            let listening_socket = decoder::decode_sockets_query(&frame);
+                            let listening_socket = decoder::decode_sockets_query(&frame)
+                                .expect("Failed to decode sockets response");
                             payload_vec.push(sourceid.to_string());
                             payload_vec.push(listening_socket);
                             cmd = Command::Get {
