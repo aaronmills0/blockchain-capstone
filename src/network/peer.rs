@@ -13,7 +13,7 @@ use std::{env, fs};
 use std::{fs::File, io, path::Path};
 use tokio::net::{TcpListener, TcpStream};
 
-static ARCHIVE_SERVER_ADDR: &str = "192.168.0.12:6780";
+static ARCHIVE_SERVER_ADDR: &str = "127.0.0.1:6780";
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Peer {
