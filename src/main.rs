@@ -4,22 +4,36 @@ mod performance_tests;
 mod shell;
 mod simulation;
 mod utils;
+use crate::{network::server::Server, shell::shell};
 use log::info;
-use shell::shell;
-use std::env;
+use std::env::{self};
 
-fn main() {
+static IS_SERVER: bool = false;
+
+#[tokio::main]
+async fn main() {
+    let mut cmd_archive = false;
+    let args: Vec<String> = env::args().collect();
+    if args.len() > 1 && args[1] == "server" {
+        cmd_archive = true;
+    }
     let cwd = std::env::current_dir().unwrap();
     let mut cwd_string = cwd.into_os_string().into_string().unwrap();
-    if env::consts::OS == "windows" {
-        cwd_string.push_str("\\logging_config.yaml");
+    let slash = if env::consts::OS == "windows" {
+        "\\"
     } else {
-        cwd_string.push_str("/logging_config.yaml");
-    }
+        "/"
+    };
+    cwd_string.push_str(&(slash.to_owned() + "logging_config.yaml"));
+
     log4rs::init_file(cwd_string, Default::default()).unwrap();
 
     info!("Welcome to the minimalist blockchain!\n");
     info!("For list of supported commands enter: 'help'");
 
-    shell();
+    if IS_SERVER || cmd_archive {
+        Server::launch().await;
+    } else {
+        shell().await;
+    }
 }

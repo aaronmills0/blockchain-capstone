@@ -1,3 +1,4 @@
+use crate::network::peer::Peer;
 use crate::simulation::start;
 use crate::utils::graph::create_block_graph;
 use crate::utils::save_and_load::deserialize_json;
@@ -13,8 +14,10 @@ use std::{env, fs, io};
 
 static mut SIM_STATUS: bool = false;
 
-pub fn shell() {
+pub async fn shell() {
     let mut tx_sim_option: Option<Sender<String>> = None;
+    let peer = Peer::launch().await;
+    info!("Successfully launched peer!");
     loop {
         let mut command = String::new();
         io::stdin()
@@ -22,53 +25,53 @@ pub fn shell() {
             .expect("Failed to read line");
 
         match command.to_lowercase().trim() {
-            "help" => {
-                info!("The user selected help");
-                display_commands();
-            }
+            // "help" => {
+            //     info!("The user selected help");
+            //     display_commands();
+            // }
 
-            "sim start" => unsafe {
-                if !SIM_STATUS {
-                    let (tx_sim_temp, rx_sim) = mpsc::channel();
-                    tx_sim_option = Some(tx_sim_temp);
-                    let _sim_handle = thread::spawn(|| start(rx_sim));
-                    SIM_STATUS = true;
-                } else {
-                    info!("\nSimulation has already begun!\n");
-                }
-            },
+            // "sim start" => unsafe {
+            //     if !SIM_STATUS {
+            //         let (tx_sim_temp, rx_sim) = mpsc::channel();
+            //         tx_sim_option = Some(tx_sim_temp);
+            //         let _sim_handle = thread::spawn(|| start(rx_sim));
+            //         SIM_STATUS = true;
+            //     } else {
+            //         info!("\nSimulation has already begun!\n");
+            //     }
+            // },
 
-            "save" => unsafe {
-                if SIM_STATUS && tx_sim_option.is_some() {
-                    let tx_sim = tx_sim_option.unwrap();
-                    if tx_sim.send(String::from("save")).is_err() {
-                        warn!("Failed to send command to the simulation");
-                    }
-                    tx_sim_option = Some(tx_sim);
-                } else {
-                    warn!("Simulation has not started");
-                }
-            },
+            // "save" => unsafe {
+            //     if SIM_STATUS && tx_sim_option.is_some() {
+            //         let tx_sim = tx_sim_option.unwrap();
+            //         if tx_sim.send(String::from("save")).is_err() {
+            //             warn!("Failed to send command to the simulation");
+            //         }
+            //         tx_sim_option = Some(tx_sim);
+            //     } else {
+            //         warn!("Simulation has not started");
+            //     }
+            // },
 
-            "graph" => {
-                info!("Please enter a file path");
-                let mut filepath = String::new();
-                io::stdin()
-                    .read_line(&mut filepath)
-                    .expect("Failed to read line");
+            // "graph" => {
+            //     info!("Please enter a file path");
+            //     let mut filepath = String::new();
+            //     io::stdin()
+            //         .read_line(&mut filepath)
+            //         .expect("Failed to read line");
 
-                let f = filepath.trim();
-                if !Path::new(f).exists() {
-                    warn!("The filepath {} doesn't exist. Going back to shell", f);
-                    continue;
-                }
+            //     let f = filepath.trim();
+            //     if !Path::new(f).exists() {
+            //         warn!("The filepath {} doesn't exist. Going back to shell", f);
+            //         continue;
+            //     }
 
-                let (blockchain, _, initial_tx_outs, _, _, _, _) = deserialize_json(f);
-                create_block_graph(initial_tx_outs, blockchain);
-            }
-
+            //     let (blockchain, _, initial_tx_outs, _, _, _, _) = deserialize_json(f);
+            //     create_block_graph(initial_tx_outs, blockchain);
+            // }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");
+                Peer::shutdown(peer);
                 write_log();
                 exit(0);
             }

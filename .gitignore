@@ -4,3 +4,6 @@ log/
 config/
 .vscode/
 graphs/
+examples/
+system/
+.DS_Store
