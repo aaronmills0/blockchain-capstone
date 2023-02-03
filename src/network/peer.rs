@@ -1,3 +1,4 @@
+use crate::components::transaction::Transaction;
 use crate::network::decoder;
 use crate::network::messages;
 use local_ip_address::local_ip;
@@ -12,8 +13,12 @@ use std::sync::Arc;
 use std::{env, fs};
 use std::{fs::File, io, path::Path};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::Sender;
+use tokio::sync::oneshot;
 
-static SERVER_ADDR: &str = "127.0.0.1:6780";
+static SERVER_ADDR: &str = "192.168.0.12:6780";
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Peer {
@@ -23,7 +28,18 @@ pub struct Peer {
     pub port: Option<String>,
 }
 
-async fn send_peerid_query(msg: Frame) -> u32 {
+#[derive(Debug)]
+enum Command {
+    Get {
+        key: String,
+        resp: Responder<Option<String>>,
+        payload: Option<Vec<String>>,
+    },
+}
+
+type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
+
+pub async fn send_peerid_query(msg: Frame) -> u32 {
     let stream = TcpStream::connect(&SERVER_ADDR).await.unwrap();
     info!("Successfully connected to {}", SERVER_ADDR);
     let mut connection = Connection::new(stream);
@@ -39,7 +55,7 @@ async fn send_peerid_query(msg: Frame) -> u32 {
     return response;
 }
 
-async fn send_sockets_query(msg: Frame) -> HashMap<u32, String> {
+pub async fn send_sockets_query(msg: Frame) -> HashMap<u32, String> {
     let stream = TcpStream::connect(&SERVER_ADDR).await.unwrap();
     info!("Successfully connected to {}", SERVER_ADDR);
     let mut connection = Connection::new(stream);
@@ -53,6 +69,27 @@ async fn send_sockets_query(msg: Frame) -> HashMap<u32, String> {
     }
 
     return response;
+}
+
+pub async fn send_transaction(msg: Frame, addr: String, sourceid: u32, destid: u32) -> bool {
+    let stream = TcpStream::connect(&addr).await.unwrap();
+    info!("Successfully connected to {}", addr);
+    let mut connection = Connection::new(stream);
+
+    connection.write_frame(&msg).await.ok();
+    if let Some(frame) = connection.read_frame().await.unwrap() {
+        let (cmd, sourceid, destid) = decoder::decode_command(&frame);
+        if cmd != "ACK" || sourceid != destid || destid != sourceid {
+            warn!(
+                "Received invalid acknowledgement {} {} {}",
+                cmd != "ACK",
+                sourceid != destid,
+                destid != sourceid
+            );
+            return false;
+        };
+    }
+    return true;
 }
 
 impl Peer {
@@ -100,6 +137,91 @@ impl Peer {
         Peer::save_peer(&peer);
 
         return peer;
+    }
+
+    async fn peer_manager(peer: Peer, mut rx: Receiver<Command>) {
+        loop {
+            let command = rx.recv().await.unwrap();
+            match command {
+                Command::Get { key, resp, payload } => {
+                    if key.as_str() == "transaction" {
+                        resp.send(Ok(Some(String::from("Received!"))));
+                    }
+                }
+            }
+        }
+    }
+
+    pub async fn listen(peer: Peer, socket: String) {
+        let listener = TcpListener::bind(&socket).await.unwrap();
+        info!("Successfully setup listener at {}", socket);
+
+        // The server should now continuously listen and respond to queries
+        // Each time it gets a request it should update its socketmap accordingly
+        let peerid = peer.peerid;
+        let (tx, rx) = mpsc::channel(32);
+        tokio::spawn(async move {
+            Peer::peer_manager(peer, rx).await;
+        });
+
+        loop {
+            info!("Waiting for connection...");
+            let (stream, socket) = listener.accept().await.unwrap();
+
+            info!("{:?}", &stream);
+            // A new task is spawned for each inbound socket. The socket is
+            // moved to the new task and processed there.
+            let tx_clone = tx.clone();
+            tokio::spawn(async move {
+                Peer::process_connection(stream, socket.to_string(), tx_clone, peerid).await;
+            });
+        }
+    }
+
+    async fn process_connection(
+        stream: TcpStream,
+        socket: String,
+        tx: Sender<Command>,
+        peerid: u32,
+    ) {
+        let mut connection = Connection::new(stream);
+        loop {
+            match connection.read_frame().await {
+                Ok(opt_frame) => {
+                    if let Some(frame) = opt_frame {
+                        let cmd;
+                        info!("GOT: {:?}", frame);
+                        let (command, sourceid, destid) = decoder::decode_command(&frame);
+
+                        if destid != peerid {
+                            warn!("Destination id does not match server id: {}", destid);
+                            return;
+                        }
+                        let (resp_tx, resp_rx) = oneshot::channel();
+                        if command == "transaction" {
+                            let transaction: Transaction = decoder::decode_transactions_msg(frame)
+                                .expect("Cannot decode frame as transaction frame");
+                            cmd = Command::Get {
+                                key: command,
+                                resp: resp_tx,
+                                payload: None,
+                            };
+                            tx.send(cmd).await.ok();
+                            let result = resp_rx.await;
+                            let response = messages::get_ack_msg(destid, sourceid);
+                            connection.write_frame(&response).await.ok();
+                        } else {
+                            warn!("invalid command for server");
+                            return;
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("{}", e);
+                    break;
+                }
+            }
+        }
     }
 
     pub async fn set_new_port(&mut self) -> String {
