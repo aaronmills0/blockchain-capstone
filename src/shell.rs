@@ -1,7 +1,13 @@
-use crate::network::peer::Peer;
+use crate::components::transaction::{
+    Outpoint, PublicKeyScript, SignatureScript, Transaction, TxIn, TxOut,
+};
+use crate::network::messages;
+use crate::network::peer::{self, Peer};
 use crate::simulation::start;
 use crate::utils::graph::create_block_graph;
+use crate::utils::hash;
 use crate::utils::save_and_load::deserialize_json;
+use crate::utils::sign_and_verify::{self, Verifier};
 use chrono::Local;
 use log::{info, warn};
 use std::fs::File;
@@ -16,8 +22,16 @@ static mut SIM_STATUS: bool = false;
 
 pub async fn shell() {
     let mut tx_sim_option: Option<Sender<String>> = None;
-    let peer = Peer::launch().await;
+    let mut peer = Peer::launch().await;
     info!("Successfully launched peer!");
+    let socket = peer.get_socket().await;
+    let socket_clone = socket.clone();
+    let peerid = peer.peerid;
+    let socket_map = peer.socketmap.clone();
+    tokio::spawn(async move {
+        Peer::listen(peer, socket_clone).await;
+    });
+
     loop {
         let mut command = String::new();
         io::stdin()
@@ -69,9 +83,20 @@ pub async fn shell() {
             //     let (blockchain, _, initial_tx_outs, _, _, _, _) = deserialize_json(f);
             //     create_block_graph(initial_tx_outs, blockchain);
             // }
+            "neighbors" | "neighbours" | "-n" => {
+                info!("Neighbors:");
+                for (id, s) in &socket_map {
+                    info!("{} : {}", id, s);
+                }
+            }
+            "transaction" | "tx" | "-t" => {
+                let frame =
+                    messages::get_transaction_msg(peerid, peerid, get_example_transaction());
+                peer::send_transaction(frame, socket.clone(), peerid, peerid).await;
+            }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");
-                Peer::shutdown(peer);
+                //Peer::shutdown(peer);
                 write_log();
                 exit(0);
             }
@@ -81,6 +106,58 @@ pub async fn shell() {
             }
         }
     }
+}
+
+/**
+ * TO BE DELETED. USED TO CREATE AN EXAMPLE TRANSACTION TO TEST NETWORKING
+ */
+
+fn get_example_transaction() -> Transaction {
+    let (private_key0, public_key0) = sign_and_verify::create_keypair();
+    let outpoint0: Outpoint = Outpoint {
+        txid: "0".repeat(64),
+        index: 0,
+    };
+
+    let tx_out0: TxOut = TxOut {
+        value: 500,
+        pk_script: PublicKeyScript {
+            public_key_hash: hash::hash_as_string(&public_key0),
+            verifier: Verifier {},
+        },
+    };
+
+    let (old_private_key, old_public_key) = (private_key0, public_key0);
+    let message = String::from(&outpoint0.txid)
+        + &outpoint0.index.to_string()
+        + &tx_out0.pk_script.public_key_hash;
+
+    let sig_script1 = SignatureScript {
+        signature: sign_and_verify::sign(&message, &old_private_key, &old_public_key),
+        full_public_key: old_public_key,
+    };
+
+    let tx_in1: TxIn = TxIn {
+        outpoint: outpoint0,
+        sig_script: sig_script1,
+    };
+
+    // We create a new keypair corresponding to our new transaction which allows us to create its tx_out
+    let (_, public_key1) = sign_and_verify::create_keypair();
+    let tx_out1: TxOut = TxOut {
+        value: 500,
+        pk_script: PublicKeyScript {
+            public_key_hash: hash::hash_as_string(&public_key1),
+            verifier: Verifier {},
+        },
+    };
+
+    let transaction1: Transaction = Transaction {
+        tx_inputs: Vec::from([tx_in1]),
+        tx_outputs: Vec::from([tx_out1]),
+    };
+
+    return transaction1;
 }
 
 fn display_commands() {

@@ -93,3 +93,8 @@ pub fn get_transaction_msg(sourceid: u32, destid: u32, tx: Transaction) -> Frame
     response_vec.push(payload);
     return Frame::Array(response_vec);
 }
+
+pub fn get_ack_msg(sourceid: u32, destid: u32) -> Frame {
+    let header_frame = get_header(sourceid, destid, String::from("00000110"));
+    return Frame::Array(Vec::from([header_frame]));
+}
