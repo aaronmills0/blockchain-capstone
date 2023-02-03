@@ -18,14 +18,17 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-static SERVER_ADDR: &str = "192.168.0.12:6780";
+static SERVER_IP: &str = "192.168.0.101";
+const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
+static NUM_PORTS: usize = 20;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Peer {
-    pub peerid: u32,
-    pub socketmap: HashMap<u32, String>, // Socket addresses of neighbors
     pub address: String,
-    pub port: Option<String>,
+    pub peerid: u32,
+    pub ports: Vec<String>,
+    pub ip_map: HashMap<u32, String>, // IP addresses of neighbors
+    pub port_map: HashMap<String, Vec<String>>, // Ports used with IP addresses of neighbours
 }
 
 #[derive(Debug)]
@@ -39,11 +42,31 @@ enum Command {
 
 type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
 
-pub async fn send_peerid_query(msg: Frame) -> u32 {
-    let stream = TcpStream::connect(&SERVER_ADDR).await.unwrap();
-    info!("Successfully connected to {}", SERVER_ADDR);
-    let mut connection = Connection::new(stream);
+async fn get_connection(ip: &str, ports: &[&str]) -> Connection {
+    let mut connection_wrapped: Option<Connection> = None;
+    for port in ports {
+        let socket = String::from(ip) + ":" + port;
 
+        let conn = TcpStream::connect(&socket).await;
+        if conn.is_err() {
+            continue;
+        };
+        let stream = conn.unwrap();
+
+        info!("Successfully connected to {}", socket);
+        connection_wrapped = Some(Connection::new(stream));
+        break;
+    }
+
+    if connection_wrapped.is_none() {
+        error!("Could not connect to any server port");
+        panic!();
+    }
+    return connection_wrapped.unwrap();
+}
+
+pub async fn send_peerid_query(msg: Frame) -> u32 {
+    let mut connection = get_connection(SERVER_IP, SERVER_PORTS).await;
     connection.write_frame(&msg).await.ok();
 
     let mut response: u32 = 0;
@@ -55,20 +78,21 @@ pub async fn send_peerid_query(msg: Frame) -> u32 {
     return response;
 }
 
-pub async fn send_sockets_query(msg: Frame) -> HashMap<u32, String> {
-    let stream = TcpStream::connect(&SERVER_ADDR).await.unwrap();
-    info!("Successfully connected to {}", SERVER_ADDR);
-    let mut connection = Connection::new(stream);
-
+pub async fn send_ports_query(msg: Frame) -> (HashMap<u32, String>, HashMap<String, Vec<String>>) {
+    let mut connection = get_connection(SERVER_IP, SERVER_PORTS).await;
     connection.write_frame(&msg).await.ok();
 
-    let mut response: HashMap<u32, String> = HashMap::new();
+    let mut ip = None;
+    let mut ports = None;
     if let Some(frame) = connection.read_frame().await.unwrap() {
-        response =
-            decoder::decode_sockets_response(frame).expect("Failed to decode sockets response");
+        (ip, ports) = decoder::decode_ports_response(frame);
+    }
+    if ip.is_none() || ports.is_none() {
+        error!("Decoded ip or ports are none from ports query");
+        panic!();
     }
 
-    return response;
+    return (ip.unwrap(), ports.unwrap());
 }
 
 pub async fn send_transaction(msg: Frame, addr: String, sourceid: u32, destid: u32) -> bool {
@@ -95,10 +119,11 @@ pub async fn send_transaction(msg: Frame, addr: String, sourceid: u32, destid: u
 impl Peer {
     pub fn new() -> Peer {
         return Peer {
-            peerid: 0,
-            socketmap: HashMap::new(),
             address: local_ip().expect("Failed to obtain local ip").to_string(),
-            port: None,
+            peerid: 0,
+            ports: Vec::with_capacity(NUM_PORTS),
+            ip_map: HashMap::new(),
+            port_map: HashMap::new(),
         };
     }
 
@@ -114,8 +139,6 @@ impl Peer {
             peer = Peer::load_peer();
         } else {
             peer = Peer::new();
-            // Binding with port 0 tells the OS to find a suitable port. We will save this port.
-            peer.set_new_port().await;
             info!("Peer doesn't exist! Creating new peer.");
             // Get peerid from the server
             let msg = messages::get_peerid_query();
@@ -124,16 +147,22 @@ impl Peer {
             // Set the id obtained as a response to the peer id
             Peer::save_peer(&peer);
         }
-        // We need to check if our saved socket is available. If not we need to change it.
+
+        info!("IP map: {:?}", peer.ip_map);
+        info!("Port map: {:?}", peer.port_map);
+
+        // We need to ensure all our ports are available. If not we need to change them.
         // Query the server
-        info!("{:?}", peer.socketmap);
-        //TODO
-        let socket = peer.get_socket().await;
-        let msg = messages::get_sockets_query(peer.peerid, socket);
-        let response = send_sockets_query(msg).await;
-        for (id, socket) in response {
-            peer.socketmap.insert(id, socket);
+        peer.set_ports().await;
+        let msg = messages::get_ports_query(peer.peerid, peer.ports.clone());
+        let (ipmap, portmap) = send_ports_query(msg).await;
+        for (id, ip) in ipmap {
+            peer.ip_map.insert(id, ip);
         }
+        for (ip, ports) in portmap {
+            peer.port_map.insert(ip, ports);
+        }
+
         Peer::save_peer(&peer);
 
         return peer;
@@ -152,7 +181,8 @@ impl Peer {
         }
     }
 
-    pub async fn listen(peer: Peer, socket: String) {
+    pub async fn listen(peer: Peer, ip: String, port: String) {
+        let socket = ip + ":" + &port;
         let listener = TcpListener::bind(&socket).await.unwrap();
         info!("Successfully setup listener at {}", socket);
 
@@ -235,27 +265,20 @@ impl Peer {
             .to_string();
     }
 
-    pub async fn get_socket(&mut self) -> String {
-        let mut current_port;
-        if self.port.is_none() {
-            info!("Port is not set. Setting new port...");
-            current_port = self.set_new_port().await;
-        } else {
-            info!("Checking port availability...");
-            current_port = self.port.clone().unwrap();
-            if !scan_port(current_port.parse::<u16>().unwrap() as u16) {
-                info!("Current port unavailable. Setting new port...");
-                current_port = self.set_new_port().await;
-            } else {
-                info!("Current port available.")
+    pub async fn set_ports(&mut self) {
+        // Update any set ports that are unavailable
+        for i in 0..self.ports.len() {
+            if !scan_port(self.ports[i].parse::<u16>().unwrap()) {
+                info!("Port {} if unavailable. Setting new port...", i);
+                self.ports[i] = self.set_new_port().await;
             }
         }
-        self.port = Some(current_port.clone());
-        let mut result = String::new();
-        result.push_str(&self.address);
-        result.push_str(":");
-        result.push_str(&current_port);
-        return result;
+
+        // Add new ports until there are `NUM_PORTS` ports
+        while self.ports.len() < NUM_PORTS {
+            let new_port = self.set_new_port().await;
+            self.ports.push(new_port);
+        }
     }
 
     pub fn shutdown(peer: Peer) {

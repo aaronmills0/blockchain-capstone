@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use bytes::Bytes;
 use mini_redis::Frame;
 use serde_json;
@@ -55,21 +53,22 @@ pub fn get_peerid_response(destid: u32) -> Frame {
     return Frame::Array(response_vec);
 }
 
-pub fn get_sockets_query(sourceid: u32, socket: String) -> Frame {
+pub fn get_ports_query(sourceid: u32, ports: Vec<String>) -> Frame {
     let header_frame = get_header(sourceid, 1, String::from("00000010"));
-    let payload_bytes = Bytes::from(socket);
-    let payload_frame = Frame::Bulk(payload_bytes);
-    return Frame::Array(Vec::from([header_frame, payload_frame]));
+    let ports_frame = Frame::Bulk(Bytes::from(serde_json::to_string(&ports).unwrap()));
+    return Frame::Array(Vec::from([header_frame, ports_frame]));
 }
 
-pub fn get_sockets_response(socketmap: HashMap<u32, String>, destid: u32) -> Frame {
+pub fn get_ports_response(ip_map_json: String, port_map_json: String, destid: u32) -> Frame {
     let mut response_vec: Vec<Frame> = Vec::new();
 
     let header_frame = get_header(1, destid, String::from("00000011"));
     response_vec.push(header_frame);
 
-    let payload = Frame::Bulk(Bytes::from(serde_json::to_string(&socketmap).unwrap()));
-    response_vec.push(payload);
+    let ip_frame = Frame::Bulk(Bytes::from(ip_map_json));
+    let port_frame = Frame::Bulk(Bytes::from(port_map_json));
+    response_vec.push(ip_frame);
+    response_vec.push(port_frame);
     return Frame::Array(response_vec);
 }
 
