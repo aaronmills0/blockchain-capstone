@@ -31,7 +31,7 @@ pub struct Server {
 enum Command {
     Get {
         key: String,
-        resp: Responder<Option<String>>,
+        resp: Responder<Vec<String>>,
         payload: Option<Vec<String>>,
     },
 }
@@ -42,12 +42,19 @@ impl Server {
     pub fn new() -> Server {
         return Server {
             peer: Peer {
-                peerid: 1,
-                socketmap: HashMap::new(),
                 address: local_ip()
                     .expect("Failed to obtain local ip address")
                     .to_string(),
-                port: Some(String::from("6780")),
+                peerid: 1,
+                ports: vec![
+                    String::from("57643"),
+                    String::from("34565"),
+                    String::from("32578"),
+                    String::from("23564"),
+                    String::from("13435"),
+                ],
+                ip_map: HashMap::new(),
+                port_map: HashMap::new(),
             },
             next_peerid: 2,
         };
@@ -66,27 +73,37 @@ impl Server {
                             if payload_vec.len() != 1 {
                                 error!("Invalid command: payload is of unexpected size");
                             }
-                            resp.send(Ok(Some(String::from(server.next_peerid.to_string()))))
+                            resp.send(Ok(Vec::from([server.next_peerid.to_string()])))
                                 .ok();
                             server.next_peerid += 1;
                             Server::save_server(&server);
                         }
-                    } else if key.as_str() == "sockets_query" {
+                    } else if key.as_str() == "ports_query" {
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
                         } else {
                             let payload_vec = payload.unwrap();
-                            if payload_vec.len() != 2 {
+                            if payload_vec.len() <= 2 {
                                 error!("Invalid command: payload is of unexpected size");
                             }
+
                             let sourceid: u32 = payload_vec[0].parse().unwrap();
-                            let socket = payload_vec[1].clone();
-                            // Update the server socketmap
-                            server.peer.socketmap.insert(sourceid, socket);
-                            resp.send(Ok(Some(
-                                serde_json::to_string(&server.peer.socketmap).unwrap(),
-                            )))
-                            .ok();
+                            let ip = payload_vec[1].clone();
+
+                            // Update the server ip_map and port_map
+                            server.peer.ip_map.insert(sourceid, ip.clone());
+                            server
+                                .peer
+                                .port_map
+                                .insert(ip.clone(), payload_vec[2..].to_vec());
+
+                            let response_vector = vec![
+                                serde_json::to_string(&server.peer.ip_map)
+                                    .expect("Failed to serialize ip map"),
+                                serde_json::to_string(&server.peer.port_map)
+                                    .expect("Failed to serialize port map"),
+                            ];
+                            resp.send(Ok(response_vector)).ok();
                             Server::save_server(&server);
                         }
                     }
@@ -112,13 +129,21 @@ impl Server {
         }
 
         let (tx, rx) = mpsc::channel(32);
-        tokio::spawn(async move {
-            Server::server_manager(server, rx).await;
-        });
 
         let local_ip = local_ip().unwrap();
         let address = local_ip.to_string();
-        let socket = address + ":6780";
+        for p in &server.peer.ports {
+            let ip = address.clone();
+            let port = p.clone();
+            let tx_copy = tx.clone();
+            tokio::spawn(async move { Server::listen(ip, port, tx_copy).await });
+        }
+
+        Server::server_manager(server, rx).await;
+    }
+
+    async fn listen(ip: String, port: String, tx: Sender<Command>) {
+        let socket = ip + ":" + &port;
 
         let listener = TcpListener::bind(&socket).await.unwrap();
         info!("Successfully setup listener at {}", socket);
@@ -141,6 +166,7 @@ impl Server {
     }
 
     async fn process_connection(stream: TcpStream, socket: String, tx: Sender<Command>) {
+        let ip = stream.peer_addr().unwrap().ip().to_string();
         let mut connection = Connection::new(stream);
         loop {
             match connection.read_frame().await {
@@ -165,31 +191,38 @@ impl Server {
                             };
                             tx.send(cmd).await.ok();
                             let result = resp_rx.await;
-                            let peerid = result.unwrap().unwrap().unwrap().parse().unwrap();
+                            let peerid = result.unwrap().unwrap()[0].parse().unwrap();
                             let response = messages::get_peerid_response(peerid);
                             connection.write_frame(&response).await.ok();
-                        } else if command == "sockets_query" {
-                            let listening_socket = decoder::decode_sockets_query(&frame)
-                                .expect("Failed to decode sockets response");
+                        } else if command == "ports_query" {
+                            let mut ports = decoder::decode_ports_query(&frame);
+                            if ports.is_empty() {
+                                error!("No ports found when decoding ports query");
+                                panic!();
+                            }
+
                             payload_vec.push(sourceid.to_string());
-                            payload_vec.push(listening_socket);
+                            payload_vec.push(ip.clone());
+                            payload_vec.append(&mut ports);
                             cmd = Command::Get {
                                 key: command,
                                 resp: resp_tx,
                                 payload: Some(payload_vec),
                             };
                             tx.send(cmd).await.ok();
-                            let result = resp_rx.await;
-                            let result_unwraped = result.unwrap();
-                            let result_unwrapped_unwrapped = result_unwraped.unwrap();
-                            if result_unwrapped_unwrapped.is_none() {
+
+                            let result = resp_rx.await.unwrap().unwrap();
+                            if result.is_empty() {
                                 error!("Empty result from server manager");
+                                panic!();
                             }
-                            let socketmap_json = result_unwrapped_unwrapped.unwrap();
-                            info!("Sending socketmap: {:?}", socketmap_json);
-                            let socketmap: HashMap<u32, String> =
-                                serde_json::from_str(&socketmap_json).unwrap();
-                            let response = messages::get_sockets_response(socketmap, sourceid);
+                            let ip_map_json = result[0].to_owned();
+                            let port_map_json = result[1].to_owned();
+                            info!("Sending ip_map: {:?}", ip_map_json);
+                            info!("Sending port_map: {:?}", port_map_json);
+
+                            let response =
+                                messages::get_ports_response(ip_map_json, port_map_json, sourceid);
                             connection.write_frame(&response).await.ok();
                         } else {
                             warn!("invalid command for server");
