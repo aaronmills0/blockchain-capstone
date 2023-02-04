@@ -63,8 +63,12 @@ mod tests {
                         }
                         utxo_copy.update(tx);
                     }
-                } else {
+                } else if flag == 1 {
                     let (result, _) = utxo_copy.batch_verify_and_update(&transactions);
+                    assert!(result);
+                } else {
+                    let (result, _) =
+                        utxo_copy.parallel_batch_verify_and_update(&transactions, 256);
                     assert!(result);
                 }
                 let duration = start.elapsed();
@@ -78,13 +82,15 @@ mod tests {
         }
     }
 
-    // Use flag 0 for sequential verification and any other flag for batch verification
+    // Use flag 0 for sequential verification, 1 for batch verification, 2 for parallel verification
     #[ignore]
     #[test]
     fn test_transaction_throughput() {
         let mut flag: usize = 0;
-        test_tx_throughput(flag);
+        /*test_tx_throughput(flag);
         flag = 1;
+        test_tx_throughput(flag);*/
+        flag = 2;
         test_tx_throughput(flag);
     }
 }
