@@ -67,9 +67,13 @@ mod tests {
                     let (result, _) = utxo_copy.batch_verify_and_update(&transactions);
                     assert!(result);
                 } else {
-                    let (result, _) =
-                        utxo_copy.parallel_batch_verify_and_update(&transactions, 256);
-                    assert!(result);
+                    for b in 0..10 {
+                        let new_base: u32 = 2;
+                        let power_of_two = new_base.pow(b.try_into().unwrap());
+                        let (result, _) = utxo_copy
+                            .parallel_batch_verify_and_update(&transactions, power_of_two as usize);
+                        assert!(result);
+                    }
                 }
                 let duration = start.elapsed();
 
