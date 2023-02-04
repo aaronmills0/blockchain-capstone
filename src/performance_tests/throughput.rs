@@ -67,13 +67,23 @@ mod tests {
                     let (result, _) = utxo_copy.batch_verify_and_update(&transactions);
                     assert!(result);
                 } else {
-                    for b in 0..10 {
+                    for b in 0..11 {
                         let new_base: u32 = 2;
                         let power_of_two = new_base.pow(b.try_into().unwrap());
                         let (result, _) = utxo_copy
                             .parallel_batch_verify_and_update(&transactions, power_of_two as usize);
                         assert!(result);
+
+                        let duration = start.elapsed();
+
+                        println!(
+                            "Time elapsed for {:#} transactions in Run {:#} for batch size {:#} is: {:?}",
+                            multiplicative_index, r, power_of_two, duration
+                        );
+                        println!();
                     }
+
+                    continue;
                 }
                 let duration = start.elapsed();
 
