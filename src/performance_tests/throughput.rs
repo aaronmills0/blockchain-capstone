@@ -10,12 +10,12 @@ mod tests {
     use std::time::Instant;
 
     fn test_tx_throughput(flag: usize) {
-        let base: u32 = 10;
+        let base: u32 = 2;
         let mut multiplicative_index: u32;
         for r in 0..5 {
-            for k in 0..10 {
+            for k in 0..20 {
+                // val is the number of transactions to be used. For parallel verification, it is also the batch size.
                 let val = base.pow(k.try_into().unwrap());
-                multiplicative_index = if val > 100000 { 100000 * (k - 4) } else { val };
 
                 let mut utxo: UTXO = UTXO(HashMap::new());
                 let mut key_map: KeyMap = KeyMap(HashMap::new());
@@ -40,7 +40,7 @@ mod tests {
                 let mut rng: ThreadRng = rand_1::thread_rng();
                 let max_num_outputs = 1;
                 let mut utxo_copy = utxo.clone();
-                for _ in 0..multiplicative_index {
+                for _ in 0..val {
                     let transaction = Transaction::create_transaction(
                         &utxo,
                         &mut key_map,
@@ -52,9 +52,9 @@ mod tests {
                     transactions.push(transaction);
                 }
 
-                assert_eq!(transactions.len() as u32, multiplicative_index);
+                assert_eq!(transactions.len() as u32, val);
 
-                let start = Instant::now();
+                let mut start = Instant::now();
                 if flag == 0 {
                     for tx in transactions.iter() {
                         if !utxo_copy.verify_transaction(tx) {
@@ -67,18 +67,37 @@ mod tests {
                     let (result, _) = utxo_copy.batch_verify_and_update(&transactions);
                     assert!(result);
                 } else {
-                    for b in 0..11 {
-                        let new_base: u32 = 2;
-                        let power_of_two = new_base.pow(b.try_into().unwrap());
+                    // max_base is the base 2 logarithm of val which correpsonds to the number of batch sizes
+                    // we will need to iterate over minus 1 (to account for 0). For example if the batch size is 16,
+                    // then the number of iterations is log(16)=4 for 5 batch sizes (1,2,4,8,16)
+                    let max_base = val.ilog2();
+
+                    let new_base: u32 = 2;
+
+                    for b in 0..max_base + 1 {
+                        let exponential = new_base.pow(b.try_into().unwrap());
+
+                        let mut batch_size = 0;
+
+                        if (exponential <= 65536
+                            || exponential == new_base.pow(max_base.try_into().unwrap()))
+                        {
+                            batch_size = exponential;
+                        } else {
+                            continue;
+                        };
+
+                        start = Instant::now();
+
                         let (result, _) = utxo_copy
-                            .parallel_batch_verify_and_update(&transactions, power_of_two as usize);
+                            .parallel_batch_verify_and_update(&transactions, batch_size as usize);
                         assert!(result);
 
                         let duration = start.elapsed();
 
                         println!(
-                            "Time elapsed for {:#} transactions in Run {:#} for batch size {:#} is: {:?}",
-                            multiplicative_index, r, power_of_two, duration
+                            "Time elapsed for {:#} transactions in Run {:#} for batch size {:#} is: {:?}. The number of threads is {:?}.",
+                            val, r, batch_size, duration, val/batch_size
                         );
                         println!();
                     }
@@ -89,7 +108,7 @@ mod tests {
 
                 println!(
                     "Time elapsed for {:#} transactions in Run {:#} is: {:?}",
-                    multiplicative_index, r, duration
+                    val, r, duration
                 );
                 println!();
             }

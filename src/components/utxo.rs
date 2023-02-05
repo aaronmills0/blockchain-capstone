@@ -11,6 +11,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::mpsc::Receiver;
 use std::sync::{mpsc, Arc};
 use std::thread::{self};
+use std::time::Instant;
 
 /**
  * The Utxo is a map containing the Unspent Transaction (X) Outputs.
@@ -191,6 +192,8 @@ impl UTXO {
         transactions: &Vec<Transaction>,
         batch_size: usize,
     ) -> (bool, Option<UTXO>) {
+        let start_full = Instant::now();
+
         let mut utxo: UTXO = self.clone();
         let mut incoming_balance: u32;
         let mut outgoing_balance: u32;
@@ -242,6 +245,9 @@ impl UTXO {
             // Update the utxo copy even though signature has not been checked yet
             utxo.update(&transaction);
         }
+
+        let start_signature_verif = Instant::now();
+
         let mut receivers: Vec<Receiver<bool>> = Vec::new();
         let msg_batches: Vec<Vec<Vec<u8>>> = msg_vec.chunks(batch_size).map(|x| x.into()).collect();
 
@@ -269,13 +275,32 @@ impl UTXO {
             let verified = receiver.recv();
             sig_status = sig_status && verified.unwrap();
             if !sig_status {
+                let duration_signature_verif = start_signature_verif.elapsed();
+                let duration_full = start_full.elapsed();
+                println!("Time elapsed for the full duration of function in {:?} and duration for signature verification only is: {:?}.
+                The share of the parallelized program is {:?}", duration_full, duration_signature_verif, duration_signature_verif.as_micros() as f32/duration_full.as_micros() as f32);
+
+                println!();
+
                 return (false, None);
             }
         }
 
         if sig_status {
+            let duration_signature_verif = start_signature_verif.elapsed();
+            let duration_full = start_full.elapsed();
+            println!("Time elapsed for the full duration of function in {:?} and duration for signature verification only is: {:?}.
+                The share of the parallelized program is {:?}", duration_full, duration_signature_verif, duration_signature_verif.as_micros() as f32/duration_full.as_micros() as f32);
+            println!();
+
             return (true, Some(utxo));
         } else {
+            let duration_signature_verif = start_signature_verif.elapsed();
+            let duration_full = start_full.elapsed();
+            println!("Time elapsed for the full duration of function in {:?} and duration for signature verification only is: {:?}.
+                The share of the parallelized program is {:?}", duration_full, duration_signature_verif, duration_signature_verif.as_micros() as f32/duration_full.as_micros() as f32);
+            println!();
+
             return (false, None);
         }
     }
