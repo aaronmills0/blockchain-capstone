@@ -16,7 +16,6 @@ mod tests {
             for k in 0..20 {
                 // val is the number of transactions to be used. For parallel verification, it is also the batch size.
                 let val = base.pow(k.try_into().unwrap());
-
                 let mut utxo: UTXO = UTXO(HashMap::new());
                 let mut key_map: KeyMap = KeyMap(HashMap::new());
                 let mut transactions: Vec<Transaction> = Vec::new();
@@ -71,12 +70,10 @@ mod tests {
                     // we will need to iterate over minus 1 (to account for 0). For example if the batch size is 16,
                     // then the number of iterations is log(16)=4 for 5 batch sizes (1,2,4,8,16)
                     let max_base = val.ilog2();
-
                     let new_base: u32 = 2;
 
                     for b in 0..max_base + 1 {
                         let exponential = new_base.pow(b.try_into().unwrap());
-
                         let mut batch_size = 0;
 
                         if (exponential <= 65536
@@ -88,11 +85,9 @@ mod tests {
                         };
 
                         start = Instant::now();
-
                         let (result, _) = utxo_copy
                             .parallel_batch_verify_and_update(&transactions, batch_size as usize);
                         assert!(result);
-
                         let duration = start.elapsed();
 
                         println!(
@@ -101,7 +96,6 @@ mod tests {
                         );
                         println!();
                     }
-
                     continue;
                 }
                 let duration = start.elapsed();

@@ -193,7 +193,6 @@ impl UTXO {
         batch_size: usize,
     ) -> (bool, Option<UTXO>) {
         let start_full = Instant::now();
-
         let mut utxo: UTXO = self.clone();
         let mut incoming_balance: u32;
         let mut outgoing_balance: u32;
@@ -247,7 +246,6 @@ impl UTXO {
         }
 
         let start_signature_verif = Instant::now();
-
         let mut receivers: Vec<Receiver<bool>> = Vec::new();
         let msg_batches: Vec<Vec<Vec<u8>>> = msg_vec.chunks(batch_size).map(|x| x.into()).collect();
 
@@ -279,7 +277,6 @@ impl UTXO {
                 let duration_full = start_full.elapsed();
                 println!("Time elapsed for the full duration of function in {:?} and duration for signature verification only is: {:?}.
                 The share of the parallelized program is {:?}", duration_full, duration_signature_verif, duration_signature_verif.as_micros() as f32/duration_full.as_micros() as f32);
-
                 println!();
 
                 return (false, None);
