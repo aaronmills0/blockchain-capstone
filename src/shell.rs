@@ -92,23 +92,9 @@ pub async fn shell() {
             }
             "transaction" | "tx" | "-t" => {
                 let peerid = peer.peerid;
-
-                let mut selected_port = None;
-                for port in &peer.ports {
-                    if scan_port(port.parse::<u16>().unwrap()) {
-                        selected_port = Some(port.to_string());
-                        break;
-                    }
-                }
-                if selected_port.is_none() {
-                    warn!("No available ports for sending a transaction. Aborted.");
-                    continue;
-                }
-
-                let socket = peer.address.to_owned() + ":" + &selected_port.unwrap();
                 let frame =
                     messages::get_transaction_msg(peerid, peerid, get_example_transaction());
-                peer::send_transaction(frame, socket, peerid, peerid).await;
+                peer::send_transaction(frame, peer.address.to_owned(), peer.ports.to_owned()).await;
             }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");

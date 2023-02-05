@@ -35,7 +35,7 @@ pub struct Peer {
 enum Command {
     Get {
         key: String,
-        resp: Responder<Option<String>>,
+        resp: Responder<Vec<String>>,
         payload: Option<Vec<String>>,
     },
 }
@@ -59,7 +59,7 @@ async fn get_connection(ip: &str, ports: &[&str]) -> Connection {
     }
 
     if connection_wrapped.is_none() {
-        error!("Could not connect to any server port");
+        error!("Could not connect to any port");
         panic!();
     }
     return connection_wrapped.unwrap();
@@ -78,8 +78,13 @@ pub async fn send_peerid_query(msg: Frame) -> u32 {
     return response;
 }
 
-pub async fn send_ports_query(msg: Frame) -> (HashMap<u32, String>, HashMap<String, Vec<String>>) {
-    let mut connection = get_connection(SERVER_IP, SERVER_PORTS).await;
+pub async fn send_ports_query(
+    msg: Frame,
+    ip: String,
+    ports: Vec<String>,
+) -> (HashMap<u32, String>, HashMap<String, Vec<String>>) {
+    let ports: Vec<&str> = ports.iter().map(AsRef::as_ref).collect();
+    let mut connection = get_connection(&ip, ports.as_slice()).await;
     connection.write_frame(&msg).await.ok();
 
     let mut ip = None;
@@ -95,25 +100,10 @@ pub async fn send_ports_query(msg: Frame) -> (HashMap<u32, String>, HashMap<Stri
     return (ip.unwrap(), ports.unwrap());
 }
 
-pub async fn send_transaction(msg: Frame, addr: String, sourceid: u32, destid: u32) -> bool {
-    let stream = TcpStream::connect(&addr).await.unwrap();
-    info!("Successfully connected to {}", addr);
-    let mut connection = Connection::new(stream);
-
+pub async fn send_transaction(msg: Frame, ip: String, ports: Vec<String>) {
+    let ports: Vec<&str> = ports.iter().map(AsRef::as_ref).collect();
+    let mut connection = get_connection(&ip, ports.as_slice()).await;
     connection.write_frame(&msg).await.ok();
-    if let Some(frame) = connection.read_frame().await.unwrap() {
-        let (cmd, sourceid, destid) = decoder::decode_command(&frame);
-        if cmd != "ACK" || sourceid != destid || destid != sourceid {
-            warn!(
-                "Received invalid acknowledgement {} {} {}",
-                cmd != "ACK",
-                sourceid != destid,
-                destid != sourceid
-            );
-            return false;
-        };
-    }
-    return true;
 }
 
 impl Peer {
@@ -154,8 +144,13 @@ impl Peer {
         // We need to ensure all our ports are available. If not we need to change them.
         // Query the server
         peer.set_ports().await;
-        let msg = messages::get_ports_query(peer.peerid, peer.ports.clone());
-        let (ipmap, portmap) = send_ports_query(msg).await;
+        let msg = messages::get_ports_query(peer.peerid, 1, peer.ports.clone());
+        let (ipmap, portmap) = send_ports_query(
+            msg,
+            SERVER_IP.to_owned(),
+            SERVER_PORTS.iter().map(|&s| s.into()).collect(),
+        )
+        .await;
         for (id, ip) in ipmap {
             peer.ip_map.insert(id, ip);
         }
@@ -168,13 +163,43 @@ impl Peer {
         return peer;
     }
 
-    async fn peer_manager(peer: Peer, mut rx: Receiver<Command>) {
+    async fn peer_manager(mut peer: Peer, mut rx: Receiver<Command>) {
         loop {
             let command = rx.recv().await.unwrap();
             match command {
                 Command::Get { key, resp, payload } => {
                     if key.as_str() == "transaction" {
-                        resp.send(Ok(Some(String::from("Received!"))));
+                        resp.send(Ok(Vec::from([String::from("Received!")]))).ok();
+                    } else if key.as_str() == "ports_query" {
+                        if payload.is_none() {
+                            error!("Invalid command: missing payload");
+                            panic!();
+                        }
+
+                        let payload_vec = payload.unwrap();
+                        if payload_vec.len() <= 2 {
+                            error!("Invalid command: payload is of unexpected size");
+                            panic!();
+                        }
+
+                        let sourceid: u32 = payload_vec[0].parse().unwrap();
+                        let ip = payload_vec[1].clone();
+
+                        // Update the server ip_map and port_map
+                        peer.ip_map.insert(sourceid, ip.clone());
+                        peer.port_map.insert(ip.clone(), payload_vec[2..].to_vec());
+
+                        let response_vector = vec![
+                            serde_json::to_string(&peer.ip_map)
+                                .expect("Failed to serialize ip map"),
+                            serde_json::to_string(&peer.port_map)
+                                .expect("Failed to serialize port map"),
+                        ];
+                        resp.send(Ok(response_vector)).ok();
+                        Peer::save_peer(&peer);
+                    } else {
+                        warn!("invalid command for peer");
+                        return;
                     }
                 }
             }
@@ -214,6 +239,7 @@ impl Peer {
         tx: Sender<Command>,
         peerid: u32,
     ) {
+        let ip = stream.peer_addr().unwrap().ip().to_string();
         let mut connection = Connection::new(stream);
         loop {
             match connection.read_frame().await {
@@ -229,7 +255,7 @@ impl Peer {
                         }
                         let (resp_tx, resp_rx) = oneshot::channel();
                         if command == "transaction" {
-                            let transaction: Transaction = decoder::decode_transactions_msg(frame)
+                            let _transaction: Transaction = decoder::decode_transactions_msg(frame)
                                 .expect("Cannot decode frame as transaction frame");
                             cmd = Command::Get {
                                 key: command,
@@ -237,11 +263,44 @@ impl Peer {
                                 payload: None,
                             };
                             tx.send(cmd).await.ok();
-                            let result = resp_rx.await;
-                            let response = messages::get_ack_msg(destid, sourceid);
+                            let _result = resp_rx.await;
+                        } else if command == "ports_query" {
+                            let mut ports = decoder::decode_ports_query(&frame);
+                            if ports.is_empty() {
+                                error!("No ports found when decoding ports query");
+                                panic!();
+                            }
+
+                            let mut payload_vec = Vec::new();
+                            payload_vec.push(sourceid.to_string());
+                            payload_vec.push(ip.clone());
+                            payload_vec.append(&mut ports);
+                            cmd = Command::Get {
+                                key: command,
+                                resp: resp_tx,
+                                payload: Some(payload_vec),
+                            };
+                            tx.send(cmd).await.ok();
+
+                            let result = resp_rx.await.unwrap().unwrap();
+                            if result.is_empty() {
+                                error!("Empty result from peer");
+                                panic!();
+                            }
+                            let ip_map_json = result[0].to_owned();
+                            let port_map_json = result[1].to_owned();
+                            info!("Sending ip_map: {:?}", ip_map_json);
+                            info!("Sending port_map: {:?}", port_map_json);
+
+                            let response = messages::get_ports_response(
+                                sourceid,
+                                1,
+                                ip_map_json,
+                                port_map_json,
+                            );
                             connection.write_frame(&response).await.ok();
                         } else {
-                            warn!("invalid command for server");
+                            warn!("invalid command for peer");
                             return;
                         }
                     }
@@ -268,10 +327,12 @@ impl Peer {
     pub async fn set_ports(&mut self) {
         // Update any set ports that are unavailable
         for i in 0..self.ports.len() {
-            if !scan_port(self.ports[i].parse::<u16>().unwrap()) {
-                info!("Port {} if unavailable. Setting new port...", i);
+            let socket = self.address.clone() + ":" + &self.ports[i];
+            let conn = TcpStream::connect(&socket).await;
+            if conn.is_err() {
+                info!("Port {} is unavailable. Setting new port...", i);
                 self.ports[i] = self.set_new_port().await;
-            }
+            };
         }
 
         // Add new ports until there are `NUM_PORTS` ports
