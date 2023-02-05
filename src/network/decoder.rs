@@ -13,7 +13,6 @@ static COMMANDS: phf::Map<&'static str, &'static str> = phf_map! {
     "00000011" => "ports_response",
     "00000100" => "termination",
     "00000101" => "transaction",
-    "00000110" => "ACK",
 };
 
 pub fn decode_command(msg: &Frame) -> (String, u32, u32) {

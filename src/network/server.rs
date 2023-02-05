@@ -68,44 +68,46 @@ impl Server {
                     if key.as_str() == "id_query" {
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
-                        } else {
-                            let payload_vec = payload.unwrap();
-                            if payload_vec.len() != 1 {
-                                error!("Invalid command: payload is of unexpected size");
-                            }
-                            resp.send(Ok(Vec::from([server.next_peerid.to_string()])))
-                                .ok();
-                            server.next_peerid += 1;
-                            Server::save_server(&server);
+                            panic!();
                         }
+
+                        let payload_vec = payload.unwrap();
+                        if payload_vec.len() != 1 {
+                            error!("Invalid command: payload is of unexpected size");
+                            panic!();
+                        }
+
+                        resp.send(Ok(Vec::from([server.next_peerid.to_string()])))
+                            .ok();
+                        server.next_peerid += 1;
+                        Server::save_server(&server);
                     } else if key.as_str() == "ports_query" {
-                        if payload.is_none() {
-                            error!("Invalid command: missing payload");
-                        } else {
-                            let payload_vec = payload.unwrap();
-                            if payload_vec.len() <= 2 {
-                                error!("Invalid command: payload is of unexpected size");
-                            }
-
-                            let sourceid: u32 = payload_vec[0].parse().unwrap();
-                            let ip = payload_vec[1].clone();
-
-                            // Update the server ip_map and port_map
-                            server.peer.ip_map.insert(sourceid, ip.clone());
-                            server
-                                .peer
-                                .port_map
-                                .insert(ip.clone(), payload_vec[2..].to_vec());
-
-                            let response_vector = vec![
-                                serde_json::to_string(&server.peer.ip_map)
-                                    .expect("Failed to serialize ip map"),
-                                serde_json::to_string(&server.peer.port_map)
-                                    .expect("Failed to serialize port map"),
-                            ];
-                            resp.send(Ok(response_vector)).ok();
-                            Server::save_server(&server);
+                        let payload_vec = payload.unwrap();
+                        if payload_vec.len() <= 2 {
+                            error!("Invalid command: payload is of unexpected size");
                         }
+
+                        let sourceid: u32 = payload_vec[0].parse().unwrap();
+                        let ip = payload_vec[1].clone();
+
+                        // Update the server ip_map and port_map
+                        server.peer.ip_map.insert(sourceid, ip.clone());
+                        server
+                            .peer
+                            .port_map
+                            .insert(ip.clone(), payload_vec[2..].to_vec());
+
+                        let response_vector = vec![
+                            serde_json::to_string(&server.peer.ip_map)
+                                .expect("Failed to serialize ip map"),
+                            serde_json::to_string(&server.peer.port_map)
+                                .expect("Failed to serialize port map"),
+                        ];
+                        resp.send(Ok(response_vector)).ok();
+                        Server::save_server(&server);
+                    } else {
+                        warn!("invalid command for server");
+                        return;
                     }
                 }
             }
@@ -221,8 +223,12 @@ impl Server {
                             info!("Sending ip_map: {:?}", ip_map_json);
                             info!("Sending port_map: {:?}", port_map_json);
 
-                            let response =
-                                messages::get_ports_response(ip_map_json, port_map_json, sourceid);
+                            let response = messages::get_ports_response(
+                                destid,
+                                sourceid,
+                                ip_map_json,
+                                port_map_json,
+                            );
                             connection.write_frame(&response).await.ok();
                         } else {
                             warn!("invalid command for server");
