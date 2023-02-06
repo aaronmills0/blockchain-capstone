@@ -13,14 +13,14 @@ use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::{thread, time};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Block {
     pub header: BlockHeader,
     pub merkle: Merkle,
     pub transactions: Vec<Transaction>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct BlockHeader {
     pub previous_hash: String,
     pub merkle_root: String,

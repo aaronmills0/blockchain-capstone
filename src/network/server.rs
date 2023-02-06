@@ -1,4 +1,12 @@
-use crate::network::{decoder, messages};
+use crate::{
+    components::{
+        block::{Block, BlockHeader},
+        merkle::Merkle,
+        utxo::UTXO,
+    },
+    network::{decoder, messages},
+    utils::hash::hash_as_string,
+};
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use mini_redis::Connection;
@@ -40,7 +48,7 @@ type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
 
 impl Server {
     pub fn new() -> Server {
-        return Server {
+        let mut server = Server {
             peer: Peer {
                 address: local_ip()
                     .expect("Failed to obtain local ip address")
@@ -55,9 +63,25 @@ impl Server {
                 ],
                 ip_map: HashMap::new(),
                 port_map: HashMap::new(),
+                blockchain: vec![Block {
+                    header: BlockHeader {
+                        previous_hash: "0".repeat(32),
+                        merkle_root: "0".repeat(32),
+                        nonce: 0,
+                    },
+                    merkle: Merkle { tree: Vec::new() },
+                    transactions: Vec::new(),
+                }],
+                block_map: HashMap::new(),
+                utxo: UTXO(HashMap::new()),
             },
             next_peerid: 2,
         };
+        server
+            .peer
+            .block_map
+            .insert(hash_as_string(&server.peer.blockchain[0]), 0);
+        return server;
     }
 
     async fn server_manager(mut server: Server, mut rx: Receiver<Command>) {

@@ -1,10 +1,15 @@
+use crate::components::block::Block;
+use crate::components::block::BlockHeader;
+use crate::components::merkle::Merkle;
 use crate::components::transaction::Transaction;
+use crate::components::utxo::UTXO;
 use crate::network::decoder;
 use crate::network::messages;
+use crate::utils::hash::hash_as_string;
+use bitcoin::blockdata::block;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use mini_redis::{Connection, Frame};
-use port_scanner::scan_port;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
@@ -21,6 +26,7 @@ use tokio::sync::oneshot;
 static SERVER_IP: &str = "192.168.0.101";
 const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
 static NUM_PORTS: usize = 20;
+static BATCH_SIZE: usize = 128;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Peer {
@@ -29,6 +35,9 @@ pub struct Peer {
     pub ports: Vec<String>,
     pub ip_map: HashMap<u32, String>, // IP addresses of neighbors
     pub port_map: HashMap<String, Vec<String>>, // Ports used with IP addresses of neighbours
+    pub blockchain: Vec<Block>,       // Blocks
+    pub block_map: HashMap<String, usize>, // Map block hashes to indices in the blockchain for quick access.
+    pub utxo: UTXO,
 }
 
 #[derive(Debug)]
@@ -42,7 +51,7 @@ enum Command {
 
 type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
 
-async fn get_connection(ip: &str, ports: &[&str]) -> Connection {
+async fn get_connection(ip: &str, ports: &[&str]) -> Option<Connection> {
     let mut connection_wrapped: Option<Connection> = None;
     for port in ports {
         let socket = String::from(ip) + ":" + port;
@@ -60,13 +69,16 @@ async fn get_connection(ip: &str, ports: &[&str]) -> Connection {
 
     if connection_wrapped.is_none() {
         error!("Could not connect to any port");
-        panic!();
     }
-    return connection_wrapped.unwrap();
+    return connection_wrapped;
 }
 
 pub async fn send_peerid_query(msg: Frame) -> u32 {
-    let mut connection = get_connection(SERVER_IP, SERVER_PORTS).await;
+    let connection_opt = get_connection(SERVER_IP, SERVER_PORTS).await;
+    if connection_opt.is_none() {
+        panic!("Cannot connect to the server");
+    }
+    let mut connection = connection_opt.unwrap();
     connection.write_frame(&msg).await.ok();
 
     let mut response: u32 = 0;
@@ -84,7 +96,11 @@ pub async fn send_ports_query(
     ports: Vec<String>,
 ) -> (HashMap<u32, String>, HashMap<String, Vec<String>>) {
     let ports: Vec<&str> = ports.iter().map(AsRef::as_ref).collect();
-    let mut connection = get_connection(&ip, ports.as_slice()).await;
+    let connection_opt = get_connection(&ip, ports.as_slice()).await;
+    if connection_opt.is_none() {
+        panic!("Cannot connect to the server");
+    }
+    let mut connection = connection_opt.unwrap();
     connection.write_frame(&msg).await.ok();
 
     let mut ip = None;
@@ -102,19 +118,37 @@ pub async fn send_ports_query(
 
 pub async fn send_transaction(msg: Frame, ip: String, ports: Vec<String>) {
     let ports: Vec<&str> = ports.iter().map(AsRef::as_ref).collect();
-    let mut connection = get_connection(&ip, ports.as_slice()).await;
+    let connection_opt = get_connection(&ip, ports.as_slice()).await;
+    if connection_opt.is_none() {
+        panic!("Cannot connect to the server");
+    }
+    let mut connection = connection_opt.unwrap();
     connection.write_frame(&msg).await.ok();
 }
 
 impl Peer {
     pub fn new() -> Peer {
-        return Peer {
+        let mut peer = Peer {
             address: local_ip().expect("Failed to obtain local ip").to_string(),
             peerid: 0,
             ports: Vec::with_capacity(NUM_PORTS),
             ip_map: HashMap::new(),
             port_map: HashMap::new(),
+            blockchain: vec![Block {
+                header: BlockHeader {
+                    previous_hash: "0".repeat(32),
+                    merkle_root: "0".repeat(32),
+                    nonce: 0,
+                },
+                merkle: Merkle { tree: Vec::new() },
+                transactions: Vec::new(),
+            }],
+            block_map: HashMap::new(),
+            utxo: UTXO(HashMap::new()),
         };
+        peer.block_map
+            .insert(hash_as_string(&peer.blockchain[0]), 0);
+        return peer;
     }
 
     pub async fn launch() -> Peer {
@@ -197,6 +231,27 @@ impl Peer {
                         ];
                         resp.send(Ok(response_vector)).ok();
                         Peer::save_peer(&peer);
+                    } else if key.as_str() == "BD_query" {
+                        if payload.is_none() {
+                            error!("Invalid command: missing payload");
+                            panic!();
+                        }
+
+                        let payload_vec = payload.unwrap();
+                        if payload_vec.len() != 1 {
+                            error!("Invalid command: payload is of unexpected size");
+                            panic!();
+                        }
+                        let hash = payload_vec[0].to_owned();
+                        let response_vector: Vec<String>;
+                        if !peer.block_map.contains_key(&hash) {
+                            response_vector = Vec::new();
+                        } else {
+                            let index = peer.block_map[&hash];
+                            let blocks_ref = &peer.blockchain[index + 1..];
+                            response_vector = vec![serde_json::to_string(blocks_ref).unwrap()];
+                        }
+                        resp.send(Ok(response_vector)).ok();
                     } else {
                         warn!("invalid command for peer");
                         return;
@@ -294,11 +349,33 @@ impl Peer {
 
                             let response = messages::get_ports_response(
                                 sourceid,
-                                1,
+                                destid,
                                 ip_map_json,
                                 port_map_json,
                             );
                             connection.write_frame(&response).await.ok();
+                        } else if command == "BD_query" {
+                            let hash = decoder::decode_bd_query(frame);
+                            if hash.is_none() {
+                                let frame = messages::get_termination_msg(sourceid, destid);
+                                connection.write_frame(&frame).await.ok();
+                                return;
+                            }
+                            cmd = Command::Get {
+                                key: command,
+                                resp: resp_tx,
+                                payload: Some(vec![hash.unwrap()]),
+                            };
+                            tx.send(cmd).await.ok();
+                            let result = resp_rx.await;
+                            let blocks_json = result.unwrap().unwrap()[0].clone();
+                            let frame: Frame;
+                            if blocks_json.is_empty() {
+                                frame = messages::get_termination_msg(sourceid, destid)
+                            } else {
+                                frame = messages::get_bd_response(sourceid, destid, blocks_json);
+                            }
+                            connection.write_frame(&frame).await.ok();
                         } else {
                             warn!("invalid command for peer");
                             return;
@@ -340,6 +417,80 @@ impl Peer {
             let new_port = self.set_new_port().await;
             self.ports.push(new_port);
         }
+    }
+
+    pub async fn download_blocks(&mut self) -> bool {
+        let mut connection_opt: Option<Connection> = None;
+        let mut destid = 0;
+        for (id, ip) in &self.ip_map {
+            let ports: Vec<&str> = self.port_map[ip].iter().map(AsRef::as_ref).collect();
+            connection_opt = get_connection(ip, &ports).await;
+            if connection_opt.is_some() {
+                destid = *id;
+                break;
+            }
+        }
+
+        if connection_opt.is_none() {
+            panic!("Failed to connect to any peer");
+        }
+
+        let mut connection = connection_opt.unwrap();
+
+        let msg = messages::get_bd_query(
+            self.peerid,
+            destid,
+            hash_as_string(self.blockchain.last().unwrap()),
+        );
+
+        connection.write_frame(&msg).await.ok();
+
+        let mut blocks = Vec::new();
+        if let Some(frame) = connection.read_frame().await.unwrap() {
+            blocks = decoder::decode_bd_response(frame);
+        }
+        let mut utxo_option = None;
+        for block in &blocks {
+            let valid;
+            (valid, utxo_option) = self.verify_block(block);
+            if !valid {
+                error!("One of the blocks received is invalid");
+                return false;
+            }
+        }
+        self.utxo = utxo_option.unwrap();
+        for block in blocks {
+            self.block_map
+                .insert(hash_as_string(&block), self.blockchain.len());
+            self.blockchain.push(block);
+        }
+        return true;
+    }
+
+    pub fn verify_block(&self, block: &Block) -> (bool, Option<UTXO>) {
+        if block.header.previous_hash != hash_as_string(&self.blockchain.last().unwrap()) {
+            return (false, None);
+        }
+
+        let merkle_tree = Merkle::create_merkle_tree(&block.transactions);
+
+        if !merkle_tree
+            .tree
+            .first()
+            .unwrap()
+            .eq(&block.header.merkle_root)
+        {
+            return (false, None);
+        }
+
+        let (valid, utxo_option) = self
+            .utxo
+            .parallel_batch_verify_and_update(&block.transactions, BATCH_SIZE);
+        if !valid {
+            warn!("Received invalid block");
+            return (false, None);
+        }
+        return (true, utxo_option);
     }
 
     pub fn shutdown(peer: Peer) {
