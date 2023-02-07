@@ -5,6 +5,7 @@ use crate::components::transaction::Transaction;
 use crate::components::utxo::UTXO;
 use crate::network::decoder;
 use crate::network::messages;
+use crate::performance_tests::single_peer_throughput::test_single_peer_tx_throughput_receiver;
 use crate::utils::hash::hash_as_string;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
@@ -270,6 +271,7 @@ impl Peer {
                         let tx: Transaction = serde_json::from_str(&payload_vec[0])
                             .expect("Could not deserialize string to transaction.");
                         mempool.insert(hash_as_string(&tx), tx.to_owned());
+                        info!("{} transactions in memory pool", mempool.keys().len())
                     } else if key.as_str() == "ports_query" {
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
