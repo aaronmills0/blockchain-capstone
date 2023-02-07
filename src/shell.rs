@@ -2,7 +2,7 @@ use crate::components::transaction::{
     Outpoint, PublicKeyScript, SignatureScript, Transaction, TxIn, TxOut,
 };
 use crate::network::messages;
-use crate::network::peer::{self, Peer, Command};
+use crate::network::peer::{self, Command, Peer};
 use crate::simulation::start;
 use crate::utils::graph::create_block_graph;
 use crate::utils::hash;
@@ -12,7 +12,6 @@ use chrono::Local;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use port_scanner::scan_port;
-use tokio::sync::oneshot;
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
@@ -21,6 +20,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::thread;
 use std::{env, fs, io};
+use tokio::sync::oneshot;
 
 static mut SIM_STATUS: bool = false;
 
@@ -103,7 +103,7 @@ pub async fn shell() {
             "transaction" | "tx" | "-t" => {
                 let (resp_tx, resp_rx) = oneshot::channel();
                 let (resp_tx_1, resp_rx_1) = oneshot::channel();
-                
+
                 let cmd = Command::Get {
                     key: String::from("id_query"),
                     resp: resp_tx,
@@ -112,7 +112,7 @@ pub async fn shell() {
                     key: String::from("ports_query"),
                     resp: resp_tx_1,
                 };
-                
+
                 tx_to_manager.send(cmd).await.ok();
                 tx_to_manager.send(cmd1).await.ok();
 
@@ -127,7 +127,7 @@ pub async fn shell() {
                     error!("Empty result from peer");
                     panic!();
                 }
-                
+
                 let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
                 let ports: Vec<String> = serde_json::from_str(&result1[0]).unwrap();
 
@@ -138,7 +138,7 @@ pub async fn shell() {
             }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");
-                //Peer::shutdown(peer);
+                // Peer::shutdown(peer_copy);
                 write_log();
                 exit(0);
             }
