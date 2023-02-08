@@ -3,6 +3,7 @@ use crate::components::transaction::{
 };
 use crate::network::messages;
 use crate::network::peer::{self, Command, Peer};
+use crate::performance_tests::single_peer_throughput::test_single_peer_tx_throughput_sender;
 use crate::simulation::start;
 use crate::utils::graph::create_block_graph;
 use crate::utils::hash;
@@ -16,13 +17,49 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
 use std::process::exit;
-use std::sync::mpsc;
-use std::sync::mpsc::Sender;
 use std::thread;
 use std::{env, fs, io};
+use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
 static mut SIM_STATUS: bool = false;
+
+async fn get_peer_info(
+    tx_to_manager: &Sender<Command>,
+) -> (u32, HashMap<u32, String>, HashMap<String, Vec<String>>) {
+    let (resp_tx, resp_rx) = oneshot::channel();
+    let (resp_tx_1, resp_rx_1) = oneshot::channel();
+
+    let cmd = Command::Get {
+        key: String::from("id_query"),
+        resp: resp_tx,
+    };
+    let cmd1 = Command::Get {
+        key: String::from("ports_query"),
+        resp: resp_tx_1,
+    };
+
+    tx_to_manager.send(cmd).await.ok();
+    tx_to_manager.send(cmd1).await.ok();
+
+    let result = resp_rx.await.unwrap().unwrap();
+    let result1 = resp_rx_1.await.unwrap().unwrap();
+
+    if result.is_empty() {
+        error!("Empty result from peer");
+        panic!();
+    }
+    if result1.is_empty() {
+        error!("Empty result from peer");
+        panic!();
+    }
+
+    let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
+    let ip_map: HashMap<u32, String> = serde_json::from_str(&result1[0]).unwrap();
+    let ports_map: HashMap<String, Vec<String>> = serde_json::from_str(&result1[1]).unwrap();
+
+    return (peerid, ip_map, ports_map);
+}
 
 pub async fn shell() {
     let mut tx_sim_option: Option<Sender<String>> = None;
@@ -101,40 +138,52 @@ pub async fn shell() {
                 }
             }
             "transaction" | "tx" | "-t" => {
-                let (resp_tx, resp_rx) = oneshot::channel();
-                let (resp_tx_1, resp_rx_1) = oneshot::channel();
-
-                let cmd = Command::Get {
-                    key: String::from("id_query"),
-                    resp: resp_tx,
-                };
-                let cmd1 = Command::Get {
-                    key: String::from("ports_query"),
-                    resp: resp_tx_1,
-                };
-
-                tx_to_manager.send(cmd).await.ok();
-                tx_to_manager.send(cmd1).await.ok();
-
-                let result = resp_rx.await.unwrap().unwrap();
-                let result1 = resp_rx_1.await.unwrap().unwrap();
-
-                if result.is_empty() {
-                    error!("Empty result from peer");
-                    panic!();
-                }
-                if result1.is_empty() {
-                    error!("Empty result from peer");
-                    panic!();
-                }
-
-                let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
-                let ports: Vec<String> = serde_json::from_str(&result1[0]).unwrap();
+                let (peerid, _, ports_map) = get_peer_info(&tx_to_manager).await;
 
                 let local_ip = local_ip().unwrap().to_string();
+                let ports = ports_map.get(&local_ip).unwrap();
                 let frame =
                     messages::get_transaction_msg(peerid, peerid, get_example_transaction());
                 peer::send_transaction(frame, local_ip, ports.to_owned()).await;
+            }
+            "tx_test" => {
+                info!("Please enter a receiver id path:");
+                let mut id_str = String::new();
+                io::stdin()
+                    .read_line(&mut id_str)
+                    .expect("Failed to read line");
+                let trimmed_id = id_str.trim();
+                let receiver_id = match trimmed_id.parse::<u32>() {
+                    Ok(i) => i,
+                    Err(..) => {
+                        error!("Receiver id needs to be a u32");
+                        panic!();
+                    }
+                };
+
+                info!("Please enter a frequency for sending transactions in microseconds:");
+                let mut dur_str = String::new();
+                io::stdin()
+                    .read_line(&mut dur_str)
+                    .expect("Failed to read line");
+                let trimmed_dur = dur_str.trim();
+                let duration = match trimmed_dur.parse::<u64>() {
+                    Ok(i) => i,
+                    Err(..) => {
+                        error!("Receiver id needs to be a u64");
+                        panic!();
+                    }
+                };
+
+                let (peerid, ip_map, ports_map) = get_peer_info(&tx_to_manager).await;
+                test_single_peer_tx_throughput_sender(
+                    peerid,
+                    ip_map,
+                    ports_map,
+                    receiver_id,
+                    duration,
+                )
+                .await;
             }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");
