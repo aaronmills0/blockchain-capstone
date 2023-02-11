@@ -24,43 +24,6 @@ use tokio::sync::oneshot;
 
 static mut SIM_STATUS: bool = false;
 
-async fn get_peer_info(
-    tx_to_manager: &Sender<Command>,
-) -> (u32, HashMap<u32, String>, HashMap<String, Vec<String>>) {
-    let (resp_tx, resp_rx) = oneshot::channel();
-    let (resp_tx_1, resp_rx_1) = oneshot::channel();
-
-    let cmd = Command::Get {
-        key: String::from("id_query"),
-        resp: resp_tx,
-    };
-    let cmd1 = Command::Get {
-        key: String::from("ports_query"),
-        resp: resp_tx_1,
-    };
-
-    tx_to_manager.send(cmd).await.ok();
-    tx_to_manager.send(cmd1).await.ok();
-
-    let result = resp_rx.await.unwrap().unwrap();
-    let result1 = resp_rx_1.await.unwrap().unwrap();
-
-    if result.is_empty() {
-        error!("Empty result from peer");
-        panic!();
-    }
-    if result1.is_empty() {
-        error!("Empty result from peer");
-        panic!();
-    }
-
-    let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
-    let ip_map: HashMap<u32, String> = serde_json::from_str(&result1[0]).unwrap();
-    let ports_map: HashMap<String, Vec<String>> = serde_json::from_str(&result1[1]).unwrap();
-
-    return (peerid, ip_map, ports_map);
-}
-
 pub async fn shell() {
     let mut tx_sim_option: Option<Sender<String>> = None;
     let tx_to_manager = Peer::launch().await;
@@ -138,16 +101,15 @@ pub async fn shell() {
                 }
             }
             "transaction" | "tx" | "-t" => {
-                let (peerid, _, ports_map) = get_peer_info(&tx_to_manager).await;
+                let (peerid, ports, _, _) = Peer::get_peer_info(&tx_to_manager).await;
 
                 let local_ip = local_ip().unwrap().to_string();
-                let ports = ports_map.get(&local_ip).unwrap();
                 let frame =
                     messages::get_transaction_msg(peerid, peerid, get_example_transaction());
                 peer::send_transaction(frame, local_ip, ports.to_owned()).await;
             }
             "tx_test" => {
-                info!("Please enter a receiver id path:");
+                info!("Please enter a receiver id:");
                 let mut id_str = String::new();
                 io::stdin()
                     .read_line(&mut id_str)
@@ -161,7 +123,7 @@ pub async fn shell() {
                     }
                 };
 
-                info!("Please enter a frequency for sending transactions in microseconds:");
+                info!("Please enter a period between sending transactions in microseconds:");
                 let mut dur_str = String::new();
                 io::stdin()
                     .read_line(&mut dur_str)
@@ -170,12 +132,12 @@ pub async fn shell() {
                 let duration = match trimmed_dur.parse::<u64>() {
                     Ok(i) => i,
                     Err(..) => {
-                        error!("Receiver id needs to be a u64");
+                        error!("Period needs to be a u64");
                         panic!();
                     }
                 };
 
-                let (peerid, ip_map, ports_map) = get_peer_info(&tx_to_manager).await;
+                let (peerid, _, ip_map, ports_map) = Peer::get_peer_info(&tx_to_manager).await;
                 test_single_peer_tx_throughput_sender(
                     peerid,
                     ip_map,

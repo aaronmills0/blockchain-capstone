@@ -5,7 +5,6 @@ use crate::components::transaction::Transaction;
 use crate::components::utxo::UTXO;
 use crate::network::decoder;
 use crate::network::messages;
-use crate::performance_tests::single_peer_throughput::test_single_peer_tx_throughput_receiver;
 use crate::utils::hash::hash_as_string;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
@@ -24,7 +23,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-static SERVER_IP: &str = "192.168.0.12";
+static SERVER_IP: &str = "192.168.0.101";
 const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
 static NUM_PORTS: usize = 20;
 static BATCH_SIZE: usize = 128;
@@ -71,7 +70,7 @@ pub enum Command {
 
 type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
 
-async fn get_connection(ip: &str, ports: &[&str]) -> Option<Connection> {
+pub async fn get_connection(ip: &str, ports: &[&str]) -> Option<Connection> {
     let mut connection_wrapped: Option<Connection> = None;
     for port in ports {
         let socket = String::from(ip) + ":" + port;
@@ -251,6 +250,35 @@ impl Peer {
         return tx.clone();
     }
 
+    pub async fn get_peer_info(
+        tx_to_manager: &Sender<Command>,
+    ) -> (
+        u32,
+        Vec<String>,
+        HashMap<u32, String>,
+        HashMap<String, Vec<String>>,
+    ) {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        let cmd = Command::Get {
+            key: String::from("all"),
+            resp: resp_tx,
+        };
+        tx_to_manager.send(cmd).await.ok();
+
+        let result = resp_rx.await.unwrap().unwrap();
+        if result.is_empty() {
+            error!("Empty result from peer");
+            panic!();
+        }
+
+        let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
+        let ports: Vec<String> = serde_json::from_str(&result[1]).unwrap();
+        let ip_map: HashMap<u32, String> = serde_json::from_str(&result[2]).unwrap();
+        let ports_map: HashMap<String, Vec<String>> = serde_json::from_str(&result[3]).unwrap();
+
+        return (peerid, ports, ip_map, ports_map);
+    }
+
     async fn peer_manager(mut peer: Peer, mut rx: Receiver<Command>) {
         let mut mempool = MemPool(HashMap::new());
         loop {
@@ -326,23 +354,41 @@ impl Peer {
                     }
                 }
                 Command::Get { key, resp } => {
-                    if key.as_str() == "ports_query" {
-                        let response_vector =
+                    let response_vector: Vec<String> = match key.as_str() {
+                        "id_query" => {
+                            vec![serde_json::to_string(&peer.peerid)
+                                .expect("Failed to serialize id")]
+                        }
+                        "ports_query" => {
                             vec![serde_json::to_string(&peer.ports)
-                                .expect("Failed to serialize ports")];
-                        resp.send(Ok(response_vector)).ok();
-                    } else if key.as_str() == "ip_map_query" {
-                        let response_vector = vec![serde_json::to_string(&peer.ip_map)
-                            .expect("Failed to serialize ip map")];
-                        resp.send(Ok(response_vector)).ok();
-                    } else if key.as_str() == "id_query" {
-                        let response_vector = vec![serde_json::to_string(&peer.peerid)
-                            .expect("Failed to serialize ip map")];
-                        resp.send(Ok(response_vector)).ok();
-                    } else {
-                        warn!("invalid command for peer");
-                        return;
-                    }
+                                .expect("Failed to serialize ports")]
+                        }
+                        "ip_map_query" => {
+                            vec![serde_json::to_string(&peer.ip_map)
+                                .expect("Failed to serialize ip map")]
+                        }
+                        "ports_map_query" => {
+                            vec![serde_json::to_string(&peer.port_map)
+                                .expect("Failed to serialize port map")]
+                        }
+                        "all" => {
+                            vec![
+                                serde_json::to_string(&peer.peerid)
+                                    .expect("Failed to serialize id"),
+                                serde_json::to_string(&peer.ports)
+                                    .expect("Failed to serialize ports"),
+                                serde_json::to_string(&peer.ip_map)
+                                    .expect("Failed to serialize ip map"),
+                                serde_json::to_string(&peer.port_map)
+                                    .expect("Failed to serialize port map"),
+                            ]
+                        }
+                        _ => {
+                            warn!("invalid command for peer");
+                            return;
+                        }
+                    };
+                    resp.send(Ok(response_vector)).ok();
                 }
             }
         }

@@ -98,17 +98,6 @@ pub fn get_transaction_msg(sourceid: u32, destid: u32, tx: Transaction) -> Frame
     return Frame::Array(response_vec);
 }
 
-pub fn get_transaction_response(sourceid: u32, destid: u32, response: String) -> Frame {
-    let mut response_vec: Vec<Frame> = Vec::new();
-
-    let header_frame = get_header(sourceid, destid, String::from("00000110"));
-    response_vec.push(header_frame);
-
-    let message_frame = Frame::Bulk(Bytes::from(response));
-    response_vec.push(message_frame);
-    return Frame::Array(response_vec);
-}
-
 /**
  * Pass the hash of the head of the current chain to receive the remainder of the chain
  * Upon initialization, send the hash of the genesis block
@@ -116,7 +105,7 @@ pub fn get_transaction_response(sourceid: u32, destid: u32, response: String) ->
 pub fn get_bd_query(sourceid: u32, destid: u32, head_hash: String) -> Frame {
     let mut response_vec: Vec<Frame> = Vec::new();
 
-    let header_frame = get_header(sourceid, destid, String::from("00000111"));
+    let header_frame = get_header(sourceid, destid, String::from("00000110"));
     response_vec.push(header_frame);
 
     let payload = Frame::Bulk(Bytes::from(head_hash));
@@ -127,7 +116,7 @@ pub fn get_bd_query(sourceid: u32, destid: u32, head_hash: String) -> Frame {
 pub fn get_bd_response(sourceid: u32, destid: u32, blocks_json: String) -> Frame {
     let mut response_vec: Vec<Frame> = Vec::new();
 
-    let header_frame = get_header(sourceid, destid, String::from("00001000"));
+    let header_frame = get_header(sourceid, destid, String::from("00000111"));
     response_vec.push(header_frame);
 
     let blocks_frame = Frame::Bulk(Bytes::from(blocks_json));
