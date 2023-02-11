@@ -482,7 +482,7 @@ impl Peer {
                             vec![serde_json::to_string(&peer.ip_map)
                                 .expect("Failed to serialize ip map")]
                         }
-                        "port_map_query" => {
+                        "ports_map_query" => {
                             vec![serde_json::to_string(&peer.port_map)
                                 .expect("Failed to serialize port map")]
                         }

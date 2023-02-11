@@ -151,7 +151,7 @@ pub async fn shell(is_miner: bool) {
                 let (id, _, ip_map, port_map) = Peer::get_peer_info(&tx_to_manager).await;
             }
             "tx_test" => {
-                info!("Please enter a receiver id path:");
+                info!("Please enter a receiver id:");
                 let mut id_str = String::new();
                 io::stdin()
                     .read_line(&mut id_str)
@@ -165,7 +165,7 @@ pub async fn shell(is_miner: bool) {
                     }
                 };
 
-                info!("Please enter a frequency for sending transactions in microseconds:");
+                info!("Please enter a period between sending transactions in microseconds:");
                 let mut dur_str = String::new();
                 io::stdin()
                     .read_line(&mut dur_str)
@@ -174,12 +174,12 @@ pub async fn shell(is_miner: bool) {
                 let duration = match trimmed_dur.parse::<u64>() {
                     Ok(i) => i,
                     Err(..) => {
-                        error!("Receiver id needs to be a u64");
+                        error!("Period needs to be a u64");
                         panic!();
                     }
                 };
 
-                let (peerid, ip_map, ports_map) = get_peer_info(&tx_to_manager).await;
+                let (peerid, _, ip_map, ports_map) = Peer::get_peer_info(&tx_to_manager).await;
                 test_single_peer_tx_throughput_sender(
                     peerid,
                     ip_map,
