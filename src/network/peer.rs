@@ -6,14 +6,15 @@ use crate::components::utxo::UTXO;
 use crate::network::decoder;
 use crate::network::messages;
 use crate::utils::hash::hash_as_string;
-use bitcoin::blockdata::block;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use mini_redis::{Connection, Frame};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use serde_with::serde_as;
 use std::collections::HashMap;
 use std::io::Write;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use std::{env, fs};
 use std::{fs::File, io, path::Path};
@@ -38,6 +39,23 @@ pub struct Peer {
     pub blockchain: Vec<Block>,       // Blocks
     pub block_map: HashMap<String, usize>, // Map block hashes to indices in the blockchain for quick access.
     pub utxo: UTXO,
+}
+
+#[serde_as]
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct MemPool(#[serde_as(as = "Vec<(_, _)>")] pub HashMap<String, Transaction>);
+
+impl Deref for MemPool {
+    type Target = HashMap<String, Transaction>;
+    fn deref(&self) -> &HashMap<String, Transaction> {
+        return &self.0;
+    }
+}
+
+impl DerefMut for MemPool {
+    fn deref_mut(&mut self) -> &mut HashMap<String, Transaction> {
+        return &mut self.0;
+    }
 }
 
 #[derive(Debug)]
@@ -198,12 +216,25 @@ impl Peer {
     }
 
     async fn peer_manager(mut peer: Peer, mut rx: Receiver<Command>) {
+        let mut mempool = MemPool(HashMap::new());
         loop {
             let command = rx.recv().await.unwrap();
             match command {
                 Command::Get { key, resp, payload } => {
                     if key.as_str() == "transaction" {
-                        resp.send(Ok(Vec::from([String::from("Received!")]))).ok();
+                        if payload.is_none() {
+                            error!("Invalid command: missing payload");
+                            panic!();
+                        }
+
+                        let payload_vec = payload.unwrap();
+                        if payload_vec.len() != 1 {
+                            error!("Invalid command: payload is of unexpected size");
+                            panic!();
+                        }
+                        let tx: Transaction = serde_json::from_str(&payload_vec[0])
+                            .expect("Could not deserialize string to transaction.");
+                        mempool.insert(hash_as_string(&tx), tx.to_owned());
                     } else if key.as_str() == "ports_query" {
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
@@ -310,15 +341,17 @@ impl Peer {
                         }
                         let (resp_tx, resp_rx) = oneshot::channel();
                         if command == "transaction" {
-                            let _transaction: Transaction = decoder::decode_transactions_msg(frame)
-                                .expect("Cannot decode frame as transaction frame");
+                            let json = decoder::decode_transactions_msg(frame);
+                            if json.is_none() {
+                                error!("Missing transaction");
+                                panic!()
+                            }
                             cmd = Command::Get {
                                 key: command,
                                 resp: resp_tx,
-                                payload: None,
+                                payload: Some(vec![json.unwrap()]),
                             };
                             tx.send(cmd).await.ok();
-                            let _result = resp_rx.await;
                         } else if command == "ports_query" {
                             let mut ports = decoder::decode_ports_query(&frame);
                             if ports.is_empty() {

@@ -2,7 +2,7 @@ use log::warn;
 use mini_redis::Frame;
 use phf::phf_map;
 use serde_json;
-use std::collections::HashMap;
+use std::{collections::HashMap, iter::empty};
 
 use crate::components::{block::Block, transaction::Transaction};
 
@@ -119,16 +119,14 @@ pub fn decode_ports_response(
     return (ip_map, port_map);
 }
 
-pub fn decode_transactions_msg(msg: Frame) -> Option<Transaction> {
-    let mut tx = None;
+pub fn decode_transactions_msg(msg: Frame) -> Option<String> {
     let array_maker: Vec<u8>;
-    let json: String;
+    let mut json = None;
     match msg {
         Frame::Array(x) => match &x[1] {
             Frame::Bulk(b) => {
                 array_maker = b.to_vec();
-                json = String::from_utf8(array_maker).expect("invalid utf-8 sequence");
-                tx = Some(serde_json::from_str(&json).expect("failed to convert from json"));
+                json = Some(String::from_utf8(array_maker).expect("invalid utf-8 sequence"));
             }
 
             _ => warn!("Wrong formatting for response"),
@@ -136,7 +134,7 @@ pub fn decode_transactions_msg(msg: Frame) -> Option<Transaction> {
 
         _ => warn!("Wrong formatting for response"),
     };
-    return tx;
+    return json;
 }
 
 pub fn decode_bd_query(msg: Frame) -> Option<String> {
