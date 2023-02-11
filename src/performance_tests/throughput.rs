@@ -5,6 +5,7 @@ mod tests {
     use crate::simulation::KeyMap;
     use crate::utils::sign_and_verify::Verifier;
     use crate::utils::{hash, sign_and_verify};
+    use csv::Error;
     use rand_1::rngs::ThreadRng;
     use std::collections::HashMap;
     use std::time::Instant;
@@ -12,6 +13,17 @@ mod tests {
     fn test_tx_throughput(flag: usize) {
         let base: u32 = 2;
         let mut multiplicative_index: u32;
+
+        let mut writer = csv::Writer::from_path("speedup_data.csv").unwrap();
+        writer.write_record(&[
+            "Number of transactions",
+            "S (number of threads)",
+            "P (share of parallelized program)",
+            "Time in ms",
+            "Expected Amdhal Speedup",
+            "Real Speedup",
+        ]);
+
         for r in 0..5 {
             for k in 0..20 {
                 // val is the number of transactions to be used. For parallel verification, it is also the batch size.
@@ -71,8 +83,11 @@ mod tests {
                     // then the number of iterations is log(16)=4 for 5 batch sizes (1,2,4,8,16)
                     let max_base = val.ilog2();
                     let new_base: u32 = 2;
+                    // P is the parallellized share of the program
+                    let mut P: f32 = 0.0;
+                    let mut sequential_time: f32 = 0.0;
 
-                    for b in 0..max_base + 1 {
+                    for b in (0..max_base + 1).rev() {
                         let exponential = new_base.pow(b.try_into().unwrap());
                         let mut batch_size = 0;
 
@@ -85,15 +100,36 @@ mod tests {
                         };
 
                         start = Instant::now();
-                        let (result, _) = utxo_copy
+                        let (result, _, share_parallelized_program, full_duration) = utxo_copy
                             .parallel_batch_verify_and_update(&transactions, batch_size as usize);
                         assert!(result);
                         let duration = start.elapsed();
 
+                        let number_of_threads = val / batch_size;
+
+                        if number_of_threads == 1 {
+                            P = share_parallelized_program;
+                            sequential_time = full_duration as f32;
+                        }
+
                         println!(
                             "Time elapsed for {:#} transactions in Run {:#} for batch size {:#} is: {:?}. The number of threads is {:?}.",
-                            val, r, batch_size, duration, val/batch_size
+                            val, r, batch_size, duration, number_of_threads
                         );
+
+                        let expected_speedup: f32 =
+                            1.0 / ((1.0 - P) + (P / number_of_threads as f32));
+                        let real_speedup: f32 = sequential_time / (full_duration as f32);
+
+                        writer.write_record(&[
+                            val.to_string(),
+                            number_of_threads.to_string(),
+                            P.to_string(),
+                            full_duration.to_string(),
+                            expected_speedup.to_string(),
+                            real_speedup.to_string(),
+                        ]);
+                        writer.flush();
                         println!();
                     }
                     continue;

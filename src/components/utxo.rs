@@ -191,7 +191,7 @@ impl UTXO {
         &self,
         transactions: &Vec<Transaction>,
         batch_size: usize,
-    ) -> (bool, Option<UTXO>) {
+    ) -> (bool, Option<UTXO>, f32, u128) {
         let start_full = Instant::now();
         let mut utxo: UTXO = self.clone();
         let mut incoming_balance: u32;
@@ -212,7 +212,7 @@ impl UTXO {
                         "Discarding invalid transaction! UTXO does not contain unspent outpoint: {:#?}",
                         &tx_in.outpoint
                     );
-                    return (false, None);
+                    return (false, None, 0 as f32, 0 as u128);
                 }
                 // Get the transaction output, add its value to the incoming balance
                 // Store the TxIn, TxOut pair in in_out_pairs for verification later
@@ -239,7 +239,7 @@ impl UTXO {
                 warn!(
                     "Discarding invalid transaction! The total available balance cannot support this transaction."
                 );
-                return (false, None);
+                return (false, None, 0 as f32, 0 as u128);
             }
             // Update the utxo copy even though signature has not been checked yet
             utxo.update(&transaction);
@@ -275,30 +275,51 @@ impl UTXO {
             if !sig_status {
                 let duration_signature_verif = start_signature_verif.elapsed();
                 let duration_full = start_full.elapsed();
+                let share_parallelized_program =
+                    duration_signature_verif.as_micros() as f32 / duration_full.as_micros() as f32;
                 println!("Time elapsed for the full duration of function in {:?} and duration for signature verification only is: {:?}.
-                The share of the parallelized program is {:?}", duration_full, duration_signature_verif, duration_signature_verif.as_micros() as f32/duration_full.as_micros() as f32);
+                The share of the parallelized program is {:?}", duration_full, duration_signature_verif, share_parallelized_program);
                 println!();
 
-                return (false, None);
+                return (
+                    false,
+                    Some(utxo),
+                    share_parallelized_program,
+                    duration_full.as_millis(),
+                );
             }
         }
 
         if sig_status {
             let duration_signature_verif = start_signature_verif.elapsed();
             let duration_full = start_full.elapsed();
+            let share_parallelized_program =
+                duration_signature_verif.as_micros() as f32 / duration_full.as_micros() as f32;
             println!("Time elapsed for the full duration of function in {:?} and duration for signature verification only is: {:?}.
-                The share of the parallelized program is {:?}", duration_full, duration_signature_verif, duration_signature_verif.as_micros() as f32/duration_full.as_micros() as f32);
+                The share of the parallelized program is {:?}", duration_full, duration_signature_verif, share_parallelized_program);
             println!();
 
-            return (true, Some(utxo));
+            return (
+                true,
+                Some(utxo),
+                share_parallelized_program,
+                duration_full.as_millis(),
+            );
         } else {
             let duration_signature_verif = start_signature_verif.elapsed();
             let duration_full = start_full.elapsed();
+            let share_parallelized_program =
+                duration_signature_verif.as_micros() as f32 / duration_full.as_micros() as f32;
             println!("Time elapsed for the full duration of function in {:?} and duration for signature verification only is: {:?}.
-                The share of the parallelized program is {:?}", duration_full, duration_signature_verif, duration_signature_verif.as_micros() as f32/duration_full.as_micros() as f32);
+                The share of the parallelized program is {:?}", duration_full, duration_signature_verif, share_parallelized_program);
             println!();
 
-            return (false, None);
+            return (
+                false,
+                Some(utxo),
+                share_parallelized_program,
+                duration_full.as_millis(),
+            );
         }
     }
 

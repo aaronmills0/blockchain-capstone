@@ -27,7 +27,7 @@ pub fn chain_validator(receiver: Receiver<Block>, mut utxo: UTXO, mut chain: Vec
             continue;
         }
 
-        let (valid, utxo_option) =
+        let (valid, utxo_option, _, _) =
             utxo.parallel_batch_verify_and_update(&incoming_block.transactions, batch_size);
         if !valid {
             warn!("Validator received block containing invalid transactions. Ignoring block.");
