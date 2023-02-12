@@ -26,13 +26,6 @@ pub async fn shell() {
     let peer = Peer::launch().await;
     info!("Successfully launched peer!");
 
-    for p in &peer.ports {
-        let peer_copy = peer.clone();
-        let ip = peer.address.clone();
-        let port = p.clone();
-        tokio::spawn(async move { Peer::listen(peer_copy, ip, port).await });
-    }
-
     loop {
         let mut command = String::new();
         io::stdin()

@@ -22,7 +22,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-static SERVER_IP: &str = "192.168.0.101";
+static SERVER_IP: &str = "192.168.0.12";
 const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
 static NUM_PORTS: usize = 20;
 static BATCH_SIZE: usize = 128;
@@ -207,6 +207,13 @@ impl Peer {
         }
 
         Peer::save_peer(&peer);
+
+        for p in &peer.ports {
+            let peer_copy = peer.clone();
+            let ip = peer.address.clone();
+            let port = p.clone();
+            tokio::spawn(async move { Peer::listen(peer_copy, ip, port).await });
+        }
 
         return peer;
     }
