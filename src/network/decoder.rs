@@ -2,9 +2,9 @@ use log::warn;
 use mini_redis::Frame;
 use phf::phf_map;
 use serde_json;
-use std::{collections::HashMap, iter::empty};
+use std::collections::HashMap;
 
-use crate::components::{block::Block, transaction::Transaction};
+use crate::components::block::Block;
 
 static COMMANDS: phf::Map<&'static str, &'static str> = phf_map! {
     "00000000" => "id_query",

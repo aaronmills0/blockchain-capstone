@@ -2,7 +2,7 @@ use bytes::Bytes;
 use mini_redis::Frame;
 use serde_json;
 
-use crate::components::{block::Block, transaction::Transaction};
+use crate::components::transaction::Transaction;
 
 pub fn get_header(sourceid: u32, destid: u32, command: String) -> Frame {
     let peerid_source_unprocessed = format!("{sourceid:#034b}");

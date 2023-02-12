@@ -11,13 +11,11 @@ use log::{error, info, warn};
 use mini_redis::{Connection, Frame};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use serde_with::serde_as;
 use std::collections::HashMap;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
-use std::sync::Arc;
 use std::{env, fs};
-use std::{fs::File, io, path::Path};
+use std::{fs::File, path::Path};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
@@ -40,10 +38,8 @@ pub struct Peer {
     pub block_map: HashMap<String, usize>, // Map block hashes to indices in the blockchain for quick access.
     pub utxo: UTXO,
 }
-
-#[serde_as]
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct MemPool(#[serde_as(as = "Vec<(_, _)>")] pub HashMap<String, Transaction>);
+pub struct MemPool(pub HashMap<String, Transaction>);
 
 impl Deref for MemPool {
     type Target = HashMap<String, Transaction>;
@@ -528,54 +524,6 @@ impl Peer {
 
     pub fn shutdown(peer: Peer) {
         Peer::save_peer(&peer);
-    }
-    pub async fn spawn_connection(socket: &str) {
-        info!("External: {}", &socket);
-        // The 'await' expression suspends the operation until it is ready to be processed. It continues to the next operation.
-        let stream = TcpStream::connect(&socket).await.unwrap();
-        info!("Successfully connected to {}", socket);
-        let mut connection = Connection::new(stream);
-
-        loop {
-            let mut command = String::new();
-            io::stdin()
-                .read_line(&mut command)
-                .expect("Failed to read line");
-
-            let frame = Frame::Simple(command);
-
-            connection.write_frame(&frame).await.unwrap();
-        }
-    }
-
-    pub async fn spawn_listener(peer: Arc<Peer>) {
-        let local_ip = local_ip().unwrap();
-        let address = local_ip.to_string();
-        let socket = address + ":6780";
-
-        let listener = TcpListener::bind(&socket).await.unwrap();
-        info!("Successfully setup listener at {}", socket);
-        loop {
-            let (socket, _) = listener.accept().await.unwrap();
-
-            info!("{:?}", &socket);
-            // A new task is spawned for each inbound socket. The socket is
-            // moved to the new task and processed there.
-            tokio::spawn(async move {
-                Peer::process(socket).await;
-            });
-        }
-    }
-
-    async fn process(socket: TcpStream) {
-        // The `Connection` lets us read/write redis **frames** instead of
-        // byte streams. The `Connection` type is defined by mini-redis.
-        let mut connection = Connection::new(socket);
-        loop {
-            if let Some(frame) = connection.read_frame().await.unwrap() {
-                info!("GOT: {:?}", frame);
-            }
-        }
     }
 
     pub fn save_peer(peer: &Peer) {
