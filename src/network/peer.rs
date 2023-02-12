@@ -12,6 +12,7 @@ use mini_redis::{Connection, Frame};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
+use std::error::Error;
 use std::io::Write;
 use std::ops::{Deref, DerefMut};
 use std::{env, fs};
@@ -55,8 +56,12 @@ impl DerefMut for MemPool {
 }
 
 #[derive(Debug)]
-enum Command {
+pub enum Command {
     Get {
+        key: String,
+        resp: Responder<Vec<String>>,
+    },
+    Set {
         key: String,
         resp: Responder<Vec<String>>,
         payload: Option<Vec<String>>,
@@ -165,7 +170,7 @@ impl Peer {
         return peer;
     }
 
-    pub async fn launch() -> Peer {
+    pub async fn launch() -> Sender<Command>{
         let slash = if env::consts::OS == "windows" {
             "\\"
         } else {
@@ -191,7 +196,9 @@ impl Peer {
 
         // We need to ensure all our ports are available. If not we need to change them.
         // Query the server
-        peer.set_ports().await;
+
+        
+        // peer.set_ports().await;
         let msg = messages::get_ports_query(peer.peerid, 1, peer.ports.clone());
         let (ipmap, portmap) = send_ports_query(
             msg,
@@ -199,16 +206,50 @@ impl Peer {
             SERVER_PORTS.iter().map(|&s| s.into()).collect(),
         )
         .await;
+        
+        
         for (id, ip) in ipmap {
             peer.ip_map.insert(id, ip);
         }
         for (ip, ports) in portmap {
             peer.port_map.insert(ip, ports);
         }
-
+        
         Peer::save_peer(&peer);
 
-        return peer;
+        let (tx, rx) = mpsc::channel(32);
+        tokio::spawn(async move {
+            Peer::peer_manager(peer, rx).await;
+        });
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+        let tx_clone = tx.clone();
+        let cmd = Command::Get {
+            key: String::from("ports_query"),
+            resp: resp_tx,
+        };
+
+        tx_clone.send(cmd).await.ok();
+        
+        let result = resp_rx.await.unwrap().unwrap();
+        if result.is_empty() {
+            error!("Empty result from peer");
+            panic!();
+        }
+        let ports: Vec<String> = serde_json::from_str(&result[0]).unwrap();
+
+        info!("Received Ports During Launch: {:?}", ports);
+
+        let local_ip = local_ip().unwrap().to_string();
+        for p in ports {
+            let ip = local_ip.clone();
+            let port = p.clone();
+            let tx_clone = tx.clone();
+            tokio::spawn(async move { Peer::listen(ip, port, tx_clone).await });
+        }
+
+
+        return tx.clone();
     }
 
     async fn peer_manager(mut peer: Peer, mut rx: Receiver<Command>) {
@@ -216,7 +257,7 @@ impl Peer {
         loop {
             let command = rx.recv().await.unwrap();
             match command {
-                Command::Get { key, resp, payload } => {
+                Command::Set { key, resp, payload } => {
                     if key.as_str() == "transaction" {
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
@@ -284,22 +325,49 @@ impl Peer {
                         return;
                     }
                 }
+                Command::Get { key, resp} => {
+                    if key.as_str() == "ports_query" {
+
+                        let response_vector = vec![
+                            serde_json::to_string(&peer.ports)
+                                .expect("Failed to serialize ports"),
+                        ];
+                        resp.send(Ok(response_vector)).ok();
+
+                    } 
+
+                    else if key.as_str() == "ip_map_query"{
+                        let response_vector = vec![
+                            serde_json::to_string(&peer.ip_map)
+                                .expect("Failed to serialize ip map"),
+                        ];
+                        resp.send(Ok(response_vector)).ok();
+                    }
+
+                    else if key.as_str() == "id_query"{
+                        let response_vector = vec![
+                            serde_json::to_string(&peer.peerid)
+                                .expect("Failed to serialize ip map"),
+                        ];
+                        resp.send(Ok(response_vector)).ok();
+                    }
+
+                    else {
+                        warn!("invalid command for peer");
+                        return;
+                    }
+                }
             }
         }
     }
 
-    pub async fn listen(peer: Peer, ip: String, port: String) {
+    pub async fn listen(ip: String, port: String, tx:Sender<Command>) {
         let socket = ip + ":" + &port;
         let listener = TcpListener::bind(&socket).await.unwrap();
         info!("Successfully setup listener at {}", socket);
 
         // The server should now continuously listen and respond to queries
         // Each time it gets a request it should update its socketmap accordingly
-        let peerid = peer.peerid;
-        let (tx, rx) = mpsc::channel(32);
-        tokio::spawn(async move {
-            Peer::peer_manager(peer, rx).await;
-        });
 
         loop {
             info!("Waiting for connection...");
@@ -310,7 +378,7 @@ impl Peer {
             // moved to the new task and processed there.
             let tx_clone = tx.clone();
             tokio::spawn(async move {
-                Peer::process_connection(stream, socket.to_string(), tx_clone, peerid).await;
+                Peer::process_connection(stream, socket.to_string(), tx_clone).await;
             });
         }
     }
@@ -319,7 +387,6 @@ impl Peer {
         stream: TcpStream,
         socket: String,
         tx: Sender<Command>,
-        peerid: u32,
     ) {
         let ip = stream.peer_addr().unwrap().ip().to_string();
         let mut connection = Connection::new(stream);
@@ -331,10 +398,6 @@ impl Peer {
                         info!("GOT: {:?}", frame);
                         let (command, sourceid, destid) = decoder::decode_command(&frame);
 
-                        if destid != peerid {
-                            warn!("Destination id does not match server id: {}", destid);
-                            return;
-                        }
                         let (resp_tx, resp_rx) = oneshot::channel();
                         if command == "transaction" {
                             let json = decoder::decode_transactions_msg(frame);
@@ -342,7 +405,7 @@ impl Peer {
                                 error!("Missing transaction");
                                 panic!()
                             }
-                            cmd = Command::Get {
+                            cmd = Command::Set {
                                 key: command,
                                 resp: resp_tx,
                                 payload: Some(vec![json.unwrap()]),
@@ -359,7 +422,7 @@ impl Peer {
                             payload_vec.push(sourceid.to_string());
                             payload_vec.push(ip.clone());
                             payload_vec.append(&mut ports);
-                            cmd = Command::Get {
+                            cmd = Command::Set {
                                 key: command,
                                 resp: resp_tx,
                                 payload: Some(payload_vec),
@@ -390,7 +453,7 @@ impl Peer {
                                 connection.write_frame(&frame).await.ok();
                                 return;
                             }
-                            cmd = Command::Get {
+                            cmd = Command::Set {
                                 key: command,
                                 resp: resp_tx,
                                 payload: Some(vec![hash.unwrap()]),
@@ -413,40 +476,40 @@ impl Peer {
                 }
                 Err(e) => {
                     warn!("{}", e);
-                    break;
+                    return;
                 }
             }
         }
     }
 
-    pub async fn set_new_port(&mut self) -> String {
-        let listener = TcpListener::bind(self.address.clone() + ":0")
-            .await
-            .unwrap();
-        return listener
-            .local_addr()
-            .expect("Failed to unwrap listener socket address")
-            .port()
-            .to_string();
-    }
+    // pub async fn set_new_port(&mut self) -> String {
+    //     let listener = TcpListener::bind(self.address.clone() + ":0")
+    //         .await
+    //         .unwrap();
+    //     return listener
+    //         .local_addr()
+    //         .expect("Failed to unwrap listener socket address")
+    //         .port()
+    //         .to_string();
+    // }
 
-    pub async fn set_ports(&mut self) {
-        // Update any set ports that are unavailable
-        for i in 0..self.ports.len() {
-            let socket = self.address.clone() + ":" + &self.ports[i];
-            let conn = TcpStream::connect(&socket).await;
-            if conn.is_err() {
-                info!("Port {} is unavailable. Setting new port...", i);
-                self.ports[i] = self.set_new_port().await;
-            };
-        }
+    // pub async fn set_ports(&mut self) {
+    //     // Update any set ports that are unavailable
+    //     for i in 0..self.ports.len() {
+    //         let socket = self.address.clone() + ":" + &self.ports[i];
+    //         let conn = TcpStream::connect(&socket).await;
+    //         if conn.is_err() {
+    //             info!("Port {} is unavailable. Setting new port...", i);
+    //             self.ports[i] = self.set_new_port().await;
+    //         };
+    //     }
 
-        // Add new ports until there are `NUM_PORTS` ports
-        while self.ports.len() < NUM_PORTS {
-            let new_port = self.set_new_port().await;
-            self.ports.push(new_port);
-        }
-    }
+    //     // Add new ports until there are `NUM_PORTS` ports
+    //     while self.ports.len() < NUM_PORTS {
+    //         let new_port = self.set_new_port().await;
+    //         self.ports.push(new_port);
+    //     }
+    // }
 
     pub async fn download_blocks(&mut self) -> bool {
         let mut connection_opt: Option<Connection> = None;
