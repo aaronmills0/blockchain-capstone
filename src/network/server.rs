@@ -262,7 +262,7 @@ impl Server {
                 }
                 Err(e) => {
                     warn!("{}", e);
-                    break;
+                    return;
                 }
             }
         }
