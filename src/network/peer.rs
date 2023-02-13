@@ -70,6 +70,7 @@ pub enum Command {
 
 type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
 
+
 async fn get_connection(ip: &str, ports: &[&str]) -> Option<Connection> {
     let mut connection_wrapped: Option<Connection> = None;
     for port in ports {
@@ -98,6 +99,7 @@ pub async fn send_peerid_query(msg: Frame) -> u32 {
         panic!("Cannot connect to the server");
     }
     let mut connection = connection_opt.unwrap();
+
     connection.write_frame(&msg).await.ok();
 
     let mut response: u32 = 0;
@@ -196,7 +198,6 @@ impl Peer {
 
         // We need to ensure all our ports are available. If not we need to change them.
         // Query the server
-
         
         // peer.set_ports().await;
         let msg = messages::get_ports_query(peer.peerid, 1, peer.ports.clone());
@@ -206,15 +207,14 @@ impl Peer {
             SERVER_PORTS.iter().map(|&s| s.into()).collect(),
         )
         .await;
-        
-        
+
         for (id, ip) in ipmap {
             peer.ip_map.insert(id, ip);
         }
         for (ip, ports) in portmap {
             peer.port_map.insert(ip, ports);
         }
-        
+
         Peer::save_peer(&peer);
 
         let (tx, rx) = mpsc::channel(32);
@@ -299,6 +299,7 @@ impl Peer {
                         ];
                         resp.send(Ok(response_vector)).ok();
                         Peer::save_peer(&peer);
+                        
                     } else if key.as_str() == "BD_query" {
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
@@ -422,6 +423,7 @@ impl Peer {
                             payload_vec.push(sourceid.to_string());
                             payload_vec.push(ip.clone());
                             payload_vec.append(&mut ports);
+
                             cmd = Command::Set {
                                 key: command,
                                 resp: resp_tx,

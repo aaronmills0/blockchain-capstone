@@ -129,10 +129,10 @@ pub fn decode_transactions_msg(msg: Frame) -> Option<String> {
                 json = Some(String::from_utf8(array_maker).expect("invalid utf-8 sequence"));
             }
 
-            _ => warn!("Wrong formatting for response"),
+            _ => warn!("Expected second and third elements of the frame array to be bytes of ip and ports respectively"),
         },
 
-        _ => warn!("Wrong formatting for response"),
+        _ => warn!("Expected the frame to be an array"),
     };
     return json;
 }
