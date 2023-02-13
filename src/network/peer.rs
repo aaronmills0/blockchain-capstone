@@ -482,35 +482,6 @@ impl Peer {
         }
     }
 
-    // pub async fn set_new_port(&mut self) -> String {
-    //     let listener = TcpListener::bind(self.address.clone() + ":0")
-    //         .await
-    //         .unwrap();
-    //     return listener
-    //         .local_addr()
-    //         .expect("Failed to unwrap listener socket address")
-    //         .port()
-    //         .to_string();
-    // }
-
-    // pub async fn set_ports(&mut self) {
-    //     // Update any set ports that are unavailable
-    //     for i in 0..self.ports.len() {
-    //         let socket = self.address.clone() + ":" + &self.ports[i];
-    //         let conn = TcpStream::connect(&socket).await;
-    //         if conn.is_err() {
-    //             info!("Port {} is unavailable. Setting new port...", i);
-    //             self.ports[i] = self.set_new_port().await;
-    //         };
-    //     }
-
-    //     // Add new ports until there are `NUM_PORTS` ports
-    //     while self.ports.len() < NUM_PORTS {
-    //         let new_port = self.set_new_port().await;
-    //         self.ports.push(new_port);
-    //     }
-    // }
-
     pub async fn download_blocks(&mut self) -> bool {
         let mut connection_opt: Option<Connection> = None;
         let mut destid = 0;
