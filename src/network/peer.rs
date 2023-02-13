@@ -216,6 +216,7 @@ impl Peer {
         }
         
         Peer::save_peer(&peer);
+
         let (tx, rx) = mpsc::channel(32);
         tokio::spawn(async move {
             Peer::peer_manager(peer, rx).await;
@@ -249,7 +250,6 @@ impl Peer {
 
 
         return tx.clone();
-        return peer;
     }
 
     async fn peer_manager(mut peer: Peer, mut rx: Receiver<Command>) {
