@@ -24,7 +24,7 @@ use std::thread::{self};
  * in the transaction input.
  */
 #[serde_as]
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[allow(clippy::upper_case_acronyms)]
 pub struct UTXO(#[serde_as(as = "Vec<(_, _)>")] pub HashMap<Outpoint, TxOut>);
 

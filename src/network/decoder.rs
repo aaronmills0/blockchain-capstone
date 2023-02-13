@@ -4,7 +4,7 @@ use phf::phf_map;
 use serde_json;
 use std::collections::HashMap;
 
-use crate::components::transaction::Transaction;
+use crate::components::block::Block;
 
 static COMMANDS: phf::Map<&'static str, &'static str> = phf_map! {
     "00000000" => "id_query",
@@ -13,6 +13,8 @@ static COMMANDS: phf::Map<&'static str, &'static str> = phf_map! {
     "00000011" => "ports_response",
     "00000100" => "termination",
     "00000101" => "transaction",
+    "00000110" => "BD_query",
+    "00000111" => "BD_response",
 };
 
 pub fn decode_command(msg: &Frame) -> (String, u32, u32) {
@@ -117,22 +119,55 @@ pub fn decode_ports_response(
     return (ip_map, port_map);
 }
 
-pub fn decode_transactions_msg(msg: Frame) -> Option<Transaction> {
-    let mut tx = None;
+pub fn decode_transactions_msg(msg: Frame) -> Option<String> {
     let array_maker: Vec<u8>;
-    let json: String;
+    let mut json = None;
     match msg {
         Frame::Array(x) => match &x[1] {
             Frame::Bulk(b) => {
                 array_maker = b.to_vec();
-                json = String::from_utf8(array_maker).expect("invalid utf-8 sequence");
-                tx = Some(serde_json::from_str(&json).expect("failed to convert from json"));
+                json = Some(String::from_utf8(array_maker).expect("invalid utf-8 sequence"));
             }
 
-            _ => warn!("Wrong formatting for response"),
+            _ => warn!("Expected second and third elements of the frame array to be bytes of ip and ports respectively"),
         },
 
-        _ => warn!("Wrong formatting for response"),
+        _ => warn!("Expected the frame to be an array"),
     };
-    return tx;
+    return json;
+}
+
+pub fn decode_bd_query(msg: Frame) -> Option<String> {
+    let mut head_hash: Option<String> = None;
+    match msg {
+        Frame::Array(x) => match &x[1] {
+            Frame::Bulk(b) => {
+                head_hash = Some(String::from_utf8(b.to_vec()).expect("invalid utf-8 sequence"));
+            }
+
+            _ => warn!("Expected bytes with hash of the head of the peer's existing blockchain as the second frame of the frame array"),
+        },
+
+        _ => warn!("Expected the frame to be an array"),
+    };
+
+    return head_hash;
+}
+
+pub fn decode_bd_response(response: Frame) -> Vec<Block> {
+    let mut blocks = Vec::new();
+    match response {
+        Frame::Array(x) => match &x[1] {
+            Frame::Bulk(b) => {
+                let blocks_json = String::from_utf8(b.to_vec()).expect("invalid utf-8 sequence");
+                blocks = serde_json::from_str(&blocks_json).unwrap();
+            }
+
+            _ => warn!("Expected bytes with hash of the head of the peer's existing blockchain as the second frame of the frame array"),
+        },
+
+        _ => warn!("Expected the frame to be an array"),
+    };
+
+    return blocks;
 }

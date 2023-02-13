@@ -97,3 +97,29 @@ pub fn get_transaction_msg(sourceid: u32, destid: u32, tx: Transaction) -> Frame
     response_vec.push(payload);
     return Frame::Array(response_vec);
 }
+
+/**
+ * Pass the hash of the head of the current chain to receive the remainder of the chain
+ * Upon initialization, send the hash of the genesis block
+ */
+pub fn get_bd_query(sourceid: u32, destid: u32, head_hash: String) -> Frame {
+    let mut response_vec: Vec<Frame> = Vec::new();
+
+    let header_frame = get_header(sourceid, destid, String::from("00000110"));
+    response_vec.push(header_frame);
+
+    let payload = Frame::Bulk(Bytes::from(head_hash));
+    response_vec.push(payload);
+    return Frame::Array(response_vec);
+}
+
+pub fn get_bd_response(sourceid: u32, destid: u32, blocks_json: String) -> Frame {
+    let mut response_vec: Vec<Frame> = Vec::new();
+
+    let header_frame = get_header(sourceid, destid, String::from("00000111"));
+    response_vec.push(header_frame);
+
+    let blocks_frame = Frame::Bulk(Bytes::from(blocks_json));
+    response_vec.push(blocks_frame);
+    return Frame::Array(response_vec);
+}

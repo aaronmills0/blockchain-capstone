@@ -2,15 +2,18 @@ use crate::components::transaction::{
     Outpoint, PublicKeyScript, SignatureScript, Transaction, TxIn, TxOut,
 };
 use crate::network::messages;
-use crate::network::peer::{self, Peer};
+use crate::network::peer::{self, Peer, Command};
 use crate::simulation::start;
 use crate::utils::graph::create_block_graph;
 use crate::utils::hash;
 use crate::utils::save_and_load::deserialize_json;
 use crate::utils::sign_and_verify::{self, Verifier};
 use chrono::Local;
-use log::{info, warn};
+use local_ip_address::local_ip;
+use log::{error, info, warn};
 use port_scanner::scan_port;
+use tokio::sync::oneshot;
+use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
 use std::process::exit;
@@ -23,15 +26,8 @@ static mut SIM_STATUS: bool = false;
 
 pub async fn shell() {
     let mut tx_sim_option: Option<Sender<String>> = None;
-    let peer = Peer::launch().await;
+    let tx_to_manager = Peer::launch().await;
     info!("Successfully launched peer!");
-
-    for p in &peer.ports {
-        let peer_copy = peer.clone();
-        let ip = peer.address.clone();
-        let port = p.clone();
-        tokio::spawn(async move { Peer::listen(peer_copy, ip, port).await });
-    }
 
     loop {
         let mut command = String::new();
@@ -86,15 +82,59 @@ pub async fn shell() {
             // }
             "neighbors" | "neighbours" | "-n" => {
                 info!("Neighbors:");
-                for (id, ip) in &peer.ip_map {
+                let (resp_tx, resp_rx) = oneshot::channel();
+                let cmd = Command::Get {
+                    key: String::from("ip_map_query"),
+                    resp: resp_tx,
+                };
+                tx_to_manager.send(cmd).await.ok();
+
+                let result = resp_rx.await.unwrap().unwrap();
+                if result.is_empty() {
+                    error!("Empty result from peer");
+                    panic!();
+                }
+                let ip_map: HashMap<u32, String> = serde_json::from_str(&result[0]).unwrap();
+
+                for (id, ip) in ip_map {
                     info!("{} : {}", id, ip);
                 }
             }
             "transaction" | "tx" | "-t" => {
-                let peerid = peer.peerid;
+                let (resp_tx, resp_rx) = oneshot::channel();
+                let (resp_tx_1, resp_rx_1) = oneshot::channel();
+                
+                let cmd = Command::Get {
+                    key: String::from("id_query"),
+                    resp: resp_tx,
+                };
+                let cmd1 = Command::Get {
+                    key: String::from("ports_query"),
+                    resp: resp_tx_1,
+                };
+                
+                tx_to_manager.send(cmd).await.ok();
+                tx_to_manager.send(cmd1).await.ok();
+
+                let result = resp_rx.await.unwrap().unwrap();
+                let result1 = resp_rx_1.await.unwrap().unwrap();
+
+                if result.is_empty() {
+                    error!("Empty result from peer");
+                    panic!();
+                }
+                if result1.is_empty() {
+                    error!("Empty result from peer");
+                    panic!();
+                }
+                
+                let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
+                let ports: Vec<String> = serde_json::from_str(&result1[0]).unwrap();
+
+                let local_ip = local_ip().unwrap().to_string();
                 let frame =
                     messages::get_transaction_msg(peerid, peerid, get_example_transaction());
-                peer::send_transaction(frame, peer.address.to_owned(), peer.ports.to_owned()).await;
+                peer::send_transaction(frame, local_ip, ports.to_owned()).await;
             }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");
