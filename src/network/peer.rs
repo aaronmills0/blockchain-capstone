@@ -23,7 +23,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-static SERVER_IP: &str = "192.168.0.101";
+static SERVER_IP: &str = "192.168.0.12";
 const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
 static NUM_PORTS: usize = 20;
 static BATCH_SIZE: usize = 128;
@@ -216,7 +216,6 @@ impl Peer {
         }
         
         Peer::save_peer(&peer);
-
         let (tx, rx) = mpsc::channel(32);
         tokio::spawn(async move {
             Peer::peer_manager(peer, rx).await;
@@ -250,6 +249,7 @@ impl Peer {
 
 
         return tx.clone();
+        return peer;
     }
 
     async fn peer_manager(mut peer: Peer, mut rx: Receiver<Command>) {

@@ -29,7 +29,6 @@ pub async fn shell() {
     let tx_to_manager = Peer::launch().await;
     info!("Successfully launched peer!");
 
-
     loop {
         let mut command = String::new();
         io::stdin()
