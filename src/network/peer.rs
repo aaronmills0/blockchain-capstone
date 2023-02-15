@@ -1,20 +1,25 @@
 use crate::components::block::Block;
 use crate::components::block::BlockHeader;
 use crate::components::merkle::Merkle;
+use crate::components::transaction::Outpoint;
+use crate::components::transaction::PublicKeyScript;
 use crate::components::transaction::Transaction;
+use crate::components::transaction::TxOut;
 use crate::components::utxo::UTXO;
 use crate::network::decoder;
 use crate::network::messages;
+use crate::utils::hash;
 use crate::utils::hash::hash_as_string;
+use crate::utils::sign_and_verify;
+use crate::utils::sign_and_verify::Verifier;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use mini_redis::{Connection, Frame};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
-use std::error::Error;
+use std::collections::HashSet;
 use std::io::Write;
-use std::ops::{Deref, DerefMut};
 use std::{env, fs};
 use std::{fs::File, path::Path};
 use tokio::net::{TcpListener, TcpStream};
@@ -26,7 +31,8 @@ use tokio::sync::oneshot;
 static SERVER_IP: &str = "192.168.0.101";
 const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
 static NUM_PORTS: usize = 20;
-static BATCH_SIZE: usize = 128;
+static BATCH_SIZE: usize = 1024;
+static NUM_PARALLEL_TRANSACTIONS: usize = 8192;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Peer {
@@ -40,19 +46,9 @@ pub struct Peer {
     pub utxo: UTXO,
 }
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct MemPool(pub HashMap<String, Transaction>);
-
-impl Deref for MemPool {
-    type Target = HashMap<String, Transaction>;
-    fn deref(&self) -> &HashMap<String, Transaction> {
-        return &self.0;
-    }
-}
-
-impl DerefMut for MemPool {
-    fn deref_mut(&mut self) -> &mut HashMap<String, Transaction> {
-        return &mut self.0;
-    }
+pub struct MemPool {
+    pub hashes: HashSet<String>,
+    pub transactions: Vec<Transaction>,
 }
 
 #[derive(Debug)]
@@ -280,7 +276,27 @@ impl Peer {
     }
 
     async fn peer_manager(mut peer: Peer, mut rx: Receiver<Command>) {
-        let mut mempool = MemPool(HashMap::new());
+        let mut mempool = MemPool {
+            hashes: HashSet::new(),
+            transactions: Vec::new(),
+        };
+        let mut verified_mempool = mempool.clone();
+
+        let mut utxo: UTXO = UTXO(HashMap::new());
+        let (_, public_key) = sign_and_verify::create_keypair();
+        let outpoint: Outpoint = Outpoint {
+            txid: "0".repeat(64),
+            index: 0,
+        };
+        let tx_out: TxOut = TxOut {
+            value: 500,
+            pk_script: PublicKeyScript {
+                public_key_hash: hash::hash_as_string(&public_key),
+                verifier: Verifier {},
+            },
+        };
+        utxo.insert(outpoint, tx_out);
+
         loop {
             let command = rx.recv().await.unwrap();
             match command {
@@ -298,8 +314,27 @@ impl Peer {
                         }
                         let tx: Transaction = serde_json::from_str(&payload_vec[0])
                             .expect("Could not deserialize string to transaction.");
-                        mempool.insert(hash_as_string(&tx), tx.to_owned());
-                        info!("{} transactions in memory pool", mempool.keys().len())
+
+                        if mempool.transactions.len() < NUM_PARALLEL_TRANSACTIONS {
+                            mempool.hashes.insert(hash_as_string(&tx));
+                            mempool.transactions.push(tx.to_owned());
+                        } else {
+                            let (valid, updated_utxo) = utxo.parallel_batch_verify_and_update(
+                                &mempool.transactions,
+                                NUM_PARALLEL_TRANSACTIONS / BATCH_SIZE,
+                            );
+                            if !valid {
+                                error!("Received an invalid transaction!"); // We can update this later
+                                panic!();
+                            }
+                            utxo = updated_utxo.unwrap();
+
+                            verified_mempool.hashes.extend(mempool.hashes);
+                            verified_mempool
+                                .transactions
+                                .append(&mut mempool.transactions); // Removes all emenets from mempool
+                            mempool.hashes = HashSet::new();
+                        }
                     } else if key.as_str() == "ports_query" {
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
