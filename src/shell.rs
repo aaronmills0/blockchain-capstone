@@ -179,15 +179,9 @@ pub async fn shell(is_miner: bool) {
                     }
                 };
 
-                let (peerid, _, ip_map, ports_map) = Peer::get_peer_info(&tx_to_manager).await;
-                test_single_peer_tx_throughput_sender(
-                    peerid,
-                    ip_map,
-                    ports_map,
-                    receiver_id,
-                    duration,
-                )
-                .await;
+                let (id, _, ip_map, ports_map) = Peer::get_peer_info(&tx_to_manager).await;
+                test_single_peer_tx_throughput_sender(id, ip_map, ports_map, receiver_id, duration)
+                    .await;
             }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");
