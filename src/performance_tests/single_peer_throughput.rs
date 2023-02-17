@@ -1,7 +1,12 @@
+use crate::components::transaction::{Outpoint, PublicKeyScript, Transaction, TxOut};
+use crate::components::utxo::UTXO;
 use crate::network::messages;
 use crate::network::peer::get_connection;
-use crate::shell::get_example_transaction;
+use crate::simulation::KeyMap;
+use crate::utils::sign_and_verify::Verifier;
+use crate::utils::{hash, sign_and_verify};
 use log::info;
+use rand_1::rngs::ThreadRng;
 use std::collections::HashMap;
 use std::thread::sleep;
 use std::time::Duration;
@@ -24,10 +29,37 @@ pub async fn test_single_peer_tx_throughput_sender(
     }
     let mut connection = connection_opt.unwrap();
 
+    let mut utxo: UTXO = UTXO(HashMap::new());
+    let mut key_map: KeyMap = KeyMap(HashMap::new());
+    let mut transactions: Vec<Transaction> = Vec::new();
+    let (private_key, public_key) = sign_and_verify::create_keypair();
+    let outpoint: Outpoint = Outpoint {
+        txid: "0".repeat(64),
+        index: 0,
+    };
+
+    let tx_out: TxOut = TxOut {
+        value: 500,
+        pk_script: PublicKeyScript {
+            public_key_hash: hash::hash_as_string(&public_key),
+            verifier: Verifier {},
+        },
+    };
+
+    key_map.insert(outpoint.clone(), (private_key, public_key));
+    utxo.insert(outpoint, tx_out);
+
+    let mut rng: ThreadRng = rand_1::thread_rng();
+    let max_num_outputs = 1;
+
     let mut sender_counter: u32 = 0;
     loop {
-        let frame =
-            messages::get_transaction_msg(sender_id, receiver_id, get_example_transaction());
+        let transaction =
+            Transaction::create_transaction(&utxo, &mut key_map, &mut rng, max_num_outputs, false);
+        utxo.update(&transaction);
+        transactions.push(transaction.clone());
+
+        let frame = messages::get_transaction_msg(sender_id, receiver_id, transaction);
         connection.write_frame(&frame).await.ok();
 
         sender_counter += 1;
