@@ -33,6 +33,7 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
+use tokio::time::Instant;
 
 pub static SERVER_IP: &str = "192.168.0.15";
 pub const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
@@ -370,6 +371,7 @@ impl Peer {
             transactions: Vec::new(),
         };
         let mut verified_mempool = mempool.clone();
+        let mut time = Instant::now(); // Gets overriden
 
         let mut utxo: UTXO = UTXO(HashMap::new());
         let keypair = Keypair::from_bytes(&[
@@ -411,6 +413,13 @@ impl Peer {
                         let tx: Transaction = serde_json::from_str(&payload_vec[0])
                             .expect("Could not deserialize string to transaction.");
 
+                        // Start the timer when the first transaction is received
+                        if verified_mempool.transactions.is_empty()
+                            && mempool.transactions.is_empty()
+                        {
+                            time = Instant::now();
+                        }
+
                         if mempool.transactions.len() < NUM_PARALLEL_TRANSACTIONS
                             && mempool.hashes.insert(hash_as_string(&tx))
                         {
@@ -425,6 +434,13 @@ impl Peer {
                                 panic!();
                             }
                             utxo = updated_utxo.unwrap();
+
+                            let time_elapsed = time.elapsed().as_micros();
+                            info!(
+                                "{} transactions received and verified in {} microseconds",
+                                verified_mempool.transactions.len(),
+                                time_elapsed
+                            );
 
                             verified_mempool.hashes.extend(mempool.hashes);
                             verified_mempool
