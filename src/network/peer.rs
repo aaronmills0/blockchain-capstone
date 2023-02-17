@@ -315,13 +315,14 @@ impl Peer {
                         let tx: Transaction = serde_json::from_str(&payload_vec[0])
                             .expect("Could not deserialize string to transaction.");
 
-                        if mempool.transactions.len() < NUM_PARALLEL_TRANSACTIONS {
-                            mempool.hashes.insert(hash_as_string(&tx));
+                        if mempool.transactions.len() < NUM_PARALLEL_TRANSACTIONS
+                            && mempool.hashes.insert(hash_as_string(&tx))
+                        {
                             mempool.transactions.push(tx.to_owned());
                         } else {
                             let (valid, updated_utxo) = utxo.parallel_batch_verify_and_update(
                                 &mempool.transactions,
-                                NUM_PARALLEL_TRANSACTIONS / BATCH_SIZE,
+                                BATCH_SIZE,
                             );
                             if !valid {
                                 error!("Received an invalid transaction!"); // We can update this later
@@ -332,7 +333,7 @@ impl Peer {
                             verified_mempool.hashes.extend(mempool.hashes);
                             verified_mempool
                                 .transactions
-                                .append(&mut mempool.transactions); // Removes all emenets from mempool
+                                .append(&mut mempool.transactions); // Removes all elements from mempool
                             mempool.hashes = HashSet::new();
                         }
                     } else if key.as_str() == "ports_query" {

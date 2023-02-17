@@ -159,7 +159,7 @@ pub async fn shell() {
  * TO BE DELETED. USED TO CREATE AN EXAMPLE TRANSACTION TO TEST NETWORKING
  */
 
-pub fn get_example_transaction() -> Transaction {
+fn get_example_transaction() -> Transaction {
     let (private_key0, public_key0) = sign_and_verify::create_keypair();
     let outpoint0: Outpoint = Outpoint {
         txid: "0".repeat(64),
