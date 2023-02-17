@@ -30,7 +30,7 @@ use std::io::Write;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Instant;
-use std::{env, fs, io};
+use std::{env, fs};
 use std::{fs::File, path::Path};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
@@ -376,19 +376,16 @@ impl Peer {
         }
     }
     
-    async fn update_mempool(verified_mempool: Arc<Mutex<MemPool>>, proc_mempool: Arc<Mutex<MemPool>>, time: Arc<Mutex<Instant>>) {
+    async fn update_mempool(verified_mempool: Arc<Mutex<MemPool>>, proc_mempool: Arc<Mutex<MemPool>>) {
         let mut verified_mempool_ref = verified_mempool.lock().unwrap();
         let mut proc_mempool_ref = proc_mempool.lock().unwrap();
         (*verified_mempool_ref).hashes.extend((*proc_mempool_ref).hashes.to_owned());
         (*verified_mempool_ref)
             .transactions
             .append(&mut (*proc_mempool_ref).transactions); // Removes all elements from mempool
-        if (*verified_mempool_ref).transactions.len() == 65536 {
-            println!("Total time for batch size of {} txs: {}us, ", NUM_PARALLEL_TRANSACTIONS, (*(time.lock().unwrap())).elapsed().as_micros());
-        };
     }
     
-    async fn verify_mempool(utxo: Arc<Mutex<UTXO>>, proc_mempool: Arc<Mutex<MemPool>>, verified_mempool: Arc<Mutex<MemPool>>, verified: Arc<Mutex<bool>>, time: Arc<Mutex<Instant>>) {
+    async fn verify_mempool(utxo: Arc<Mutex<UTXO>>, proc_mempool: Arc<Mutex<MemPool>>, verified_mempool: Arc<Mutex<MemPool>>, verified: Arc<Mutex<bool>>) {
         let mut utxo_ref = utxo.lock().unwrap();
         let proc_mempool_ref = proc_mempool.lock().unwrap();
         let (valid, updated_utxo) = (*utxo_ref).parallel_batch_verify_and_update(
@@ -405,9 +402,8 @@ impl Peer {
              
         let proc_mempool_clone = proc_mempool.clone();
         let verified_mempool_clone = verified_mempool.clone();
-        let time_clone = time.clone();
         tokio::spawn(async move {
-            Peer::update_mempool(verified_mempool_clone, proc_mempool_clone, time_clone).await;
+            Peer::update_mempool(verified_mempool_clone, proc_mempool_clone).await;
         });
     }
 
@@ -417,9 +413,7 @@ impl Peer {
         let proc_mempool_arc = Arc::new(Mutex::new(MemPool::new()));
         let verified_mempool_arc = Arc::new(Mutex::new(MemPool::new()));
         let verified_arc = Arc::new(Mutex::new(true));
-
-        let time_arc = Arc::new(Mutex::new(Instant::now()));
-        
+       
         let mut utxo: UTXO = UTXO(HashMap::new());
         let keypair = Keypair::from_bytes(&[
             9, 75, 189, 163, 133, 148, 28, 198, 139, 3, 56, 182, 118, 26, 250, 201, 129, 109, 104,
@@ -465,7 +459,6 @@ impl Peer {
                         if first_tx {
                             println!("Received first tx!");
                             first_tx = false;
-                            *(time_arc.lock().unwrap()) = Instant::now();
                         }
                         
                         mempool.hashes.insert(hash_as_string(&tx));
@@ -490,9 +483,8 @@ impl Peer {
                         let proc_mempool_arc_clone = proc_mempool_arc.clone();
                         let verified_mempool_arc_clone = verified_mempool_arc.clone();
                         let verified_arc_clone = verified_arc.clone();
-                        let time_arc_clone = time_arc.clone();
                         tokio::spawn(async move {
-                            Peer::verify_mempool(utxo_arc_clone, proc_mempool_arc_clone, verified_mempool_arc_clone, verified_arc_clone, time_arc_clone).await;
+                            Peer::verify_mempool(utxo_arc_clone, proc_mempool_arc_clone, verified_mempool_arc_clone, verified_arc_clone).await;
                         });
                     } else if key.as_str() == "block" {
                         if payload.is_none() {
