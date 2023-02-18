@@ -2,7 +2,7 @@ use crate::components::transaction::{
     Outpoint, PublicKeyScript, SignatureScript, Transaction, TxIn, TxOut,
 };
 use crate::network::messages;
-use crate::network::peer::{self, Peer, Command};
+use crate::network::peer::{self, Command, Peer};
 use crate::simulation::start;
 use crate::utils::graph::create_block_graph;
 use crate::utils::hash;
@@ -12,7 +12,6 @@ use chrono::Local;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use port_scanner::scan_port;
-use tokio::sync::oneshot;
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
@@ -21,6 +20,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::thread;
 use std::{env, fs, io};
+use tokio::sync::oneshot;
 
 static mut SIM_STATUS: bool = false;
 
@@ -103,7 +103,7 @@ pub async fn shell() {
             "transaction" | "tx" | "-t" => {
                 let (resp_tx, resp_rx) = oneshot::channel();
                 let (resp_tx_1, resp_rx_1) = oneshot::channel();
-                
+
                 let cmd = Command::Get {
                     key: String::from("id_query"),
                     resp: resp_tx,
@@ -112,7 +112,7 @@ pub async fn shell() {
                     key: String::from("ports_query"),
                     resp: resp_tx_1,
                 };
-                
+
                 tx_to_manager.send(cmd).await.ok();
                 tx_to_manager.send(cmd1).await.ok();
 
@@ -127,7 +127,7 @@ pub async fn shell() {
                     error!("Empty result from peer");
                     panic!();
                 }
-                
+
                 let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
                 let ports: Vec<String> = serde_json::from_str(&result1[0]).unwrap();
 
@@ -135,6 +135,56 @@ pub async fn shell() {
                 let frame =
                     messages::get_transaction_msg(peerid, peerid, get_example_transaction());
                 peer::send_transaction(frame, local_ip, ports.to_owned()).await;
+            }
+            "create transaction" | "create tx" | "Create Transaction" => {
+                info!("Welcome to the transaction creator! In order to create a transaction, first enter your private key:");
+                let mut private_key = String::new();
+                io::stdin()
+                    .read_line(&mut private_key)
+                    .expect("Failed to read line");
+
+                info!("Now enter your public key:");
+                let mut public_key = String::new();
+                io::stdin()
+                    .read_line(&mut public_key)
+                    .expect("Failed to read line");
+
+                info!("Now enter your public key:");
+                let mut public_key = String::new();
+                io::stdin()
+                    .read_line(&mut public_key)
+                    .expect("Failed to read line");
+
+                info!("Now enter the txid of the transaction you would like to spend:");
+                let mut txid = String::new();
+                io::stdin()
+                    .read_line(&mut txid)
+                    .expect("Failed to read line");
+
+                info!("Now enter the index corresponding to the output in the transaction you would like to spend:");
+                let mut str_index: String = String::new();
+                io::stdin()
+                    .read_line(&mut str_index)
+                    .expect("Failed to read line");
+                let trimmed_index = str_index.trim();
+                let index = match trimmed_index.parse::<u32>() {
+                    Ok(i) => i,
+                    Err(..) => {
+                        error!("Period needs to be a u64");
+                        panic!();
+                    }
+                };
+
+                let outpoint: Outpoint = Outpoint {
+                    txid: txid,
+                    index: index,
+                };
+
+                info!("Now enter the message to sign:");
+                let mut message: String = String::new();
+                io::stdin()
+                    .read_line(&mut message)
+                    .expect("Failed to read line");
             }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");
