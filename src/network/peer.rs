@@ -28,11 +28,11 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-static SERVER_IP: &str = "192.168.0.101";
-const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
-static NUM_PORTS: usize = 20;
-static BATCH_SIZE: usize = 1024;
-static NUM_PARALLEL_TRANSACTIONS: usize = 8192;
+pub static SERVER_IP: &str = "192.168.0.12";
+pub const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
+pub static NUM_PORTS: usize = 20;
+pub static BATCH_SIZE: usize = 1024;
+pub static NUM_PARALLEL_TRANSACTIONS: usize = 8192;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Peer {
@@ -132,9 +132,9 @@ pub async fn send_ports_query(
     return (ip.unwrap(), ports.unwrap());
 }
 
-pub async fn send_transaction(msg: Frame, ip: String, ports: Vec<String>) {
+pub async fn broadcast(msg: Frame, ip: &String, ports: &Vec<String>) {
     let ports: Vec<&str> = ports.iter().map(AsRef::as_ref).collect();
-    let connection_opt = get_connection(&ip, ports.as_slice()).await;
+    let connection_opt = get_connection(ip, ports.as_slice()).await;
     if connection_opt.is_none() {
         panic!("Cannot connect to the server");
     }
@@ -194,7 +194,7 @@ impl Peer {
         // We need to ensure all our ports are available. If not we need to change them.
         // Query the server
 
-        // peer.set_ports().await;
+        peer.set_ports().await;
         let msg = messages::get_ports_query(peer.peerid, 1, peer.ports.clone());
         let (ipmap, portmap) = send_ports_query(
             msg,
@@ -246,6 +246,35 @@ impl Peer {
         return tx.clone();
     }
 
+    pub async fn set_new_port(&mut self) -> String {
+        let listener = TcpListener::bind(self.address.clone() + ":0")
+            .await
+            .unwrap();
+        return listener
+            .local_addr()
+            .expect("Failed to unwrap listener socket address")
+            .port()
+            .to_string();
+    }
+
+    pub async fn set_ports(&mut self) {
+        // Update any set ports that are unavailable
+        for i in 0..self.ports.len() {
+            let socket = self.address.clone() + ":" + &self.ports[i];
+            let conn = TcpStream::connect(&socket).await;
+            if conn.is_err() {
+                info!("Port {} is unavailable. Setting new port...", i);
+                self.ports[i] = self.set_new_port().await;
+            };
+        }
+
+        // Add new ports until there are `NUM_PORTS` ports
+        while self.ports.len() < NUM_PORTS {
+            let new_port = self.set_new_port().await;
+            self.ports.push(new_port);
+        }
+    }
+
     pub async fn get_peer_info(
         tx_to_manager: &Sender<Command>,
     ) -> (
@@ -275,7 +304,7 @@ impl Peer {
         return (peerid, ports, ip_map, ports_map);
     }
 
-    async fn peer_manager(mut peer: Peer, mut rx: Receiver<Command>) {
+    pub async fn peer_manager(mut peer: Peer, mut rx: Receiver<Command>) {
         let mut mempool = MemPool {
             hashes: HashSet::new(),
             transactions: Vec::new(),
@@ -406,6 +435,17 @@ impl Peer {
                         "ports_map_query" => {
                             vec![serde_json::to_string(&peer.port_map)
                                 .expect("Failed to serialize port map")]
+                        }
+                        "block_info_query" => {
+                            vec![
+                                hash_as_string(&peer.blockchain.last().unwrap()),
+                                serde_json::to_string(&peer.peerid)
+                                    .expect("Failed to serialize id"),
+                                serde_json::to_string(&peer.ip_map)
+                                    .expect("Failed to serialize ip map"),
+                                serde_json::to_string(&peer.port_map)
+                                    .expect("Failed to serialize port map"),
+                            ]
                         }
                         "all" => {
                             vec![

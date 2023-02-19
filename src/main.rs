@@ -4,18 +4,24 @@ mod performance_tests;
 mod shell;
 mod simulation;
 mod utils;
-use crate::{network::server::Server, shell::shell};
+use crate::{
+    network::{miner::Miner, server::Server},
+    shell::shell,
+};
 use log::info;
 use std::env::{self};
 
-static IS_SERVER: bool = false;
-
 #[tokio::main]
 async fn main() {
-    let mut cmd_archive = false;
+    let mut cmd_server = false;
+    let mut cmd_miner = false;
     let args: Vec<String> = env::args().collect();
-    if args.len() > 1 && args[1] == "server" {
-        cmd_archive = true;
+    if args.len() > 1 {
+        if args[1] == "server" {
+            cmd_server = true;
+        } else if args[1] == "miner" {
+            cmd_miner = true;
+        }
     }
     let cwd = std::env::current_dir().unwrap();
     let mut cwd_string = cwd.into_os_string().into_string().unwrap();
@@ -31,8 +37,10 @@ async fn main() {
     info!("Welcome to the minimalist blockchain!\n");
     info!("For list of supported commands enter: 'help'");
 
-    if IS_SERVER || cmd_archive {
+    if cmd_server {
         Server::launch().await;
+    } else if cmd_miner {
+        Miner::launch().await;
     } else {
         shell().await;
     }

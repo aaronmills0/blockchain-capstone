@@ -3,7 +3,6 @@ use crate::components::transaction::{
 };
 use crate::network::messages;
 use crate::network::peer::{self, Command, Peer};
-use crate::performance_tests::single_peer_throughput::test_single_peer_tx_throughput_sender;
 use crate::simulation::start;
 use crate::utils::graph::create_block_graph;
 use crate::utils::hash;
@@ -105,8 +104,8 @@ pub async fn shell() {
 
                 let local_ip = local_ip().unwrap().to_string();
                 let frame =
-                    messages::get_transaction_msg(peerid, peerid, get_example_transaction());
-                peer::send_transaction(frame, local_ip, ports.to_owned()).await;
+                    messages::get_transaction_msg(peerid, peerid, &get_example_transaction());
+                peer::broadcast(frame, &local_ip, &ports).await;
             }
             "tx_test" => {
                 info!("Please enter a receiver id:");
@@ -138,8 +137,6 @@ pub async fn shell() {
                 };
 
                 let (id, _, ip_map, ports_map) = Peer::get_peer_info(&tx_to_manager).await;
-                test_single_peer_tx_throughput_sender(id, ip_map, ports_map, receiver_id, duration)
-                    .await;
             }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");

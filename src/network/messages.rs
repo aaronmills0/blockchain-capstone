@@ -2,7 +2,7 @@ use bytes::Bytes;
 use mini_redis::Frame;
 use serde_json;
 
-use crate::components::transaction::Transaction;
+use crate::components::{block::Block, transaction::Transaction};
 
 pub fn get_header(sourceid: u32, destid: u32, command: String) -> Frame {
     let peerid_source_unprocessed = format!("{sourceid:#034b}");
@@ -87,13 +87,24 @@ pub fn get_termination_msg(sourceid: u32, destid: u32) -> Frame {
     return Frame::Array(response_vec);
 }
 
-pub fn get_transaction_msg(sourceid: u32, destid: u32, tx: Transaction) -> Frame {
+pub fn get_transaction_msg(sourceid: u32, destid: u32, tx: &Transaction) -> Frame {
     let mut response_vec: Vec<Frame> = Vec::new();
 
     let header_frame = get_header(sourceid, destid, String::from("00000101"));
     response_vec.push(header_frame);
 
     let payload = Frame::Bulk(Bytes::from(serde_json::to_string(&tx).unwrap()));
+    response_vec.push(payload);
+    return Frame::Array(response_vec);
+}
+
+pub fn get_block_msg(sourceid: u32, destid: u32, block: &Block) -> Frame {
+    let mut response_vec: Vec<Frame> = Vec::new();
+
+    let header_frame = get_header(sourceid, destid, String::from("00000101"));
+    response_vec.push(header_frame);
+
+    let payload = Frame::Bulk(Bytes::from(serde_json::to_string(block).unwrap()));
     response_vec.push(payload);
     return Frame::Array(response_vec);
 }
