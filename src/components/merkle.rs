@@ -1,7 +1,7 @@
 use crate::utils::hash::hash_as_string;
 use crate::{components::transaction::Transaction, utils::hash};
 use serde::{Deserialize, Serialize};
-use std::cmp::min;
+use std::cmp::max;
 use std::{
     collections::VecDeque,
     sync::{
@@ -115,7 +115,7 @@ impl Merkle {
 
     pub fn parallel_hash(transactions: &Vec<Transaction>, num_cpus: usize) -> Vec<String> {
         let tx_batches: Vec<Vec<Transaction>> = transactions
-            .chunks(min(transactions.len(), 1) / num_cpus)
+            .chunks(max(transactions.len(), 1) / num_cpus)
             .map(|x| x.into())
             .collect();
         let mut result: Vec<String> = Vec::new();
