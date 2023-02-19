@@ -9,6 +9,7 @@ use crate::utils::hash;
 use crate::utils::save_and_load::deserialize_json;
 use crate::utils::sign_and_verify::{self, Verifier};
 use crate::utils::sign_and_verify::{PrivateKey, PublicKey};
+use crate::wallet::Wallet;
 use chrono::Local;
 use ed25519_dalek::{
     ExpandedSecretKey, Keypair, PublicKey as DalekPublicKey, SecretKey as DalekSecretKey,
@@ -17,6 +18,7 @@ use ed25519_dalek::{
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use port_scanner::scan_port;
+use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
@@ -142,6 +144,55 @@ pub async fn shell() {
                 peer::send_transaction(frame, local_ip, ports.to_owned()).await;
             }
             "create transaction" | "create tx" | "Create Transaction" => {
+                let mut transaction = Transaction {
+                    tx_inputs: Vec::from([]),
+                    tx_outputs: Vec::from([]),
+                };
+
+                let slash = if env::consts::OS == "windows" {
+                    "\\"
+                } else {
+                    "/"
+                };
+                let data = fs::read_to_string("system".to_owned() + slash + "wallet.json");
+                if data.is_err() {
+                    error!("Failed to load file. {:?}", data.err());
+                    panic!();
+                }
+                let json: Value = serde_json::from_str(&data.unwrap()).unwrap();
+                let wallet: Wallet =
+                    serde_json::from_value(json.get("wallet").unwrap().to_owned()).unwrap();
+
+                for i in 0..wallet.0.len() {
+                    let (private_key, public_key, outpoint, value_from_outpoint) =
+                        wallet.0[i].clone();
+
+                    let tx_out: TxOut = TxOut {
+                        value: value_from_outpoint,
+                        pk_script: PublicKeyScript {
+                            public_key_hash: hash::hash_as_string(&public_key),
+                            verifier: Verifier {},
+                        },
+                    };
+
+                    let message = String::from(&outpoint.txid)
+                        + &outpoint.index.to_string()
+                        + &tx_out.pk_script.public_key_hash;
+
+                    let sig_script = SignatureScript {
+                        signature: sign_and_verify::sign(&message, &private_key, &public_key),
+                        full_public_key: public_key,
+                    };
+
+                    let tx_in: TxIn = TxIn {
+                        outpoint: outpoint,
+                        sig_script: sig_script,
+                    };
+
+                    transaction.tx_inputs.append(&mut vec![tx_in]);
+                }
+
+                /*
                 info!("Welcome to the transaction creator! In order to create a transaction, first enter your hex private key:");
                 let mut private_key = String::new();
                 io::stdin()
@@ -229,6 +280,7 @@ pub async fn shell() {
                     tx_inputs: Vec::from([tx_in]),
                     tx_outputs: Vec::from([tx_out]),
                 };
+                */
 
                 let (resp_tx, resp_rx) = oneshot::channel();
                 let (resp_tx_1, resp_rx_1) = oneshot::channel();
