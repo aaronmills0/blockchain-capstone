@@ -115,7 +115,7 @@ impl Merkle {
 
     pub fn parallel_hash(transactions: &Vec<Transaction>, num_cpus: usize) -> Vec<String> {
         let tx_batches: Vec<Vec<Transaction>> = transactions
-            .chunks(max(transactions.len(), 1) / num_cpus)
+            .chunks(max(transactions.len(), num_cpus) / num_cpus)
             .map(|x| x.into())
             .collect();
         let mut result: Vec<String> = Vec::new();
