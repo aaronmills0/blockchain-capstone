@@ -8,7 +8,12 @@ use crate::utils::graph::create_block_graph;
 use crate::utils::hash;
 use crate::utils::save_and_load::deserialize_json;
 use crate::utils::sign_and_verify::{self, Verifier};
+use crate::utils::sign_and_verify::{PrivateKey, PublicKey};
 use chrono::Local;
+use ed25519_dalek::{
+    ExpandedSecretKey, Keypair, PublicKey as DalekPublicKey, SecretKey as DalekSecretKey,
+    Signature as DalekSignature, Verifier as DalekVerifer,
+};
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use port_scanner::scan_port;
@@ -137,19 +142,13 @@ pub async fn shell() {
                 peer::send_transaction(frame, local_ip, ports.to_owned()).await;
             }
             "create transaction" | "create tx" | "Create Transaction" => {
-                info!("Welcome to the transaction creator! In order to create a transaction, first enter your private key:");
+                info!("Welcome to the transaction creator! In order to create a transaction, first enter your hex private key:");
                 let mut private_key = String::new();
                 io::stdin()
                     .read_line(&mut private_key)
                     .expect("Failed to read line");
 
-                info!("Now enter your public key:");
-                let mut public_key = String::new();
-                io::stdin()
-                    .read_line(&mut public_key)
-                    .expect("Failed to read line");
-
-                info!("Now enter your public key:");
+                info!("Now enter your hex public key:");
                 let mut public_key = String::new();
                 io::stdin()
                     .read_line(&mut public_key)
@@ -185,6 +184,85 @@ pub async fn shell() {
                 io::stdin()
                     .read_line(&mut message)
                     .expect("Failed to read line");
+
+                let private_bytes = hex::decode(private_key).unwrap();
+                let public_bytes = hex::decode(public_key).unwrap();
+
+                let sig_script1 = SignatureScript {
+                    signature: sign_and_verify::sign(
+                        &message,
+                        &PrivateKey(DalekSecretKey::from_bytes(&private_bytes).unwrap()),
+                        &PublicKey(DalekPublicKey::from_bytes(&public_bytes).unwrap()),
+                    ),
+                    full_public_key: PublicKey(DalekPublicKey::from_bytes(&public_bytes).unwrap()),
+                };
+
+                let tx_in: TxIn = TxIn {
+                    outpoint: outpoint,
+                    sig_script: sig_script1,
+                };
+
+                let mut str_value: String = String::new();
+                io::stdin()
+                    .read_line(&mut str_value)
+                    .expect("Failed to read line");
+                let trimmed_value = str_value.trim();
+                let value = match trimmed_value.parse::<u32>() {
+                    Ok(i) => i,
+                    Err(..) => {
+                        error!("Period needs to be a u64");
+                        panic!();
+                    }
+                };
+
+                // We create a new keypair corresponding to our new transaction which allows us to create its tx_out
+                let (_, public_key1) = sign_and_verify::create_keypair();
+                let tx_out: TxOut = TxOut {
+                    value: value,
+                    pk_script: PublicKeyScript {
+                        public_key_hash: hash::hash_as_string(&public_key1),
+                        verifier: Verifier {},
+                    },
+                };
+
+                let transaction: Transaction = Transaction {
+                    tx_inputs: Vec::from([tx_in]),
+                    tx_outputs: Vec::from([tx_out]),
+                };
+
+                let (resp_tx, resp_rx) = oneshot::channel();
+                let (resp_tx_1, resp_rx_1) = oneshot::channel();
+
+                let cmd = Command::Get {
+                    key: String::from("id_query"),
+                    resp: resp_tx,
+                };
+                let cmd1 = Command::Get {
+                    key: String::from("ports_query"),
+                    resp: resp_tx_1,
+                };
+
+                tx_to_manager.send(cmd).await.ok();
+                tx_to_manager.send(cmd1).await.ok();
+
+                let result = resp_rx.await.unwrap().unwrap();
+                let result1 = resp_rx_1.await.unwrap().unwrap();
+
+                if result.is_empty() {
+                    error!("Empty result from peer");
+                    panic!();
+                }
+                if result1.is_empty() {
+                    error!("Empty result from peer");
+                    panic!();
+                }
+
+                let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
+                let ports: Vec<String> = serde_json::from_str(&result1[0]).unwrap();
+
+                let local_ip = local_ip().unwrap().to_string();
+                let frame = messages::get_transaction_msg(peerid, peerid, transaction);
+                peer::send_transaction(frame, local_ip, ports.to_owned()).await;
             }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");

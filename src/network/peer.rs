@@ -23,7 +23,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-static SERVER_IP: &str = "192.168.0.12";
+static SERVER_IP: &str = "192.168.0.13";
 const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
 static NUM_PORTS: usize = 20;
 static BATCH_SIZE: usize = 128;
@@ -69,7 +69,6 @@ pub enum Command {
 }
 
 type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
-
 
 async fn get_connection(ip: &str, ports: &[&str]) -> Option<Connection> {
     let mut connection_wrapped: Option<Connection> = None;
@@ -172,7 +171,7 @@ impl Peer {
         return peer;
     }
 
-    pub async fn launch() -> Sender<Command>{
+    pub async fn launch() -> Sender<Command> {
         let slash = if env::consts::OS == "windows" {
             "\\"
         } else {
@@ -198,7 +197,7 @@ impl Peer {
 
         // We need to ensure all our ports are available. If not we need to change them.
         // Query the server
-        
+
         // peer.set_ports().await;
         let msg = messages::get_ports_query(peer.peerid, 1, peer.ports.clone());
         let (ipmap, portmap) = send_ports_query(
@@ -230,7 +229,7 @@ impl Peer {
         };
 
         tx_clone.send(cmd).await.ok();
-        
+
         let result = resp_rx.await.unwrap().unwrap();
         if result.is_empty() {
             error!("Empty result from peer");
@@ -247,7 +246,6 @@ impl Peer {
             let tx_clone = tx.clone();
             tokio::spawn(async move { Peer::listen(ip, port, tx_clone).await });
         }
-
 
         return tx.clone();
     }
@@ -299,7 +297,6 @@ impl Peer {
                         ];
                         resp.send(Ok(response_vector)).ok();
                         Peer::save_peer(&peer);
-                        
                     } else if key.as_str() == "BD_query" {
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
@@ -326,34 +323,21 @@ impl Peer {
                         return;
                     }
                 }
-                Command::Get { key, resp} => {
+                Command::Get { key, resp } => {
                     if key.as_str() == "ports_query" {
-
-                        let response_vector = vec![
-                            serde_json::to_string(&peer.ports)
-                                .expect("Failed to serialize ports"),
-                        ];
+                        let response_vector =
+                            vec![serde_json::to_string(&peer.ports)
+                                .expect("Failed to serialize ports")];
                         resp.send(Ok(response_vector)).ok();
-
-                    } 
-
-                    else if key.as_str() == "ip_map_query"{
-                        let response_vector = vec![
-                            serde_json::to_string(&peer.ip_map)
-                                .expect("Failed to serialize ip map"),
-                        ];
+                    } else if key.as_str() == "ip_map_query" {
+                        let response_vector = vec![serde_json::to_string(&peer.ip_map)
+                            .expect("Failed to serialize ip map")];
                         resp.send(Ok(response_vector)).ok();
-                    }
-
-                    else if key.as_str() == "id_query"{
-                        let response_vector = vec![
-                            serde_json::to_string(&peer.peerid)
-                                .expect("Failed to serialize ip map"),
-                        ];
+                    } else if key.as_str() == "id_query" {
+                        let response_vector = vec![serde_json::to_string(&peer.peerid)
+                            .expect("Failed to serialize ip map")];
                         resp.send(Ok(response_vector)).ok();
-                    }
-
-                    else {
+                    } else {
                         warn!("invalid command for peer");
                         return;
                     }
@@ -362,7 +346,7 @@ impl Peer {
         }
     }
 
-    pub async fn listen(ip: String, port: String, tx:Sender<Command>) {
+    pub async fn listen(ip: String, port: String, tx: Sender<Command>) {
         let socket = ip + ":" + &port;
         let listener = TcpListener::bind(&socket).await.unwrap();
         info!("Successfully setup listener at {}", socket);
@@ -384,11 +368,7 @@ impl Peer {
         }
     }
 
-    async fn process_connection(
-        stream: TcpStream,
-        socket: String,
-        tx: Sender<Command>,
-    ) {
+    async fn process_connection(stream: TcpStream, socket: String, tx: Sender<Command>) {
         let ip = stream.peer_addr().unwrap().ip().to_string();
         let mut connection = Connection::new(stream);
         loop {
