@@ -2,6 +2,7 @@ use crate::components::transaction::{
     Outpoint, PublicKeyScript, SignatureScript, Transaction, TxIn, TxOut,
 };
 use crate::network::messages;
+use crate::network::miner::Miner;
 use crate::network::peer::{self, Command, Peer};
 use crate::simulation::start;
 use crate::utils::graph::create_block_graph;
@@ -23,9 +24,15 @@ use tokio::sync::oneshot;
 
 static mut SIM_STATUS: bool = false;
 
-pub async fn shell() {
+pub async fn shell(is_miner: bool) {
     let mut tx_sim_option: Option<Sender<String>> = None;
-    let tx_to_manager = Peer::launch().await;
+    let tx_to_manager: Sender<Command>;
+    if is_miner {
+        tx_to_manager = Miner::launch().await;
+    } else {
+        tx_to_manager = Peer::launch().await;
+    }
+
     info!("Successfully launched peer!");
 
     loop {

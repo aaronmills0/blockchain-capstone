@@ -4,10 +4,7 @@ mod performance_tests;
 mod shell;
 mod simulation;
 mod utils;
-use crate::{
-    network::{miner::Miner, server::Server},
-    shell::shell,
-};
+use crate::{network::server::Server, shell::shell};
 use log::info;
 use std::env::{self};
 
@@ -39,9 +36,7 @@ async fn main() {
 
     if cmd_server {
         Server::launch().await;
-    } else if cmd_miner {
-        Miner::launch().await;
     } else {
-        shell().await;
+        shell(cmd_miner).await;
     }
 }

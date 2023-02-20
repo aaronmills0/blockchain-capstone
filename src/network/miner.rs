@@ -136,20 +136,26 @@ impl Miner {
                             mempool.hashes = HashSet::new();
                         }
                     } else {
+                        let (resp_tx, resp_rx) = oneshot::channel();
                         let cmd_peer = Command::Set {
                             key: key,
-                            resp: resp,
+                            resp: resp_tx,
                             payload: payload,
                         };
-                        tx_peer.send(cmd_peer);
+                        tx_peer.send(cmd_peer).await;
+                        let response = resp_rx.await;
+                        resp.send(response.unwrap());
                     }
                 }
                 Command::Get { key, resp } => {
+                    let (resp_tx, resp_rx) = oneshot::channel();
                     let cmd_peer = Command::Get {
                         key: key,
-                        resp: resp,
+                        resp: resp_tx,
                     };
-                    tx_peer.send(cmd_peer);
+                    tx_peer.send(cmd_peer).await;
+                    let response = resp_rx.await;
+                    resp.send(response.unwrap());
                 }
             }
         }
