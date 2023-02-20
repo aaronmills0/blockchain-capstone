@@ -29,7 +29,7 @@ pub fn get_header(sourceid: u32, destid: u32, command: String) -> Frame {
     return header_frame;
 }
 
-pub fn get_peerid_query() -> Frame {
+pub fn get_header_message_for_peerid_query() -> Frame {
     let header_frame = get_header(0, 1, String::from("00000000"));
     return Frame::Array(Vec::from([header_frame]));
 }
@@ -53,27 +53,27 @@ pub fn get_peerid_response(destid: u32) -> Frame {
     return Frame::Array(response_vec);
 }
 
-pub fn get_ports_query(sourceid: u32, destid: u32, ports: Vec<String>) -> Frame {
+pub fn get_ports_msg_for_maps_query(sourceid: u32, destid: u32, ports: Vec<String>) -> Frame {
     let header_frame = get_header(sourceid, destid, String::from("00000010"));
     let ports_frame = Frame::Bulk(Bytes::from(serde_json::to_string(&ports).unwrap()));
     return Frame::Array(Vec::from([header_frame, ports_frame]));
 }
 
-pub fn get_ports_response(
+pub fn get_maps_response(
     sourceid: u32,
     destid: u32,
     ip_map_json: String,
-    port_map_json: String,
+    ports_map_json: String,
 ) -> Frame {
     let mut response_vec: Vec<Frame> = Vec::new();
 
     let header_frame = get_header(sourceid, destid, String::from("00000011"));
     response_vec.push(header_frame);
 
-    let ip_frame = Frame::Bulk(Bytes::from(ip_map_json));
-    let port_frame = Frame::Bulk(Bytes::from(port_map_json));
-    response_vec.push(ip_frame);
-    response_vec.push(port_frame);
+    let ip_map_frame = Frame::Bulk(Bytes::from(ip_map_json));
+    let ports_map_frame = Frame::Bulk(Bytes::from(ports_map_json));
+    response_vec.push(ip_map_frame);
+    response_vec.push(ports_map_frame);
     return Frame::Array(response_vec);
 }
 
@@ -102,7 +102,7 @@ pub fn get_transaction_msg(sourceid: u32, destid: u32, tx: &Transaction) -> Fram
  * Pass the hash of the head of the current chain to receive the remainder of the chain
  * Upon initialization, send the hash of the genesis block
  */
-pub fn get_bd_query(sourceid: u32, destid: u32, head_hash: String) -> Frame {
+pub fn get_head_hash_msg_for_bd_query(sourceid: u32, destid: u32, head_hash: String) -> Frame {
     let mut response_vec: Vec<Frame> = Vec::new();
 
     let header_frame = get_header(sourceid, destid, String::from("00000110"));

@@ -62,7 +62,7 @@ impl Server {
                     String::from("13435"),
                 ],
                 ip_map: HashMap::new(),
-                port_map: HashMap::new(),
+                ports_map: HashMap::new(),
                 blockchain: vec![Block {
                     header: BlockHeader {
                         previous_hash: "0".repeat(32),
@@ -105,7 +105,7 @@ impl Server {
                             .ok();
                         server.next_peerid += 1;
                         Server::save_server(&server);
-                    } else if key.as_str() == "ports_query" {
+                    } else if key.as_str() == "maps_query" {
                         let payload_vec = payload.unwrap();
                         if payload_vec.len() <= 2 {
                             error!("Invalid command: payload is of unexpected size");
@@ -114,18 +114,18 @@ impl Server {
                         let sourceid: u32 = payload_vec[0].parse().unwrap();
                         let ip = payload_vec[1].clone();
 
-                        // Update the server ip_map and port_map
+                        // Update the server ip_map and ports_map
                         server.peer.ip_map.insert(sourceid, ip.clone());
                         server
                             .peer
-                            .port_map
+                            .ports_map
                             .insert(ip.clone(), payload_vec[2..].to_vec());
 
                         let response_vector = vec![
                             serde_json::to_string(&server.peer.ip_map)
                                 .expect("Failed to serialize ip map"),
-                            serde_json::to_string(&server.peer.port_map)
-                                .expect("Failed to serialize port map"),
+                            serde_json::to_string(&server.peer.ports_map)
+                                .expect("Failed to serialize ports map"),
                         ];
                         resp.send(Ok(response_vector)).ok();
                         Server::save_server(&server);
@@ -220,10 +220,10 @@ impl Server {
                             let peerid = result.unwrap().unwrap()[0].parse().unwrap();
                             let response = messages::get_peerid_response(peerid);
                             connection.write_frame(&response).await.ok();
-                        } else if command == "ports_query" {
-                            let mut ports = decoder::decode_ports_query(&frame);
+                        } else if command == "maps_query" {
+                            let mut ports = decoder::decode_ports(&frame);
                             if ports.is_empty() {
-                                error!("No ports found when decoding ports query");
+                                error!("No ports found when decoding ports for maps query");
                                 panic!();
                             }
 
@@ -243,15 +243,15 @@ impl Server {
                                 panic!();
                             }
                             let ip_map_json = result[0].to_owned();
-                            let port_map_json = result[1].to_owned();
+                            let ports_map_json = result[1].to_owned();
                             info!("Sending ip_map: {:?}", ip_map_json);
-                            info!("Sending port_map: {:?}", port_map_json);
+                            info!("Sending ports_map: {:?}", ports_map_json);
 
-                            let response = messages::get_ports_response(
+                            let response = messages::get_maps_response(
                                 destid,
                                 sourceid,
                                 ip_map_json,
-                                port_map_json,
+                                ports_map_json,
                             );
                             connection.write_frame(&response).await.ok();
                         } else {
