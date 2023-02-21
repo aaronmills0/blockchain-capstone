@@ -62,7 +62,7 @@ impl Miner {
             219, 144, 86, 74, 205, 134, 25,
         ])
         .unwrap();
-        let public_key0 = PublicKey(keypair.public);
+        let public_key = PublicKey(keypair.public);
         let outpoint: Outpoint = Outpoint {
             txid: "0".repeat(64),
             index: 0,
