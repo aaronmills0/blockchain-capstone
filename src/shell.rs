@@ -21,6 +21,7 @@ use port_scanner::scan_port;
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::fs::File;
+use std::io::Write;
 use std::path::Path;
 use std::process::exit;
 use std::sync::mpsc;
@@ -149,138 +150,236 @@ pub async fn shell() {
                     tx_outputs: Vec::from([]),
                 };
 
+                let mut example_transaction = get_example_transaction();
+
+                let mut map = Map::new();
+                let server_json = serde_json::to_value(example_transaction);
+
+                if server_json.is_err() {
+                    error!("Failed to serialize server peer");
+                    panic!();
+                }
+
+                let mut json = server_json.unwrap();
+
+                map.insert(String::from("transaction"), json);
+
+                json = serde_json::Value::Object(map);
+
                 let slash = if env::consts::OS == "windows" {
                     "\\"
                 } else {
                     "/"
                 };
-                let data = fs::read_to_string("system".to_owned() + slash + "wallet.json");
-                if data.is_err() {
-                    error!("Failed to load file. {:?}", data.err());
+                if fs::create_dir_all("system".to_owned() + slash).is_err() {
+                    warn!("Failed to create directory! It may already exist, or permissions are needed.");
+                }
+
+                let cwd = std::env::current_dir().unwrap();
+                let mut dirpath = cwd.into_os_string().into_string().unwrap();
+                dirpath.push_str(&(slash.to_owned() + "system"));
+
+                let dir_path = Path::new(&dirpath);
+
+                let file_name: &str = &format!("transaction.json");
+
+                let file_path = dir_path.join(file_name);
+                let file = File::create(file_path);
+                if file.is_err() {
+                    error!("Failed to create new file.");
                     panic!();
                 }
-                let json: Value = serde_json::from_str(&data.unwrap()).unwrap();
-                let wallet: Wallet =
-                    serde_json::from_value(json.get("wallet").unwrap().to_owned()).unwrap();
-
-                for i in 0..wallet.0.len() {
-                    let (private_key, public_key, outpoint, value_from_outpoint) =
-                        wallet.0[i].clone();
-
-                    let tx_out: TxOut = TxOut {
-                        value: value_from_outpoint,
-                        pk_script: PublicKeyScript {
-                            public_key_hash: hash::hash_as_string(&public_key),
-                            verifier: Verifier {},
-                        },
-                    };
-
-                    let message = String::from(&outpoint.txid)
-                        + &outpoint.index.to_string()
-                        + &tx_out.pk_script.public_key_hash;
-
-                    let sig_script = SignatureScript {
-                        signature: sign_and_verify::sign(&message, &private_key, &public_key),
-                        full_public_key: public_key,
-                    };
-
-                    let tx_in: TxIn = TxIn {
-                        outpoint: outpoint,
-                        sig_script: sig_script,
-                    };
-
-                    transaction.tx_inputs.append(&mut vec![tx_in]);
+                if file
+                    .unwrap()
+                    .write_all(serde_json::to_string_pretty(&json).unwrap().as_bytes())
+                    .is_err()
+                {
+                    error!("Failed to write to file.");
+                    panic!();
                 }
 
-                /*
-                info!("Welcome to the transaction creator! In order to create a transaction, first enter your hex private key:");
-                let mut private_key = String::new();
+                info!("Welcome to the transaction creator! Would you like to create a transaction using a config file (y) or your wallet (n)? y/n");
+                let mut choice = String::new();
                 io::stdin()
-                    .read_line(&mut private_key)
+                    .read_line(&mut choice)
                     .expect("Failed to read line");
 
-                info!("Now enter your hex public key:");
-                let mut public_key = String::new();
-                io::stdin()
-                    .read_line(&mut public_key)
-                    .expect("Failed to read line");
-
-                info!("Now enter the txid of the transaction you would like to spend:");
-                let mut txid = String::new();
-                io::stdin()
-                    .read_line(&mut txid)
-                    .expect("Failed to read line");
-
-                info!("Now enter the index corresponding to the output in the transaction you would like to spend:");
-                let mut str_index: String = String::new();
-                io::stdin()
-                    .read_line(&mut str_index)
-                    .expect("Failed to read line");
-                let trimmed_index = str_index.trim();
-                let index = match trimmed_index.parse::<u32>() {
-                    Ok(i) => i,
-                    Err(..) => {
-                        error!("Period needs to be a u64");
-                        panic!();
+                match choice.to_lowercase().trim() {
+                    "y" => {
+                        info!("Hello!!!");
+                        let slash = if env::consts::OS == "windows" {
+                            "\\"
+                        } else {
+                            "/"
+                        };
+                        let data =
+                            fs::read_to_string("system".to_owned() + slash + "transaction.json");
+                        if data.is_err() {
+                            error!("Failed to load file. {:?}", data.err());
+                            panic!();
+                        }
+                        let json: Value = serde_json::from_str(&data.unwrap()).unwrap();
+                        transaction =
+                            serde_json::from_value(json.get("transaction").unwrap().to_owned())
+                                .unwrap();
                     }
-                };
+                    _ => {
+                        let slash = if env::consts::OS == "windows" {
+                            "\\"
+                        } else {
+                            "/"
+                        };
+                        let data = fs::read_to_string("system".to_owned() + slash + "wallet.json");
+                        if data.is_err() {
+                            error!("Failed to load file. {:?}", data.err());
+                            panic!();
+                        }
+                        let json: Value = serde_json::from_str(&data.unwrap()).unwrap();
+                        let wallet: Wallet =
+                            serde_json::from_value(json.get("wallet").unwrap().to_owned()).unwrap();
 
-                let outpoint: Outpoint = Outpoint {
-                    txid: txid,
-                    index: index,
-                };
+                        for i in 0..wallet.0.len() {
+                            let (private_key, public_key, outpoint, value_from_outpoint) =
+                                wallet.0[i].clone();
 
-                info!("Now enter the message to sign:");
-                let mut message: String = String::new();
-                io::stdin()
-                    .read_line(&mut message)
-                    .expect("Failed to read line");
+                            let tx_out: TxOut = TxOut {
+                                value: value_from_outpoint,
+                                pk_script: PublicKeyScript {
+                                    public_key_hash: hash::hash_as_string(&public_key),
+                                    verifier: Verifier {},
+                                },
+                            };
 
-                let private_bytes = hex::decode(private_key).unwrap();
-                let public_bytes = hex::decode(public_key).unwrap();
+                            let message = String::from(&outpoint.txid)
+                                + &outpoint.index.to_string()
+                                + &tx_out.pk_script.public_key_hash;
 
-                let sig_script1 = SignatureScript {
-                    signature: sign_and_verify::sign(
-                        &message,
-                        &PrivateKey(DalekSecretKey::from_bytes(&private_bytes).unwrap()),
-                        &PublicKey(DalekPublicKey::from_bytes(&public_bytes).unwrap()),
-                    ),
-                    full_public_key: PublicKey(DalekPublicKey::from_bytes(&public_bytes).unwrap()),
-                };
+                            let sig_script = SignatureScript {
+                                signature: sign_and_verify::sign(
+                                    &message,
+                                    &private_key,
+                                    &public_key,
+                                ),
+                                full_public_key: public_key,
+                            };
 
-                let tx_in: TxIn = TxIn {
-                    outpoint: outpoint,
-                    sig_script: sig_script1,
-                };
+                            let tx_in: TxIn = TxIn {
+                                outpoint: outpoint,
+                                sig_script: sig_script,
+                            };
 
-                let mut str_value: String = String::new();
-                io::stdin()
-                    .read_line(&mut str_value)
-                    .expect("Failed to read line");
-                let trimmed_value = str_value.trim();
-                let value = match trimmed_value.parse::<u32>() {
-                    Ok(i) => i,
-                    Err(..) => {
-                        error!("Period needs to be a u64");
-                        panic!();
+                            transaction.tx_inputs.append(&mut vec![tx_in]);
+                        }
+
+                        info!(
+                            "Enter the number of receipients you would like for your transaction: "
+                        );
+                        let mut str_out: String = String::new();
+                        io::stdin()
+                            .read_line(&mut str_out)
+                            .expect("Failed to read line");
+                        let trimmed_out = str_out.trim();
+                        let num_out = match trimmed_out.parse::<u32>() {
+                            Ok(i) => i,
+                            Err(..) => {
+                                error!("Period needs to be a u64");
+                                panic!();
+                            }
+                        };
+
+                        for i in 0..num_out {}
+
+                        /*
+                        info!("Welcome to the transaction creator! In order to create a transaction, first enter your hex private key:");
+                        let mut private_key = String::new();
+                        io::stdin()
+                            .read_line(&mut private_key)
+                            .expect("Failed to read line");
+
+                        info!("Now enter your hex public key:");
+                        let mut public_key = String::new();
+                        io::stdin()
+                            .read_line(&mut public_key)
+                            .expect("Failed to read line");
+
+                        info!("Now enter the txid of the transaction you would like to spend:");
+                        let mut txid = String::new();
+                        io::stdin()
+                            .read_line(&mut txid)
+                            .expect("Failed to read line");
+
+                        info!("Now enter the index corresponding to the output in the transaction you would like to spend:");
+                        let mut str_index: String = String::new();
+                        io::stdin()
+                            .read_line(&mut str_index)
+                            .expect("Failed to read line");
+                        let trimmed_index = str_index.trim();
+                        let index = match trimmed_index.parse::<u32>() {
+                            Ok(i) => i,
+                            Err(..) => {
+                                error!("Period needs to be a u64");
+                                panic!();
+                            }
+                        };
+
+                        let outpoint: Outpoint = Outpoint {
+                            txid: txid,
+                            index: index,
+                        };
+
+                        info!("Now enter the message to sign:");
+                        let mut message: String = String::new();
+                        io::stdin()
+                            .read_line(&mut message)
+                            .expect("Failed to read line");
+
+                        let private_bytes = hex::decode(private_key).unwrap();
+                        let public_bytes = hex::decode(public_key).unwrap();
+
+                        let sig_script1 = SignatureScript {
+                            signature: sign_and_verify::sign(
+                                &message,
+                                &PrivateKey(DalekSecretKey::from_bytes(&private_bytes).unwrap()),
+                                &PublicKey(DalekPublicKey::from_bytes(&public_bytes).unwrap()),
+                            ),
+                            full_public_key: PublicKey(DalekPublicKey::from_bytes(&public_bytes).unwrap()),
+                        };
+
+                        let tx_in: TxIn = TxIn {
+                            outpoint: outpoint,
+                            sig_script: sig_script1,
+                        };
+
+                        let mut str_value: String = String::new();
+                        io::stdin()
+                            .read_line(&mut str_value)
+                            .expect("Failed to read line");
+                        let trimmed_value = str_value.trim();
+                        let value = match trimmed_value.parse::<u32>() {
+                            Ok(i) => i,
+                            Err(..) => {
+                                error!("Period needs to be a u64");
+                                panic!();
+                            }
+                        };
+
+                        // We create a new keypair corresponding to our new transaction which allows us to create its tx_out
+                        let (_, public_key1) = sign_and_verify::create_keypair();
+                        let tx_out: TxOut = TxOut {
+                            value: value,
+                            pk_script: PublicKeyScript {
+                                public_key_hash: hash::hash_as_string(&public_key1),
+                                verifier: Verifier {},
+                            },
+                        };
+
+                        let transaction: Transaction = Transaction {
+                            tx_inputs: Vec::from([tx_in]),
+                            tx_outputs: Vec::from([tx_out]),
+                        };
+                        */
                     }
-                };
-
-                // We create a new keypair corresponding to our new transaction which allows us to create its tx_out
-                let (_, public_key1) = sign_and_verify::create_keypair();
-                let tx_out: TxOut = TxOut {
-                    value: value,
-                    pk_script: PublicKeyScript {
-                        public_key_hash: hash::hash_as_string(&public_key1),
-                        verifier: Verifier {},
-                    },
-                };
-
-                let transaction: Transaction = Transaction {
-                    tx_inputs: Vec::from([tx_in]),
-                    tx_outputs: Vec::from([tx_out]),
-                };
-                */
+                }
 
                 let (resp_tx, resp_rx) = oneshot::channel();
                 let (resp_tx_1, resp_rx_1) = oneshot::channel();
@@ -311,6 +410,16 @@ pub async fn shell() {
 
                 let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
                 let ports: Vec<String> = serde_json::from_str(&result1[0]).unwrap();
+
+                /*
+                    let msg = messages::get_ports_query(peer.peerid, 1, peer.ports.clone());
+                    let (ipmap, portmap) = send_ports_query(
+                        msg,
+                        SERVER_IP.to_owned(),
+                        SERVER_PORTS.iter().map(|&s| s.into()).collect(),
+                    )
+                    .await;
+                */
 
                 let local_ip = local_ip().unwrap().to_string();
                 let frame = messages::get_transaction_msg(peerid, peerid, transaction);
