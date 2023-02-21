@@ -146,6 +146,16 @@ pub async fn send_transaction(msg: Frame, ip: String, ports: Vec<String>) {
     connection.write_frame(&msg).await.ok();
 }
 
+pub async fn broadcast(msg: Frame, ip: &String, ports: &Vec<String>) {
+    let ports: Vec<&str> = ports.iter().map(AsRef::as_ref).collect();
+    let connection_opt = get_connection(ip, ports.as_slice()).await;
+    if connection_opt.is_none() {
+        panic!("Cannot connect to the server");
+    }
+    let mut connection = connection_opt.unwrap();
+    connection.write_frame(&msg).await.ok();
+}
+
 impl Peer {
     pub fn new() -> Peer {
         let mut peer = Peer {
@@ -248,6 +258,35 @@ impl Peer {
         }
 
         return tx.clone();
+    }
+
+    pub async fn get_peer_info(
+        tx_to_manager: &Sender<Command>,
+    ) -> (
+        u32,
+        Vec<String>,
+        HashMap<u32, String>,
+        HashMap<String, Vec<String>>,
+    ) {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        let cmd = Command::Get {
+            key: String::from("all"),
+            resp: resp_tx,
+        };
+        tx_to_manager.send(cmd).await.ok();
+
+        let result = resp_rx.await.unwrap().unwrap();
+        if result.is_empty() {
+            error!("Empty result from peer");
+            panic!();
+        }
+
+        let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
+        let ports: Vec<String> = serde_json::from_str(&result[1]).unwrap();
+        let ip_map: HashMap<u32, String> = serde_json::from_str(&result[2]).unwrap();
+        let ports_map: HashMap<String, Vec<String>> = serde_json::from_str(&result[3]).unwrap();
+
+        return (peerid, ports, ip_map, ports_map);
     }
 
     async fn peer_manager(mut peer: Peer, mut rx: Receiver<Command>) {

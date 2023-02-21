@@ -87,7 +87,7 @@ pub fn get_termination_msg(sourceid: u32, destid: u32) -> Frame {
     return Frame::Array(response_vec);
 }
 
-pub fn get_transaction_msg(sourceid: u32, destid: u32, tx: Transaction) -> Frame {
+pub fn get_transaction_msg(sourceid: u32, destid: u32, tx: &Transaction) -> Frame {
     let mut response_vec: Vec<Frame> = Vec::new();
 
     let header_frame = get_header(sourceid, destid, String::from("00000101"));

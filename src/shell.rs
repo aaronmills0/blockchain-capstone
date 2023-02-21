@@ -3,18 +3,12 @@ use crate::components::transaction::{
 };
 use crate::network::messages;
 use crate::network::peer::{self, Command, Peer};
-use crate::simulation::start;
-use crate::utils::graph::create_block_graph;
 use crate::utils::hash;
 use crate::utils::save_and_load::deserialize_json;
 use crate::utils::sign_and_verify::{self, Verifier};
 use crate::utils::sign_and_verify::{PrivateKey, PublicKey};
 use crate::wallet::Wallet;
 use chrono::Local;
-use ed25519_dalek::{
-    ExpandedSecretKey, Keypair, PublicKey as DalekPublicKey, SecretKey as DalekSecretKey,
-    Signature as DalekSignature, Verifier as DalekVerifer,
-};
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use port_scanner::scan_port;
@@ -109,49 +103,13 @@ pub async fn shell() {
                 }
             }
             "transaction" | "tx" | "-t" => {
-                let (resp_tx, resp_rx) = oneshot::channel();
-                let (resp_tx_1, resp_rx_1) = oneshot::channel();
-
-                let cmd = Command::Get {
-                    key: String::from("id_query"),
-                    resp: resp_tx,
-                };
-                let cmd1 = Command::Get {
-                    key: String::from("ports_query"),
-                    resp: resp_tx_1,
-                };
-
-                tx_to_manager.send(cmd).await.ok();
-                tx_to_manager.send(cmd1).await.ok();
-
-                let result = resp_rx.await.unwrap().unwrap();
-                let result1 = resp_rx_1.await.unwrap().unwrap();
-
-                if result.is_empty() {
-                    error!("Empty result from peer");
-                    panic!();
-                }
-                if result1.is_empty() {
-                    error!("Empty result from peer");
-                    panic!();
-                }
-
-                let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
-                let ports: Vec<String> = serde_json::from_str(&result1[0]).unwrap();
-
-                let local_ip = local_ip().unwrap().to_string();
-                let frame =
-                    messages::get_transaction_msg(peerid, peerid, get_example_transaction());
-                peer::send_transaction(frame, local_ip, ports.to_owned()).await;
-            }
-            "create transaction" | "create tx" | "Create Transaction" => {
                 let mut transaction = Transaction {
                     tx_inputs: Vec::from([]),
                     tx_outputs: Vec::from([]),
                 };
 
-                // As a test for loading the transaction and broadcatsing it, create transaction.json
-                let mut example_transaction = get_example_transaction();
+                // This is a test for loading the transaction and broadcatsing it. This block of code creates transaction.json
+                let example_transaction = get_example_transaction();
 
                 let mut map = Map::new();
                 let server_json = serde_json::to_value(example_transaction);
@@ -199,7 +157,7 @@ pub async fn shell() {
                     panic!();
                 }
 
-                // As a test for loading the transaction and broadcatsing it, create wallet.json
+                // This is a test for loading the transaction and broadcatsing it. It creates wallet.json
                 let (private_key_initial, public_key_initial) = sign_and_verify::create_keypair();
                 let values = vec![(
                     private_key_initial,
@@ -210,7 +168,7 @@ pub async fn shell() {
                     },
                     500,
                 )];
-                let mut wallet: Wallet = Wallet(values);
+                let wallet: Wallet = Wallet(values);
 
                 let mut map = Map::new();
                 let server_json = serde_json::to_value(wallet);
@@ -258,6 +216,7 @@ pub async fn shell() {
                     panic!();
                 }
 
+                // start of the transaction creator
                 info!("Welcome to the transaction creator! Would you like to create a transaction using a config file (y) or your wallet (n)? y/n");
                 let mut choice = String::new();
                 io::stdin()
@@ -265,6 +224,7 @@ pub async fn shell() {
                     .expect("Failed to read line");
 
                 match choice.to_lowercase().trim() {
+                    // In this case, we simply need to be provided with a transaction.json file that we deserialize and directly send the transaction
                     "y" => {
                         info!("Hello!!!");
                         let slash = if env::consts::OS == "windows" {
@@ -284,6 +244,8 @@ pub async fn shell() {
                                 .unwrap();
                     }
                     "n" => {
+                        // In this case, we need to be provided with a wallet.json file which we deserialize to obtain certain
+                        // parameters (public, private keys) we need to create our transaction
                         let slash = if env::consts::OS == "windows" {
                             "\\"
                         } else {
@@ -298,6 +260,7 @@ pub async fn shell() {
                         let wallet: Wallet =
                             serde_json::from_value(json.get("wallet").unwrap().to_owned()).unwrap();
 
+                        // We create the tx_inputs
                         for i in 0..wallet.0.len() {
                             let (private_key, public_key, outpoint, value_from_outpoint) =
                                 wallet.0[i].clone();
@@ -324,13 +287,14 @@ pub async fn shell() {
                             };
 
                             let tx_in: TxIn = TxIn {
-                                outpoint: outpoint,
-                                sig_script: sig_script,
+                                outpoint,
+                                sig_script,
                             };
 
                             transaction.tx_inputs.append(&mut vec![tx_in]);
                         }
 
+                        // We need the recipients to create the tx_outputs
                         info!(
                             "Enter the number of receipients you would like for your transaction: "
                         );
@@ -347,7 +311,8 @@ pub async fn shell() {
                             }
                         };
 
-                        for i in 0..num_out {
+                        // We create the tx_outputs
+                        for _i in 0..num_out {
                             info!("Enter the hash of the public key associated with the next recipient:");
                             let mut public_key = String::new();
                             io::stdin()
@@ -369,7 +334,7 @@ pub async fn shell() {
                             };
 
                             let tx_out: TxOut = TxOut {
-                                value: value,
+                                value,
                                 pk_script: PublicKeyScript {
                                     public_key_hash: hash::hash_as_string(&public_key),
                                     verifier: Verifier {},
@@ -385,6 +350,7 @@ pub async fn shell() {
                     }
                 }
 
+                // We broadcast the transaction
                 let (resp_tx, resp_rx) = oneshot::channel();
                 let (resp_tx_1, resp_rx_1) = oneshot::channel();
 
@@ -411,23 +377,19 @@ pub async fn shell() {
                     error!("Empty result from peer");
                     panic!();
                 }
-
                 let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
                 let ports: Vec<String> = serde_json::from_str(&result1[0]).unwrap();
 
-                /*
-                    let msg = messages::get_ports_query(peer.peerid, 1, peer.ports.clone());
-                    let (ipmap, portmap) = send_ports_query(
-                        msg,
-                        SERVER_IP.to_owned(),
-                        SERVER_PORTS.iter().map(|&s| s.into()).collect(),
-                    )
-                    .await;
-                */
-
                 let local_ip = local_ip().unwrap().to_string();
-                let frame = messages::get_transaction_msg(peerid, peerid, transaction);
+                let frame = messages::get_transaction_msg(peerid, peerid, &transaction);
                 peer::send_transaction(frame, local_ip, ports.to_owned()).await;
+
+                /*
+                let (peerid, _, ip_map, ports_map) = Peer::get_peer_info(&tx_to_manager).await;
+                for (id, ip) in ip_map {
+                    let frame = messages::get_transaction_msg(peerid, id, &transaction);
+                    peer::broadcast(frame, &ip, &ports_map[&ip]).await;
+                } */
             }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");
