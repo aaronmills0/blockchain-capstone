@@ -377,19 +377,18 @@ pub async fn shell() {
                     error!("Empty result from peer");
                     panic!();
                 }
+
                 let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
                 let ports: Vec<String> = serde_json::from_str(&result1[0]).unwrap();
-
                 let local_ip = local_ip().unwrap().to_string();
                 let frame = messages::get_transaction_msg(peerid, peerid, &transaction);
                 peer::send_transaction(frame, local_ip, ports.to_owned()).await;
 
-                /*
-                let (peerid, _, ip_map, ports_map) = Peer::get_peer_info(&tx_to_manager).await;
+                /*let (peerid, _, ip_map, ports_map) = Peer::get_peer_info(&tx_to_manager).await;
                 for (id, ip) in ip_map {
                     let frame = messages::get_transaction_msg(peerid, id, &transaction);
                     peer::broadcast(frame, &ip, &ports_map[&ip]).await;
-                } */
+                }*/
             }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");
