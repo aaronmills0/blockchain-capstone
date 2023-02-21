@@ -28,7 +28,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-pub static SERVER_IP: &str = "192.168.0.12";
+pub static SERVER_IP: &str = "192.168.0.101";
 pub const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
 pub static NUM_PORTS: usize = 20;
 pub static BATCH_SIZE: usize = 1024;
@@ -259,14 +259,14 @@ impl Peer {
 
     pub async fn set_ports(&mut self) {
         // Update any set ports that are unavailable
-        for i in 0..self.ports.len() {
-            let socket = self.address.clone() + ":" + &self.ports[i];
-            let conn = TcpStream::connect(&socket).await;
-            if conn.is_err() {
-                info!("Port {} is unavailable. Setting new port...", i);
-                self.ports[i] = self.set_new_port().await;
-            };
-        }
+        // for i in 0..self.ports.len() {
+        //     let socket = self.address.clone() + ":" + &self.ports[i];
+        //     let conn = TcpStream::connect(&socket).await;
+        //     if conn.is_err() {
+        //         info!("Port {} is unavailable. Setting new port...", i);
+        //         self.ports[i] = self.set_new_port().await;
+        //     };
+        // }
 
         // Add new ports until there are `NUM_PORTS` ports
         while self.ports.len() < NUM_PORTS {
@@ -365,6 +365,20 @@ impl Peer {
                                 .append(&mut mempool.transactions); // Removes all elements from mempool
                             mempool.hashes = HashSet::new();
                         }
+                    } else if key.as_str() == "block" {
+                        if payload.is_none() {
+                            error!("Invalid command: missing payload");
+                            panic!();
+                        }
+
+                        let payload_vec = payload.unwrap();
+                        if payload_vec.len() != 1 {
+                            error!("Invalid command: payload is of unexpected size");
+                            panic!();
+                        }
+                        let block: Block = serde_json::from_str(&payload_vec[0])
+                            .expect("Could not deserialize string to block.");
+                        info!("Block: {:?}", block);
                     } else if key.as_str() == "ports_query" {
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
@@ -504,10 +518,10 @@ impl Peer {
                         let (command, sourceid, destid) = decoder::decode_command(&frame);
 
                         let (resp_tx, resp_rx) = oneshot::channel();
-                        if command == "transaction" {
-                            let json = decoder::decode_transactions_msg(frame);
+                        if command == "transaction" || command == "block" {
+                            let json = decoder::decode_json_msg(frame);
                             if json.is_none() {
-                                error!("Missing transaction");
+                                error!("Missing json");
                                 panic!()
                             }
                             cmd = Command::Set {

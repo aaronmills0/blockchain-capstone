@@ -8,8 +8,9 @@ use crate::simulation::start;
 use crate::utils::graph::create_block_graph;
 use crate::utils::hash;
 use crate::utils::save_and_load::deserialize_json;
-use crate::utils::sign_and_verify::{self, Verifier};
+use crate::utils::sign_and_verify::{self, PrivateKey, PublicKey, Verifier};
 use chrono::Local;
+use ed25519_dalek::Keypair;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use port_scanner::scan_port;
@@ -107,12 +108,12 @@ pub async fn shell(is_miner: bool) {
                 }
             }
             "transaction" | "tx" | "-t" => {
-                let (peerid, ports, _, _) = Peer::get_peer_info(&tx_to_manager).await;
-
-                let local_ip = local_ip().unwrap().to_string();
-                let frame =
-                    messages::get_transaction_msg(peerid, peerid, &get_example_transaction());
-                peer::broadcast(frame, &local_ip, &ports).await;
+                let (peerid, _, ip_map, ports_map) = Peer::get_peer_info(&tx_to_manager).await;
+                for (id, ip) in ip_map {
+                    let frame =
+                        messages::get_transaction_msg(peerid, id, &get_example_transaction());
+                    peer::broadcast(frame, &ip, &ports_map[&ip]).await;
+                }
             }
             "tx_test" => {
                 info!("Please enter a receiver id:");
@@ -164,7 +165,15 @@ pub async fn shell(is_miner: bool) {
  */
 
 fn get_example_transaction() -> Transaction {
-    let (private_key0, public_key0) = sign_and_verify::create_keypair();
+    let keypair = Keypair::from_bytes(&[
+        9, 75, 189, 163, 133, 148, 28, 198, 139, 3, 56, 182, 118, 26, 250, 201, 129, 109, 104, 32,
+        92, 248, 176, 200, 83, 98, 207, 118, 47, 231, 60, 75, 4, 65, 208, 174, 11, 82, 239, 211,
+        201, 251, 90, 173, 173, 165, 36, 120, 162, 85, 139, 187, 164, 152, 53, 13, 62, 219, 144,
+        86, 74, 205, 134, 25,
+    ])
+    .unwrap();
+    let private_key0 = PrivateKey(keypair.secret);
+    let public_key0 = PublicKey(keypair.public);
     let outpoint0: Outpoint = Outpoint {
         txid: "0".repeat(64),
         index: 0,
