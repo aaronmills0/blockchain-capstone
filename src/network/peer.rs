@@ -132,14 +132,26 @@ pub async fn send_ports_query(
     return (ip.unwrap(), ports.unwrap());
 }
 
-pub async fn broadcast(msg: Frame, ip: &String, ports: &Vec<String>) {
-    let ports: Vec<&str> = ports.iter().map(AsRef::as_ref).collect();
-    let connection_opt = get_connection(ip, ports.as_slice()).await;
-    if connection_opt.is_none() {
-        panic!("Cannot connect to the server");
+pub async fn broadcast<T: Clone>(
+    msg_fn: fn(u32, u32, T) -> Frame,
+    payload: T,
+    peerid: u32,
+    ip_map: &HashMap<u32, String>,
+    port_map: &HashMap<String, Vec<String>>,
+) {
+    for (id, ip) in ip_map {
+        if *id == peerid {
+            continue;
+        }
+        let frame = msg_fn(peerid, *id, payload.clone());
+        let ports: Vec<&str> = port_map[ip].iter().map(AsRef::as_ref).collect();
+        let connection_opt = get_connection(ip, ports.as_slice()).await;
+        if connection_opt.is_none() {
+            panic!("Cannot connect to the server");
+        }
+        let mut connection = connection_opt.unwrap();
+        connection.write_frame(&frame).await.ok();
     }
-    let mut connection = connection_opt.unwrap();
-    connection.write_frame(&msg).await.ok();
 }
 
 impl Peer {
@@ -259,14 +271,14 @@ impl Peer {
 
     pub async fn set_ports(&mut self) {
         // Update any set ports that are unavailable
-        // for i in 0..self.ports.len() {
-        //     let socket = self.address.clone() + ":" + &self.ports[i];
-        //     let conn = TcpStream::connect(&socket).await;
-        //     if conn.is_err() {
-        //         info!("Port {} is unavailable. Setting new port...", i);
-        //         self.ports[i] = self.set_new_port().await;
-        //     };
-        // }
+        for i in 0..self.ports.len() {
+            let socket = self.address.clone() + ":" + &self.ports[i];
+            let conn = TcpStream::connect(&socket).await;
+            if conn.is_err() {
+                info!("Port {} is unavailable. Setting new port...", i);
+                self.ports[i] = self.set_new_port().await;
+            };
+        }
 
         // Add new ports until there are `NUM_PORTS` ports
         while self.ports.len() < NUM_PORTS {
@@ -299,9 +311,9 @@ impl Peer {
         let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
         let ports: Vec<String> = serde_json::from_str(&result[1]).unwrap();
         let ip_map: HashMap<u32, String> = serde_json::from_str(&result[2]).unwrap();
-        let ports_map: HashMap<String, Vec<String>> = serde_json::from_str(&result[3]).unwrap();
+        let port_map: HashMap<String, Vec<String>> = serde_json::from_str(&result[3]).unwrap();
 
-        return (peerid, ports, ip_map, ports_map);
+        return (peerid, ports, ip_map, port_map);
     }
 
     pub async fn peer_manager(mut peer: Peer, mut rx: Receiver<Command>) {
@@ -379,6 +391,30 @@ impl Peer {
                         let block: Block = serde_json::from_str(&payload_vec[0])
                             .expect("Could not deserialize string to block.");
                         info!("Block: {:?}", block);
+
+                        if peer.block_map.contains_key(&hash_as_string(&block)) {
+                            continue;
+                        }
+                        let (valid, utxo_option) = peer.verify_block(&block);
+
+                        if !valid {
+                            continue;
+                        }
+
+                        broadcast(
+                            messages::get_block_msg,
+                            &block,
+                            peer.peerid,
+                            &peer.ip_map,
+                            &peer.port_map,
+                        )
+                        .await;
+
+                        peer.block_map
+                            .insert(hash_as_string(&block), peer.blockchain.len());
+                        peer.blockchain.push(block.to_owned());
+
+                        peer.utxo = utxo_option.unwrap().to_owned();
                     } else if key.as_str() == "ports_query" {
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
@@ -429,7 +465,7 @@ impl Peer {
                         resp.send(Ok(response_vector)).ok();
                     } else {
                         warn!("invalid command for peer");
-                        return;
+                        continue;
                     }
                 }
                 Command::Get { key, resp } => {
@@ -446,7 +482,7 @@ impl Peer {
                             vec![serde_json::to_string(&peer.ip_map)
                                 .expect("Failed to serialize ip map")]
                         }
-                        "ports_map_query" => {
+                        "port_map_query" => {
                             vec![serde_json::to_string(&peer.port_map)
                                 .expect("Failed to serialize port map")]
                         }
@@ -475,7 +511,7 @@ impl Peer {
                         }
                         _ => {
                             warn!("invalid command for peer");
-                            return;
+                            continue;
                         }
                     };
                     resp.send(Ok(response_vector)).ok();

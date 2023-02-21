@@ -129,13 +129,17 @@ impl Miner {
                             let peer_id: u32 = serde_json::from_str(&result_vec[1]).unwrap();
                             let ip_map: HashMap<u32, String> =
                                 serde_json::from_str(&result_vec[2]).unwrap();
-                            let ports_map: HashMap<String, Vec<String>> =
+                            let port_map: HashMap<String, Vec<String>> =
                                 serde_json::from_str(&result_vec[3]).unwrap();
 
-                            for (id, ip) in ip_map {
-                                let frame = messages::get_block_msg(peer_id, id, &block);
-                                peer::broadcast(frame, &ip, &ports_map[&ip]).await;
-                            }
+                            peer::broadcast(
+                                messages::get_block_msg,
+                                &block,
+                                peer_id,
+                                &ip_map,
+                                &port_map,
+                            )
+                            .await;
 
                             utxo = utxo_option.unwrap();
                         }

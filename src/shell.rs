@@ -108,12 +108,15 @@ pub async fn shell(is_miner: bool) {
                 }
             }
             "transaction" | "tx" | "-t" => {
-                let (peerid, _, ip_map, ports_map) = Peer::get_peer_info(&tx_to_manager).await;
-                for (id, ip) in ip_map {
-                    let frame =
-                        messages::get_transaction_msg(peerid, id, &get_example_transaction());
-                    peer::broadcast(frame, &ip, &ports_map[&ip]).await;
-                }
+                let (peerid, _, ip_map, port_map) = Peer::get_peer_info(&tx_to_manager).await;
+                peer::broadcast(
+                    messages::get_transaction_msg,
+                    &get_example_transaction(),
+                    peerid,
+                    &ip_map,
+                    &port_map,
+                )
+                .await;
             }
             "tx_test" => {
                 info!("Please enter a receiver id:");
@@ -144,7 +147,7 @@ pub async fn shell(is_miner: bool) {
                     }
                 };
 
-                let (id, _, ip_map, ports_map) = Peer::get_peer_info(&tx_to_manager).await;
+                let (id, _, ip_map, port_map) = Peer::get_peer_info(&tx_to_manager).await;
             }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");
