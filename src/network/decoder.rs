@@ -15,6 +15,7 @@ static COMMANDS: phf::Map<&'static str, &'static str> = phf_map! {
     "00000101" => "transaction",
     "00000110" => "BD_query",
     "00000111" => "BD_response",
+    "00001000" => "block"
 };
 
 pub fn decode_command(msg: &Frame) -> (String, u32, u32) {
@@ -119,7 +120,7 @@ pub fn decode_ports_response(
     return (ip_map, port_map);
 }
 
-pub fn decode_transactions_msg(msg: Frame) -> Option<String> {
+pub fn decode_json_msg(msg: Frame) -> Option<String> {
     let array_maker: Vec<u8>;
     let mut json = None;
     match msg {

@@ -1,4 +1,5 @@
 use std::{
+    cmp::max,
     collections::{HashMap, HashSet},
     env,
     fs::{self, File},
@@ -6,6 +7,7 @@ use std::{
     path::Path,
 };
 
+use ed25519_dalek::Keypair;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
@@ -24,7 +26,7 @@ use crate::{
     },
     utils::{
         hash::{self, hash_as_string},
-        sign_and_verify::{self, Verifier},
+        sign_and_verify::{self, PrivateKey, PublicKey, Verifier},
     },
 };
 
@@ -53,7 +55,14 @@ impl Miner {
         let mut verified_mempool = mempool.clone();
 
         let mut utxo: UTXO = UTXO(HashMap::new());
-        let (_, public_key) = sign_and_verify::create_keypair();
+        let keypair = Keypair::from_bytes(&[
+            9, 75, 189, 163, 133, 148, 28, 198, 139, 3, 56, 182, 118, 26, 250, 201, 129, 109, 104,
+            32, 92, 248, 176, 200, 83, 98, 207, 118, 47, 231, 60, 75, 4, 65, 208, 174, 11, 82, 239,
+            211, 201, 251, 90, 173, 173, 165, 36, 120, 162, 85, 139, 187, 164, 152, 53, 13, 62,
+            219, 144, 86, 74, 205, 134, 25,
+        ])
+        .unwrap();
+        let public_key0 = PublicKey(keypair.public);
         let outpoint: Outpoint = Outpoint {
             txid: "0".repeat(64),
             index: 0,
@@ -89,52 +98,53 @@ impl Miner {
                         let tx: Transaction = serde_json::from_str(&payload_vec[0])
                             .expect("Could not deserialize string to transaction.");
 
-                        if mempool.transactions.len() < NUM_PARALLEL_TRANSACTIONS
-                            && mempool.hashes.insert(hash_as_string(&tx))
-                        {
-                            mempool.transactions.push(tx.to_owned());
-                        } else {
-                            // Get block hash from peer_manager
-                            let (resp_tx, resp_rx) = oneshot::channel();
-                            let cmd = Command::Get {
-                                key: String::from("block_info_query"),
-                                resp: resp_tx,
-                            };
+                        mempool.hashes.insert(hash_as_string(&tx));
+                        mempool.transactions.push(tx.to_owned());
+                        if mempool.transactions.len() < NUM_PARALLEL_TRANSACTIONS {
+                            continue;
+                        }
 
-                            tx_peer.send(cmd).await;
+                        // Get block hash from peer_manager
+                        mempool.transactions.push(tx.to_owned());
+                        let (resp_tx, resp_rx) = oneshot::channel();
+                        let cmd = Command::Get {
+                            key: String::from("block_info_query"),
+                            resp: resp_tx,
+                        };
 
-                            let result = resp_rx.await;
-                            let result_vec = result.unwrap().unwrap();
-                            let prev_hash = result_vec[0].to_owned();
-                            let (block_option, utxo_option) = Miner::create_block(
-                                prev_hash,
-                                mempool.transactions.clone(),
-                                &utxo,
-                                mempool.transactions.len() / num_cpus::get(),
-                            );
+                        tx_peer.send(cmd).await;
 
-                            if block_option.is_some() {
-                                let block = block_option.unwrap();
-                                let peer_id: u32 = serde_json::from_str(&result_vec[1]).unwrap();
-                                let ip_map: HashMap<u32, String> =
-                                    serde_json::from_str(&result_vec[2]).unwrap();
-                                let ports_map: HashMap<String, Vec<String>> =
-                                    serde_json::from_str(&result_vec[3]).unwrap();
+                        let result = resp_rx.await;
+                        let result_vec = result.unwrap().unwrap();
+                        let prev_hash = result_vec[0].to_owned();
+                        let (block_option, utxo_option) = Miner::create_block(
+                            prev_hash,
+                            mempool.transactions.clone(),
+                            &utxo,
+                            max(mempool.transactions.len(), num_cpus::get()) / num_cpus::get(),
+                        );
 
-                                for (id, ip) in ip_map {
-                                    let frame = messages::get_block_msg(peer_id, id, &block);
-                                    peer::broadcast(frame, &ip, &ports_map[&ip]).await;
-                                }
+                        if block_option.is_some() {
+                            let block = block_option.unwrap();
+                            let peer_id: u32 = serde_json::from_str(&result_vec[1]).unwrap();
+                            let ip_map: HashMap<u32, String> =
+                                serde_json::from_str(&result_vec[2]).unwrap();
+                            let ports_map: HashMap<String, Vec<String>> =
+                                serde_json::from_str(&result_vec[3]).unwrap();
 
-                                utxo = utxo_option.unwrap();
+                            for (id, ip) in ip_map {
+                                let frame = messages::get_block_msg(peer_id, id, &block);
+                                peer::broadcast(frame, &ip, &ports_map[&ip]).await;
                             }
 
-                            verified_mempool.hashes.extend(mempool.hashes);
-                            verified_mempool
-                                .transactions
-                                .append(&mut mempool.transactions); // Removes all elements from mempool
-                            mempool.hashes = HashSet::new();
+                            utxo = utxo_option.unwrap();
                         }
+
+                        verified_mempool.hashes.extend(mempool.hashes);
+                        verified_mempool
+                            .transactions
+                            .append(&mut mempool.transactions); // Removes all elements from mempool
+                        mempool.hashes = HashSet::new();
                     } else {
                         let (resp_tx, resp_rx) = oneshot::channel();
                         let cmd_peer = Command::Set {
