@@ -146,14 +146,26 @@ pub async fn send_transaction(msg: Frame, ip: String, ports: Vec<String>) {
     connection.write_frame(&msg).await.ok();
 }
 
-pub async fn broadcast(msg: Frame, ip: &String, ports: &Vec<String>) {
-    let ports: Vec<&str> = ports.iter().map(AsRef::as_ref).collect();
-    let connection_opt = get_connection(ip, ports.as_slice()).await;
-    if connection_opt.is_none() {
-        panic!("Cannot connect to the server");
+pub async fn broadcast<T: Clone>(
+    msg_fn: fn(u32, u32, T) -> Frame,
+    payload: T,
+    peerid: u32,
+    ip_map: &HashMap<u32, String>,
+    port_map: &HashMap<String, Vec<String>>,
+) {
+    for (id, ip) in ip_map {
+        if *id == peerid {
+            continue;
+        }
+        let frame = msg_fn(peerid, *id, payload.clone());
+        let ports: Vec<&str> = port_map[ip].iter().map(AsRef::as_ref).collect();
+        let connection_opt = get_connection(ip, ports.as_slice()).await;
+        if connection_opt.is_none() {
+            panic!("Cannot connect to the server");
+        }
+        let mut connection = connection_opt.unwrap();
+        connection.write_frame(&frame).await.ok();
     }
-    let mut connection = connection_opt.unwrap();
-    connection.write_frame(&msg).await.ok();
 }
 
 impl Peer {

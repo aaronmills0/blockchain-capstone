@@ -217,7 +217,7 @@ pub async fn shell() {
                 }
 
                 // start of the transaction creator
-                info!("Welcome to the transaction creator! Would you like to create a transaction using a config file (y) or your wallet (n)? y/n");
+                info!("Would you like to load a transaction from a file (f) or create it manually (m)?");
                 let mut choice = String::new();
                 io::stdin()
                     .read_line(&mut choice)
@@ -225,8 +225,7 @@ pub async fn shell() {
 
                 match choice.to_lowercase().trim() {
                     // In this case, we simply need to be provided with a transaction.json file that we deserialize and directly send the transaction
-                    "y" => {
-                        info!("Hello!!!");
+                    "f" => {
                         let slash = if env::consts::OS == "windows" {
                             "\\"
                         } else {
@@ -243,7 +242,7 @@ pub async fn shell() {
                             serde_json::from_value(json.get("transaction").unwrap().to_owned())
                                 .unwrap();
                     }
-                    "n" => {
+                    "m" => {
                         // In this case, we need to be provided with a wallet.json file which we deserialize to obtain certain
                         // parameters (public, private keys) we need to create our transaction
                         let slash = if env::consts::OS == "windows" {
@@ -260,8 +259,24 @@ pub async fn shell() {
                         let wallet: Wallet =
                             serde_json::from_value(json.get("wallet").unwrap().to_owned()).unwrap();
 
+                        // We will obtain the indices of wallet entries to only select certain keys and their outpoints
+                        info!(
+                            "Enter the indices of wallet entries you would like to enter delimited by a comma (e.g., 4,6,8,9) "
+                        );
+                        let mut indices = Vec::new();
+                        let mut indices_out: String = String::new();
+                        io::stdin()
+                            .read_line(&mut indices_out)
+                            .expect("Failed to read line");
+                        let trimmed_indices = indices_out.trim();
+                        for s in trimmed_indices.split(',') {
+                            if let Ok(n) = s.trim().parse::<usize>() {
+                                indices.push(n);
+                            }
+                        }
+
                         // We create the tx_inputs
-                        for i in 0..wallet.0.len() {
+                        for i in indices {
                             let (private_key, public_key, outpoint, value_from_outpoint) =
                                 wallet.0[i].clone();
 
@@ -385,10 +400,14 @@ pub async fn shell() {
                 peer::send_transaction(frame, local_ip, ports.to_owned()).await;
 
                 /*let (peerid, _, ip_map, ports_map) = Peer::get_peer_info(&tx_to_manager).await;
-                for (id, ip) in ip_map {
-                    let frame = messages::get_transaction_msg(peerid, id, &transaction);
-                    peer::broadcast(frame, &ip, &ports_map[&ip]).await;
-                }*/
+                peer::broadcast(
+                    messages::get_transaction_msg,
+                    &transaction,
+                    peerid,
+                    &ip_map,
+                    &ports_map,
+                )
+                .await;*/
             }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");
