@@ -1,7 +1,15 @@
-use crate::components::transaction::Transaction;
 use crate::utils::hash::hash_as_string;
+use crate::{components::transaction::Transaction, utils::hash};
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
+use std::cmp::max;
+use std::{
+    collections::VecDeque,
+    sync::{
+        mpsc::{self, Receiver},
+        Arc,
+    },
+    thread,
+};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Merkle {
@@ -69,6 +77,7 @@ impl Merkle {
         let mut queue: VecDeque<String> = VecDeque::new();
         let mut stack: VecDeque<String> = VecDeque::new();
 
+        let hashes = Merkle::parallel_hash(transactions, num_cpus::get());
         // Load the hashes into queue1
         for tx in transactions {
             queue.push_back(hash_as_string(&tx));
@@ -102,6 +111,31 @@ impl Merkle {
         merkle_tree.push(queue.pop_front().unwrap());
         merkle_tree.reverse();
         return Merkle { tree: merkle_tree };
+    }
+
+    pub fn parallel_hash(transactions: &Vec<Transaction>, num_cpus: usize) -> Vec<String> {
+        let tx_batches: Vec<Vec<Transaction>> = transactions
+            .chunks(max(transactions.len(), num_cpus) / num_cpus)
+            .map(|x| x.into())
+            .collect();
+        let mut result: Vec<String> = Vec::new();
+        let mut receivers: Vec<Receiver<Vec<String>>> = Vec::new();
+        for batch in tx_batches {
+            let tx_batch = Arc::new(batch);
+            let (sender, receiver) = mpsc::channel();
+
+            thread::spawn(move || {
+                hash::hash_parallel_vec(sender, &tx_batch);
+            });
+            receivers.push(receiver);
+        }
+
+        for receiver in receivers {
+            let hashes = receiver.recv();
+            result.append(&mut hashes.unwrap());
+        }
+
+        return result;
     }
 }
 

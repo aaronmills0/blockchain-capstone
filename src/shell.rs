@@ -2,31 +2,38 @@ use crate::components::transaction::{
     Outpoint, PublicKeyScript, SignatureScript, Transaction, TxIn, TxOut,
 };
 use crate::network::messages;
-use crate::network::peer::{self, Peer, Command};
+use crate::network::miner::Miner;
+use crate::network::peer::{self, Command, Peer};
 use crate::simulation::start;
 use crate::utils::graph::create_block_graph;
 use crate::utils::hash;
 use crate::utils::save_and_load::deserialize_json;
-use crate::utils::sign_and_verify::{self, Verifier};
+use crate::utils::sign_and_verify::{self, PrivateKey, PublicKey, Verifier};
 use chrono::Local;
+use ed25519_dalek::Keypair;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use port_scanner::scan_port;
-use tokio::sync::oneshot;
 use std::collections::HashMap;
 use std::fs::File;
 use std::path::Path;
 use std::process::exit;
-use std::sync::mpsc;
-use std::sync::mpsc::Sender;
 use std::thread;
 use std::{env, fs, io};
+use tokio::sync::mpsc::Sender;
+use tokio::sync::oneshot;
 
 static mut SIM_STATUS: bool = false;
 
-pub async fn shell() {
+pub async fn shell(is_miner: bool) {
     let mut tx_sim_option: Option<Sender<String>> = None;
-    let tx_to_manager = Peer::launch().await;
+    let tx_to_manager: Sender<Command>;
+    if is_miner {
+        tx_to_manager = Miner::launch().await;
+    } else {
+        tx_to_manager = Peer::launch().await;
+    }
+
     info!("Successfully launched peer!");
 
     loop {
@@ -101,44 +108,50 @@ pub async fn shell() {
                 }
             }
             "transaction" | "tx" | "-t" => {
-                let (resp_tx, resp_rx) = oneshot::channel();
-                let (resp_tx_1, resp_rx_1) = oneshot::channel();
-                
-                let cmd = Command::Get {
-                    key: String::from("id_query"),
-                    resp: resp_tx,
+                let (peerid, _, ip_map, port_map) = Peer::get_peer_info(&tx_to_manager).await;
+                peer::broadcast(
+                    messages::get_transaction_msg,
+                    &get_example_transaction(),
+                    peerid,
+                    &ip_map,
+                    &port_map,
+                )
+                .await;
+            }
+            "tx_test" => {
+                info!("Please enter a receiver id:");
+                let mut id_str = String::new();
+                io::stdin()
+                    .read_line(&mut id_str)
+                    .expect("Failed to read line");
+                let trimmed_id = id_str.trim();
+                let receiver_id = match trimmed_id.parse::<u32>() {
+                    Ok(i) => i,
+                    Err(..) => {
+                        error!("Receiver id needs to be a u32");
+                        panic!();
+                    }
                 };
-                let cmd1 = Command::Get {
-                    key: String::from("ports_query"),
-                    resp: resp_tx_1,
+
+                info!("Please enter a period between sending transactions in microseconds:");
+                let mut dur_str = String::new();
+                io::stdin()
+                    .read_line(&mut dur_str)
+                    .expect("Failed to read line");
+                let trimmed_dur = dur_str.trim();
+                let duration = match trimmed_dur.parse::<u64>() {
+                    Ok(i) => i,
+                    Err(..) => {
+                        error!("Period needs to be a u64");
+                        panic!();
+                    }
                 };
-                
-                tx_to_manager.send(cmd).await.ok();
-                tx_to_manager.send(cmd1).await.ok();
 
-                let result = resp_rx.await.unwrap().unwrap();
-                let result1 = resp_rx_1.await.unwrap().unwrap();
-
-                if result.is_empty() {
-                    error!("Empty result from peer");
-                    panic!();
-                }
-                if result1.is_empty() {
-                    error!("Empty result from peer");
-                    panic!();
-                }
-                
-                let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
-                let ports: Vec<String> = serde_json::from_str(&result1[0]).unwrap();
-
-                let local_ip = local_ip().unwrap().to_string();
-                let frame =
-                    messages::get_transaction_msg(peerid, peerid, get_example_transaction());
-                peer::send_transaction(frame, local_ip, ports.to_owned()).await;
+                let (id, _, ip_map, port_map) = Peer::get_peer_info(&tx_to_manager).await;
             }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");
-                //Peer::shutdown(peer);
+                // Peer::shutdown(peer_copy);
                 write_log();
                 exit(0);
             }
@@ -155,7 +168,15 @@ pub async fn shell() {
  */
 
 fn get_example_transaction() -> Transaction {
-    let (private_key0, public_key0) = sign_and_verify::create_keypair();
+    let keypair = Keypair::from_bytes(&[
+        9, 75, 189, 163, 133, 148, 28, 198, 139, 3, 56, 182, 118, 26, 250, 201, 129, 109, 104, 32,
+        92, 248, 176, 200, 83, 98, 207, 118, 47, 231, 60, 75, 4, 65, 208, 174, 11, 82, 239, 211,
+        201, 251, 90, 173, 173, 165, 36, 120, 162, 85, 139, 187, 164, 152, 53, 13, 62, 219, 144,
+        86, 74, 205, 134, 25,
+    ])
+    .unwrap();
+    let private_key0 = PrivateKey(keypair.secret);
+    let public_key0 = PublicKey(keypair.public);
     let outpoint0: Outpoint = Outpoint {
         txid: "0".repeat(64),
         index: 0,
