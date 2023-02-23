@@ -5,20 +5,15 @@ use crate::network::peer::get_connection;
 use crate::simulation::KeyMap;
 use crate::utils::sign_and_verify::Verifier;
 use crate::utils::{hash, sign_and_verify};
-use log::info;
 use rand_1::rngs::ThreadRng;
 use std::collections::HashMap;
-use std::thread::sleep;
-use std::time::Duration;
 
 pub async fn test_single_peer_tx_throughput_sender(
     sender_id: u32,
     ip_map: HashMap<u32, String>,
     ports_map: HashMap<String, Vec<String>>,
     receiver_id: u32,
-    duration: u64,
 ) {
-    let sleep_time = Duration::from_micros(duration);
     let receiver_ip = ip_map.get(&receiver_id).unwrap();
     let receiver_ports = ports_map.get(&receiver_ip.to_owned()).unwrap();
 
@@ -52,19 +47,15 @@ pub async fn test_single_peer_tx_throughput_sender(
     let mut rng: ThreadRng = rand_1::thread_rng();
     let max_num_outputs = 1;
 
-    let mut sender_counter: u32 = 0;
-    loop {
+    for _ in 0..131072 {
         let transaction =
             Transaction::create_transaction(&utxo, &mut key_map, &mut rng, max_num_outputs, false);
         utxo.update(&transaction);
-        transactions.push(transaction.clone());
+        transactions.push(transaction);
+    }
 
-        let frame = messages::get_transaction_msg(sender_id, receiver_id, transaction);
+    for t in transactions.iter() {
+        let frame = messages::get_transaction_msg(sender_id, receiver_id, t.clone());
         connection.write_frame(&frame).await.ok();
-
-        sender_counter += 1;
-        info!("Sent {} transactions", sender_counter);
-
-        sleep(sleep_time);
     }
 }
