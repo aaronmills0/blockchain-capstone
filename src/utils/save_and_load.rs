@@ -202,10 +202,7 @@ pub fn deserialize_json(
     );
 }
 
-pub fn save_object<T>(obj: &T, object_name: String)
-where
-    T: Serialize,
-{
+pub fn save_object<T: Serialize>(obj: &T, object_name: String, dirname: String) {
     let mut map = Map::new();
     let json_result = serde_json::to_value(obj);
 
@@ -225,13 +222,13 @@ where
     } else {
         "/"
     };
-    if fs::create_dir_all("system".to_owned() + slash).is_err() {
+    if fs::create_dir_all(dirname.to_owned() + slash).is_err() {
         warn!("Failed to create directory! It may already exist, or permissions are needed.");
     }
 
     let cwd = std::env::current_dir().unwrap();
     let mut dirpath = cwd.into_os_string().into_string().unwrap();
-    dirpath.push_str(&(slash.to_owned() + "system"));
+    dirpath.push_str(&(slash.to_owned() + &dirname));
 
     let dir_path = Path::new(&dirpath);
 
@@ -253,16 +250,13 @@ where
     }
 }
 
-pub fn load_object<T>(object_name: String) -> T
-where
-    T: DeserializeOwned,
-{
+pub fn load_object<T: DeserializeOwned>(object_name: String, dirname: String) -> T {
     let slash = if env::consts::OS == "windows" {
         "\\"
     } else {
         "/"
     };
-    let data = fs::read_to_string("system".to_owned() + slash + &object_name + ".json");
+    let data = fs::read_to_string(dirname.to_owned() + slash + &object_name + ".json");
     if data.is_err() {
         error!("Failed to load file. {:?}", data.err());
         panic!();

@@ -2,13 +2,16 @@ use crate::components::transaction::{
     Outpoint, PublicKeyScript, SignatureScript, Transaction, TxIn, TxOut,
 };
 use crate::network::messages;
+use crate::network::miner::Miner;
 use crate::network::peer::{self, Command, Peer};
+use crate::simulation::start;
+use crate::utils::graph::create_block_graph;
 use crate::utils::hash;
-use crate::utils::save_and_load::deserialize_json;
-use crate::utils::sign_and_verify::{self, Verifier};
-use crate::utils::sign_and_verify::{PrivateKey, PublicKey};
+use crate::utils::save_and_load::{deserialize_json, load_object, save_object};
+use crate::utils::sign_and_verify::{self, PrivateKey, PublicKey, Verifier};
 use crate::wallet::Wallet;
 use chrono::Local;
+use ed25519_dalek::Keypair;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use port_scanner::scan_port;
@@ -18,17 +21,22 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::process::exit;
-use std::sync::mpsc;
-use std::sync::mpsc::Sender;
 use std::thread;
 use std::{env, fs, io};
+use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
 static mut SIM_STATUS: bool = false;
 
-pub async fn shell() {
+pub async fn shell(is_miner: bool) {
     let mut tx_sim_option: Option<Sender<String>> = None;
-    let tx_to_manager = Peer::launch().await;
+    let tx_to_manager: Sender<Command>;
+    if is_miner {
+        tx_to_manager = Miner::launch().await;
+    } else {
+        tx_to_manager = Peer::launch().await;
+    }
+
     info!("Successfully launched peer!");
 
     loop {
@@ -110,52 +118,11 @@ pub async fn shell() {
 
                 // This is a test for loading the transaction and broadcatsing it. This block of code creates transaction.json
                 let example_transaction = get_example_transaction();
-
-                let mut map = Map::new();
-                let server_json = serde_json::to_value(example_transaction);
-
-                if server_json.is_err() {
-                    error!("Failed to serialize server peer");
-                    panic!();
-                }
-
-                let mut json = server_json.unwrap();
-
-                map.insert(String::from("transaction"), json);
-
-                json = serde_json::Value::Object(map);
-
-                let slash = if env::consts::OS == "windows" {
-                    "\\"
-                } else {
-                    "/"
-                };
-                if fs::create_dir_all("system".to_owned() + slash).is_err() {
-                    warn!("Failed to create directory! It may already exist, or permissions are needed.");
-                }
-
-                let cwd = std::env::current_dir().unwrap();
-                let mut dirpath = cwd.into_os_string().into_string().unwrap();
-                dirpath.push_str(&(slash.to_owned() + "system"));
-
-                let dir_path = Path::new(&dirpath);
-
-                let file_name: &str = &format!("transaction.json");
-
-                let file_path = dir_path.join(file_name);
-                let file = File::create(file_path);
-                if file.is_err() {
-                    error!("Failed to create new file.");
-                    panic!();
-                }
-                if file
-                    .unwrap()
-                    .write_all(serde_json::to_string_pretty(&json).unwrap().as_bytes())
-                    .is_err()
-                {
-                    error!("Failed to write to file.");
-                    panic!();
-                }
+                save_object(
+                    &example_transaction,
+                    String::from("transaction"),
+                    String::from("account"),
+                );
 
                 // This is a test for loading the transaction and broadcatsing it. It creates wallet.json
                 let (private_key_initial, public_key_initial) = sign_and_verify::create_keypair();
@@ -169,52 +136,7 @@ pub async fn shell() {
                     500,
                 )];
                 let wallet: Wallet = Wallet(values);
-
-                let mut map = Map::new();
-                let server_json = serde_json::to_value(wallet);
-
-                if server_json.is_err() {
-                    error!("Failed to serialize server peer");
-                    panic!();
-                }
-
-                let mut json = server_json.unwrap();
-
-                map.insert(String::from("wallet"), json);
-
-                json = serde_json::Value::Object(map);
-
-                let slash = if env::consts::OS == "windows" {
-                    "\\"
-                } else {
-                    "/"
-                };
-                if fs::create_dir_all("system".to_owned() + slash).is_err() {
-                    warn!("Failed to create directory! It may already exist, or permissions are needed.");
-                }
-
-                let cwd = std::env::current_dir().unwrap();
-                let mut dirpath = cwd.into_os_string().into_string().unwrap();
-                dirpath.push_str(&(slash.to_owned() + "system"));
-
-                let dir_path = Path::new(&dirpath);
-
-                let file_name: &str = &format!("wallet.json");
-
-                let file_path = dir_path.join(file_name);
-                let file = File::create(file_path);
-                if file.is_err() {
-                    error!("Failed to create new file.");
-                    panic!();
-                }
-                if file
-                    .unwrap()
-                    .write_all(serde_json::to_string_pretty(&json).unwrap().as_bytes())
-                    .is_err()
-                {
-                    error!("Failed to write to file.");
-                    panic!();
-                }
+                save_object(&wallet, String::from("wallet"), String::from("system"));
 
                 // start of the transaction creator
                 info!("Would you like to load a transaction from a file (f) or create it manually (m)?");
@@ -226,38 +148,15 @@ pub async fn shell() {
                 match choice.to_lowercase().trim() {
                     // In this case, we simply need to be provided with a transaction.json file that we deserialize and directly send the transaction
                     "f" => {
-                        let slash = if env::consts::OS == "windows" {
-                            "\\"
-                        } else {
-                            "/"
-                        };
-                        let data =
-                            fs::read_to_string("system".to_owned() + slash + "transaction.json");
-                        if data.is_err() {
-                            error!("Failed to load file. {:?}", data.err());
-                            panic!();
-                        }
-                        let json: Value = serde_json::from_str(&data.unwrap()).unwrap();
                         transaction =
-                            serde_json::from_value(json.get("transaction").unwrap().to_owned())
-                                .unwrap();
+                            load_object(String::from("transaction"), String::from("account"));
+                        info!("{:?}", transaction.tx_outputs[0].value);
                     }
                     "m" => {
                         // In this case, we need to be provided with a wallet.json file which we deserialize to obtain certain
                         // parameters (public, private keys) we need to create our transaction
-                        let slash = if env::consts::OS == "windows" {
-                            "\\"
-                        } else {
-                            "/"
-                        };
-                        let data = fs::read_to_string("system".to_owned() + slash + "wallet.json");
-                        if data.is_err() {
-                            error!("Failed to load file. {:?}", data.err());
-                            panic!();
-                        }
-                        let json: Value = serde_json::from_str(&data.unwrap()).unwrap();
                         let wallet: Wallet =
-                            serde_json::from_value(json.get("wallet").unwrap().to_owned()).unwrap();
+                            load_object(String::from("wallet"), String::from("system"));
 
                         // We will obtain the indices of wallet entries to only select certain keys and their outpoints
                         info!(
@@ -393,13 +292,7 @@ pub async fn shell() {
                     panic!();
                 }
 
-                let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
-                let ports: Vec<String> = serde_json::from_str(&result1[0]).unwrap();
-                let local_ip = local_ip().unwrap().to_string();
-                let frame = messages::get_transaction_msg(peerid, peerid, &transaction);
-                peer::send_transaction(frame, local_ip, ports.to_owned()).await;
-
-                /*let (peerid, _, ip_map, ports_map) = Peer::get_peer_info(&tx_to_manager).await;
+                let (peerid, _, ip_map, ports_map) = Peer::get_peer_info(&tx_to_manager).await;
                 peer::broadcast(
                     messages::get_transaction_msg,
                     &transaction,
@@ -407,11 +300,48 @@ pub async fn shell() {
                     &ip_map,
                     &ports_map,
                 )
-                .await;*/
+                .await;
+
+                /*let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
+                let ports: Vec<String> = serde_json::from_str(&result1[0]).unwrap();
+                let local_ip = local_ip().unwrap().to_string();
+                let frame = messages::get_transaction_msg(peerid, peerid, &transaction);
+                peer::send_transaction(frame, local_ip, ports.to_owned()).await;*/
+            }
+            "tx_test" => {
+                info!("Please enter a receiver id:");
+                let mut id_str = String::new();
+                io::stdin()
+                    .read_line(&mut id_str)
+                    .expect("Failed to read line");
+                let trimmed_id = id_str.trim();
+                let receiver_id = match trimmed_id.parse::<u32>() {
+                    Ok(i) => i,
+                    Err(..) => {
+                        error!("Receiver id needs to be a u32");
+                        panic!();
+                    }
+                };
+
+                info!("Please enter a period between sending transactions in microseconds:");
+                let mut dur_str = String::new();
+                io::stdin()
+                    .read_line(&mut dur_str)
+                    .expect("Failed to read line");
+                let trimmed_dur = dur_str.trim();
+                let duration = match trimmed_dur.parse::<u64>() {
+                    Ok(i) => i,
+                    Err(..) => {
+                        error!("Period needs to be a u64");
+                        panic!();
+                    }
+                };
+
+                let (id, _, ip_map, port_map) = Peer::get_peer_info(&tx_to_manager).await;
             }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");
-                //Peer::shutdown(peer);
+                // Peer::shutdown(peer_copy);
                 write_log();
                 exit(0);
             }
@@ -428,7 +358,15 @@ pub async fn shell() {
  */
 
 fn get_example_transaction() -> Transaction {
-    let (private_key0, public_key0) = sign_and_verify::create_keypair();
+    let keypair = Keypair::from_bytes(&[
+        9, 75, 189, 163, 133, 148, 28, 198, 139, 3, 56, 182, 118, 26, 250, 201, 129, 109, 104, 32,
+        92, 248, 176, 200, 83, 98, 207, 118, 47, 231, 60, 75, 4, 65, 208, 174, 11, 82, 239, 211,
+        201, 251, 90, 173, 173, 165, 36, 120, 162, 85, 139, 187, 164, 152, 53, 13, 62, 219, 144,
+        86, 74, 205, 134, 25,
+    ])
+    .unwrap();
+    let private_key0 = PrivateKey(keypair.secret);
+    let public_key0 = PublicKey(keypair.public);
     let outpoint0: Outpoint = Outpoint {
         txid: "0".repeat(64),
         index: 0,

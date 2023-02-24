@@ -1,20 +1,27 @@
 use crate::components::block::Block;
 use crate::components::block::BlockHeader;
 use crate::components::merkle::Merkle;
+use crate::components::transaction::Outpoint;
+use crate::components::transaction::PublicKeyScript;
 use crate::components::transaction::Transaction;
+use crate::components::transaction::TxOut;
 use crate::components::utxo::UTXO;
 use crate::network::decoder;
 use crate::network::messages;
+use crate::utils::hash;
 use crate::utils::hash::hash_as_string;
+use crate::utils::save_and_load::save_object;
+use crate::utils::sign_and_verify;
+use crate::utils::sign_and_verify::Verifier;
+use crate::wallet::Wallet;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use mini_redis::{Connection, Frame};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
-use std::error::Error;
+use std::collections::HashSet;
 use std::io::Write;
-use std::ops::{Deref, DerefMut};
 use std::{env, fs};
 use std::{fs::File, path::Path};
 use tokio::net::{TcpListener, TcpStream};
@@ -23,10 +30,11 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-static SERVER_IP: &str = "192.168.0.15";
-const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
-static NUM_PORTS: usize = 20;
-static BATCH_SIZE: usize = 128;
+pub static SERVER_IP: &str = "192.168.0.15";
+pub const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
+pub static NUM_PORTS: usize = 5;
+pub static BATCH_SIZE: usize = 1024;
+pub static NUM_PARALLEL_TRANSACTIONS: usize = 8192;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Peer {
@@ -40,19 +48,9 @@ pub struct Peer {
     pub utxo: UTXO,
 }
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct MemPool(pub HashMap<String, Transaction>);
-
-impl Deref for MemPool {
-    type Target = HashMap<String, Transaction>;
-    fn deref(&self) -> &HashMap<String, Transaction> {
-        return &self.0;
-    }
-}
-
-impl DerefMut for MemPool {
-    fn deref_mut(&mut self) -> &mut HashMap<String, Transaction> {
-        return &mut self.0;
-    }
+pub struct MemPool {
+    pub hashes: HashSet<String>,
+    pub transactions: Vec<Transaction>,
 }
 
 #[derive(Debug)]
@@ -70,7 +68,7 @@ pub enum Command {
 
 type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
 
-async fn get_connection(ip: &str, ports: &[&str]) -> Option<Connection> {
+pub async fn get_connection(ip: &str, ports: &[&str]) -> Option<Connection> {
     let mut connection_wrapped: Option<Connection> = None;
     for port in ports {
         let socket = String::from(ip) + ":" + port;
@@ -134,16 +132,6 @@ pub async fn send_ports_query(
     }
 
     return (ip.unwrap(), ports.unwrap());
-}
-
-pub async fn send_transaction(msg: Frame, ip: String, ports: Vec<String>) {
-    let ports: Vec<&str> = ports.iter().map(AsRef::as_ref).collect();
-    let connection_opt = get_connection(&ip, ports.as_slice()).await;
-    if connection_opt.is_none() {
-        panic!("Cannot connect to the server");
-    }
-    let mut connection = connection_opt.unwrap();
-    connection.write_frame(&msg).await.ok();
 }
 
 pub async fn broadcast<T: Clone>(
@@ -212,6 +200,20 @@ impl Peer {
             peer.peerid = response;
             // Set the id obtained as a response to the peer id
             Peer::save_peer(&peer);
+
+            // We create a new wallet for each peer
+            let (private_key_initial, public_key_initial) = sign_and_verify::create_keypair();
+            let values = vec![(
+                private_key_initial,
+                public_key_initial,
+                Outpoint {
+                    txid: "0".repeat(64),
+                    index: 0,
+                },
+                500,
+            )];
+            let wallet: Wallet = Wallet(values);
+            save_object(&wallet, String::from("wallet"), String::from("system"));
         }
 
         info!("IP map: {:?}", peer.ip_map);
@@ -220,7 +222,7 @@ impl Peer {
         // We need to ensure all our ports are available. If not we need to change them.
         // Query the server
 
-        // peer.set_ports().await;
+        peer.set_ports().await;
         let msg = messages::get_ports_query(peer.peerid, 1, peer.ports.clone());
         let (ipmap, portmap) = send_ports_query(
             msg,
@@ -301,8 +303,57 @@ impl Peer {
         return (peerid, ports, ip_map, ports_map);
     }
 
-    async fn peer_manager(mut peer: Peer, mut rx: Receiver<Command>) {
-        let mut mempool = MemPool(HashMap::new());
+    pub async fn set_new_port(&mut self) -> String {
+        let listener = TcpListener::bind(self.address.clone() + ":0")
+            .await
+            .unwrap();
+        return listener
+            .local_addr()
+            .expect("Failed to unwrap listener socket address")
+            .port()
+            .to_string();
+    }
+
+    pub async fn set_ports(&mut self) {
+        // Update any set ports that are unavailable
+        for i in 0..self.ports.len() {
+            let socket = self.address.clone() + ":" + &self.ports[i];
+            let conn = TcpStream::connect(&socket).await;
+            if conn.is_err() {
+                info!("Port {} is unavailable. Setting new port...", i);
+                self.ports[i] = self.set_new_port().await;
+            };
+        }
+
+        // Add new ports until there are `NUM_PORTS` ports
+        while self.ports.len() < NUM_PORTS {
+            let new_port = self.set_new_port().await;
+            self.ports.push(new_port);
+        }
+    }
+
+    pub async fn peer_manager(mut peer: Peer, mut rx: Receiver<Command>) {
+        let mut mempool = MemPool {
+            hashes: HashSet::new(),
+            transactions: Vec::new(),
+        };
+        let mut verified_mempool = mempool.clone();
+
+        let mut utxo: UTXO = UTXO(HashMap::new());
+        let (_, public_key) = sign_and_verify::create_keypair();
+        let outpoint: Outpoint = Outpoint {
+            txid: "0".repeat(64),
+            index: 0,
+        };
+        let tx_out: TxOut = TxOut {
+            value: 500,
+            pk_script: PublicKeyScript {
+                public_key_hash: hash::hash_as_string(&public_key),
+                verifier: Verifier {},
+            },
+        };
+        utxo.insert(outpoint, tx_out);
+
         loop {
             let command = rx.recv().await.unwrap();
             match command {
@@ -320,7 +371,66 @@ impl Peer {
                         }
                         let tx: Transaction = serde_json::from_str(&payload_vec[0])
                             .expect("Could not deserialize string to transaction.");
-                        mempool.insert(hash_as_string(&tx), tx.to_owned());
+
+                        if mempool.transactions.len() < NUM_PARALLEL_TRANSACTIONS
+                            && mempool.hashes.insert(hash_as_string(&tx))
+                        {
+                            mempool.transactions.push(tx.to_owned());
+                        } else {
+                            let (valid, updated_utxo) = utxo.parallel_batch_verify_and_update(
+                                &mempool.transactions,
+                                BATCH_SIZE,
+                            );
+                            if !valid {
+                                error!("Received an invalid transaction!"); // We can update this later
+                                panic!();
+                            }
+                            utxo = updated_utxo.unwrap();
+
+                            verified_mempool.hashes.extend(mempool.hashes);
+                            verified_mempool
+                                .transactions
+                                .append(&mut mempool.transactions); // Removes all elements from mempool
+                            mempool.hashes = HashSet::new();
+                        }
+                    } else if key.as_str() == "block" {
+                        if payload.is_none() {
+                            error!("Invalid command: missing payload");
+                            panic!();
+                        }
+
+                        let payload_vec = payload.unwrap();
+                        if payload_vec.len() != 1 {
+                            error!("Invalid command: payload is of unexpected size");
+                            panic!();
+                        }
+                        let block: Block = serde_json::from_str(&payload_vec[0])
+                            .expect("Could not deserialize string to block.");
+                        info!("Block: {:?}", block);
+
+                        if peer.block_map.contains_key(&hash_as_string(&block)) {
+                            continue;
+                        }
+                        let (valid, utxo_option) = peer.verify_block(&block);
+
+                        if !valid {
+                            continue;
+                        }
+
+                        broadcast(
+                            messages::get_block_msg,
+                            &block,
+                            peer.peerid,
+                            &peer.ip_map,
+                            &peer.port_map,
+                        )
+                        .await;
+
+                        peer.block_map
+                            .insert(hash_as_string(&block), peer.blockchain.len());
+                        peer.blockchain.push(block.to_owned());
+
+                        peer.utxo = utxo_option.unwrap().to_owned();
                     } else if key.as_str() == "ports_query" {
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
@@ -371,27 +481,56 @@ impl Peer {
                         resp.send(Ok(response_vector)).ok();
                     } else {
                         warn!("invalid command for peer");
-                        return;
+                        continue;
                     }
                 }
                 Command::Get { key, resp } => {
-                    if key.as_str() == "ports_query" {
-                        let response_vector =
+                    let response_vector: Vec<String> = match key.as_str() {
+                        "id_query" => {
+                            vec![serde_json::to_string(&peer.peerid)
+                                .expect("Failed to serialize id")]
+                        }
+                        "ports_query" => {
                             vec![serde_json::to_string(&peer.ports)
-                                .expect("Failed to serialize ports")];
-                        resp.send(Ok(response_vector)).ok();
-                    } else if key.as_str() == "ip_map_query" {
-                        let response_vector = vec![serde_json::to_string(&peer.ip_map)
-                            .expect("Failed to serialize ip map")];
-                        resp.send(Ok(response_vector)).ok();
-                    } else if key.as_str() == "id_query" {
-                        let response_vector = vec![serde_json::to_string(&peer.peerid)
-                            .expect("Failed to serialize ip map")];
-                        resp.send(Ok(response_vector)).ok();
-                    } else {
-                        warn!("invalid command for peer");
-                        return;
-                    }
+                                .expect("Failed to serialize ports")]
+                        }
+                        "ip_map_query" => {
+                            vec![serde_json::to_string(&peer.ip_map)
+                                .expect("Failed to serialize ip map")]
+                        }
+                        "port_map_query" => {
+                            vec![serde_json::to_string(&peer.port_map)
+                                .expect("Failed to serialize port map")]
+                        }
+                        "block_info_query" => {
+                            vec![
+                                hash_as_string(&peer.blockchain.last().unwrap()),
+                                serde_json::to_string(&peer.peerid)
+                                    .expect("Failed to serialize id"),
+                                serde_json::to_string(&peer.ip_map)
+                                    .expect("Failed to serialize ip map"),
+                                serde_json::to_string(&peer.port_map)
+                                    .expect("Failed to serialize port map"),
+                            ]
+                        }
+                        "all" => {
+                            vec![
+                                serde_json::to_string(&peer.peerid)
+                                    .expect("Failed to serialize id"),
+                                serde_json::to_string(&peer.ports)
+                                    .expect("Failed to serialize ports"),
+                                serde_json::to_string(&peer.ip_map)
+                                    .expect("Failed to serialize ip map"),
+                                serde_json::to_string(&peer.port_map)
+                                    .expect("Failed to serialize port map"),
+                            ]
+                        }
+                        _ => {
+                            warn!("invalid command for peer");
+                            continue;
+                        }
+                    };
+                    resp.send(Ok(response_vector)).ok();
                 }
             }
         }
@@ -431,10 +570,10 @@ impl Peer {
                         let (command, sourceid, destid) = decoder::decode_command(&frame);
 
                         let (resp_tx, resp_rx) = oneshot::channel();
-                        if command == "transaction" {
-                            let json = decoder::decode_transactions_msg(frame);
+                        if command == "transaction" || command == "block" {
+                            let json = decoder::decode_json_msg(frame);
                             if json.is_none() {
-                                error!("Missing transaction");
+                                error!("Missing json");
                                 panic!()
                             }
                             cmd = Command::Set {
