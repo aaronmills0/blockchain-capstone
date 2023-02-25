@@ -213,7 +213,7 @@ impl Miner {
             miner = Miner::new();
             info!("Miner doesn't exist! Creating new miner.");
             // Get peerid from the server
-            let msg = messages::get_peerid_query();
+            let msg = messages::get_header_message_for_peerid_query();
             let response = peer::send_peerid_query(msg).await;
             miner.peer.peerid = response;
             // Set the id obtained as a response to the peer id
@@ -222,8 +222,9 @@ impl Miner {
 
         miner.peer.set_ports().await;
 
-        let msg = messages::get_ports_query(miner.peer.peerid, 1, miner.peer.ports.clone());
-        let (ipmap, portmap) = peer::send_ports_query(
+        let msg =
+            messages::get_ports_msg_for_maps_query(miner.peer.peerid, 1, miner.peer.ports.clone());
+        let (ipmap, portmap) = peer::send_maps_query(
             msg,
             peer::SERVER_IP.to_owned(),
             peer::SERVER_PORTS.iter().map(|&s| s.into()).collect(),
@@ -234,7 +235,7 @@ impl Miner {
             miner.peer.ip_map.insert(id, ip);
         }
         for (ip, ports) in portmap {
-            miner.peer.port_map.insert(ip, ports);
+            miner.peer.ports_map.insert(ip, ports);
         }
 
         Miner::save_miner(&miner);

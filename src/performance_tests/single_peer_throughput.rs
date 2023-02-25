@@ -55,7 +55,7 @@ pub async fn test_single_peer_tx_throughput_sender(
     }
 
     for t in transactions.iter() {
-        let frame = messages::get_transaction_msg(sender_id, receiver_id, t.clone());
+        let frame = messages::get_transaction_msg(sender_id, receiver_id, &t.clone());
         connection.write_frame(&frame).await.ok();
     }
 }
