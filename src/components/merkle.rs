@@ -79,8 +79,8 @@ impl Merkle {
 
         let hashes = Merkle::parallel_hash(transactions, num_cpus::get());
         // Load the hashes into queue1
-        for tx in transactions {
-            queue.push_back(hash_as_string(&tx));
+        for hash in hashes {
+            queue.push_back(hash);
         }
 
         while queue.len() > 1 {
