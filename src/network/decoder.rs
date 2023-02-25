@@ -138,7 +138,7 @@ pub fn decode_json_msg(msg: Frame) -> Option<String> {
     return json;
 }
 
-pub fn decode_bd_query(msg: Frame) -> Option<String> {
+pub fn decode_head_hash(msg: Frame) -> Option<String> {
     let mut head_hash: Option<String> = None;
     match msg {
         Frame::Array(x) => match &x[1] {

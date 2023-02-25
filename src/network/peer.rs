@@ -11,7 +11,9 @@ use crate::network::messages;
 use crate::utils::hash;
 use crate::utils::hash::hash_as_string;
 use crate::utils::sign_and_verify;
+use crate::utils::sign_and_verify::PublicKey;
 use crate::utils::sign_and_verify::Verifier;
+use ed25519_dalek::Keypair;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use mini_redis::{Connection, Frame};
@@ -28,7 +30,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-pub static SERVER_IP: &str = "192.168.0.101";
+pub static SERVER_IP: &str = "192.168.1.81";
 pub const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
 pub static NUM_PORTS: usize = 20;
 pub static BATCH_SIZE: usize = 1024;
@@ -106,7 +108,7 @@ pub async fn send_peerid_query(header_msg: Frame) -> u32 {
     return response;
 }
 
-pub async fn send_ports_query(
+pub async fn send_maps_query(
     ports_msg: Frame,
     ip: String,
     ports: Vec<String>,
@@ -152,16 +154,6 @@ pub async fn broadcast<T: Clone>(
         let mut connection = connection_opt.unwrap();
         connection.write_frame(&frame).await.ok();
     }
-}
-
-pub async fn send_transaction(transaction_msg: Frame, ip: String, ports: Vec<String>) {
-    let ports: Vec<&str> = ports.iter().map(AsRef::as_ref).collect();
-    let connection_opt = get_connection(&ip, ports.as_slice()).await;
-    if connection_opt.is_none() {
-        panic!("Cannot connect to the server");
-    }
-    let mut connection = connection_opt.unwrap();
-    connection.write_frame(&transaction_msg).await.ok();
 }
 
 impl Peer {
@@ -218,7 +210,7 @@ impl Peer {
 
         peer.set_ports().await;
         let msg = messages::get_ports_msg_for_maps_query(peer.peerid, 1, peer.ports.clone());
-        let (ipmap, ports_map) = send_ports_query(
+        let (ipmap, ports_map) = send_maps_query(
             msg,
             SERVER_IP.to_owned(),
             SERVER_PORTS.iter().map(|&s| s.into()).collect(),
@@ -334,7 +326,14 @@ impl Peer {
         let mut verified_mempool = mempool.clone();
 
         let mut utxo: UTXO = UTXO(HashMap::new());
-        let (_, public_key) = sign_and_verify::create_keypair();
+        let keypair = Keypair::from_bytes(&[
+            9, 75, 189, 163, 133, 148, 28, 198, 139, 3, 56, 182, 118, 26, 250, 201, 129, 109, 104,
+            32, 92, 248, 176, 200, 83, 98, 207, 118, 47, 231, 60, 75, 4, 65, 208, 174, 11, 82, 239,
+            211, 201, 251, 90, 173, 173, 165, 36, 120, 162, 85, 139, 187, 164, 152, 53, 13, 62,
+            219, 144, 86, 74, 205, 134, 25,
+        ])
+        .unwrap();
+        let public_key = PublicKey(keypair.public);
         let outpoint: Outpoint = Outpoint {
             txid: "0".repeat(64),
             index: 0,
@@ -613,7 +612,7 @@ impl Peer {
                             );
                             connection.write_frame(&response).await.ok();
                         } else if command == "BD_query" {
-                            let hash = decoder::decode_bd_query(frame);
+                            let hash = decoder::decode_head_hash(frame);
                             if hash.is_none() {
                                 let frame = messages::get_termination_msg(sourceid, destid);
                                 connection.write_frame(&frame).await.ok();
