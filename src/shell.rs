@@ -353,11 +353,7 @@ pub async fn shell(is_miner: bool) {
     }
 }
 
-/**
- * TO BE DELETED. USED TO CREATE AN EXAMPLE TRANSACTION TO TEST NETWORKING
- */
-
-fn get_example_transaction() -> Transaction {
+pub fn get_example_transaction() -> Transaction {
     let keypair = Keypair::from_bytes(&[
         9, 75, 189, 163, 133, 148, 28, 198, 139, 3, 56, 182, 118, 26, 250, 201, 129, 109, 104, 32,
         92, 248, 176, 200, 83, 98, 207, 118, 47, 231, 60, 75, 4, 65, 208, 174, 11, 82, 239, 211,

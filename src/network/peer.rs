@@ -8,8 +8,10 @@ use crate::components::transaction::TxOut;
 use crate::components::utxo::UTXO;
 use crate::network::decoder;
 use crate::network::messages;
+use crate::shell::get_example_transaction;
 use crate::utils::hash;
 use crate::utils::hash::hash_as_string;
+use crate::utils::save_and_load::load_object;
 use crate::utils::save_and_load::save_object;
 use crate::utils::sign_and_verify;
 use crate::utils::sign_and_verify::Verifier;
@@ -21,8 +23,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::io::Read;
 use std::io::Write;
-use std::{env, fs};
+use std::{env, fs, io};
 use std::{fs::File, path::Path};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
@@ -154,6 +157,8 @@ pub async fn broadcast<T: Clone>(
         let mut connection = connection_opt.unwrap();
         connection.write_frame(&frame).await.ok();
     }
+
+    info!("Broadcasting transactions was successful!!!");
 }
 
 impl Peer {
@@ -269,6 +274,44 @@ impl Peer {
             let port = p.clone();
             let tx_clone = tx.clone();
             tokio::spawn(async move { Peer::listen(ip, port, tx_clone).await });
+        }
+
+        // Give the peer a chance to see what a transaction.json file looks like
+        info!(
+            "In this system you can include your own transaction.json file under the 'account' folder in the root. Would you like to see what
+            a template transaction.json file looks like? y/n"
+        );
+        let mut choice_display: String = String::new();
+        io::stdin()
+            .read_line(&mut choice_display)
+            .expect("Failed to read line");
+
+        if choice_display.to_lowercase().trim() == "y" {
+            let dirname = String::from("account");
+            let object_name = String::from("transaction");
+
+            let example_transaction = get_example_transaction();
+            save_object(
+                &example_transaction,
+                String::from("transaction"),
+                String::from("account"),
+            );
+
+            let slash = if env::consts::OS == "windows" {
+                "\\"
+            } else {
+                "/"
+            };
+            let mut file =
+                File::open(dirname + slash + &object_name + ".json").expect("Failed to open file");
+            let mut contents = String::new();
+            file.read_to_string(&mut contents)
+                .expect("Failed to read file");
+
+            let json_data: serde_json::Value =
+                serde_json::from_str(&contents).expect("Failed to parse JSON");
+
+            println!("{}", serde_json::to_string_pretty(&json_data).unwrap());
         }
 
         return tx.clone();

@@ -262,8 +262,8 @@ pub fn load_object<T: DeserializeOwned>(object_name: String, dirname: String) ->
         panic!();
     }
     let json: Value = serde_json::from_str(&data.unwrap()).unwrap();
-    let server = serde_json::from_value(json.get(object_name).unwrap().to_owned());
-    return server.unwrap();
+    let object = serde_json::from_value(json.get(object_name).unwrap().to_owned());
+    return object.unwrap();
 }
 
 #[derive(Clone, Serialize, Deserialize)]
