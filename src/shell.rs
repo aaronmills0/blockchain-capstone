@@ -4,6 +4,7 @@ use crate::components::transaction::{
 use crate::network::messages;
 use crate::network::miner::Miner;
 use crate::network::peer::{self, Command, Peer};
+use crate::performance_tests::single_peer_throughput::test_single_peer_tx_throughput_sender;
 use crate::simulation::start;
 use crate::utils::graph::create_block_graph;
 use crate::utils::hash;
@@ -323,21 +324,8 @@ pub async fn shell(is_miner: bool) {
                     }
                 };
 
-                info!("Please enter a period between sending transactions in microseconds:");
-                let mut dur_str = String::new();
-                io::stdin()
-                    .read_line(&mut dur_str)
-                    .expect("Failed to read line");
-                let trimmed_dur = dur_str.trim();
-                let duration = match trimmed_dur.parse::<u64>() {
-                    Ok(i) => i,
-                    Err(..) => {
-                        error!("Period needs to be a u64");
-                        panic!();
-                    }
-                };
-
-                let (id, _, ip_map, port_map) = Peer::get_peer_info(&tx_to_manager).await;
+                let (id, _, ip_map, ports_map) = Peer::get_peer_info(&tx_to_manager).await;
+                test_single_peer_tx_throughput_sender(id, ip_map, ports_map, receiver_id).await;
             }
             "exit" | "Exit" | "EXIT" => {
                 info!("The user selected exit");

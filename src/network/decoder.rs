@@ -9,8 +9,8 @@ use crate::components::block::Block;
 static COMMANDS: phf::Map<&'static str, &'static str> = phf_map! {
     "00000000" => "id_query",
     "00000001" => "id_response",
-    "00000010" => "ports_query",
-    "00000011" => "ports_response",
+    "00000010" => "maps_query",
+    "00000011" => "maps_response",
     "00000100" => "termination",
     "00000101" => "transaction",
     "00000110" => "BD_query",
@@ -50,7 +50,7 @@ pub fn decode_command(msg: &Frame) -> (String, u32, u32) {
     return (cmd, sourceid, destid);
 }
 
-pub fn decode_ports_query(msg: &Frame) -> Vec<String> {
+pub fn decode_ports(msg: &Frame) -> Vec<String> {
     let mut ports = Vec::new();
     let json: String;
     match msg {
@@ -90,34 +90,34 @@ pub fn decode_peerid_response(response: Frame) -> Option<u32> {
 }
 
 #[allow(clippy::type_complexity)]
-pub fn decode_ports_response(
-    ports_frame: Frame,
+pub fn decode_maps_response(
+    maps_frame: Frame,
 ) -> (
     Option<HashMap<u32, String>>,
     Option<HashMap<String, Vec<String>>>,
 ) {
     let mut ip_map = None;
-    let mut port_map = None;
-    let ip_json: String;
-    let port_json: String;
-    match ports_frame {
+    let mut ports_map = None;
+    let ip_map_json: String;
+    let ports_map_json: String;
+    match maps_frame {
         Frame::Array(x) => match &x[1..=2] {
-            [Frame::Bulk(ip_bytes), Frame::Bulk(ports_bytes)] => {
-                ip_json = String::from_utf8(ip_bytes.to_vec()).expect("invalid utf-8 sequence");
-                ip_map = Some(serde_json::from_str(&ip_json).expect("failed to convert from json"));
-                port_json =
-                    String::from_utf8(ports_bytes.to_vec()).expect("invalid utf-8 sequence");
-                port_map =
-                    Some(serde_json::from_str(&port_json).expect("failed to convert from json"));
+            [Frame::Bulk(ip_map_bytes), Frame::Bulk(ports_map_bytes)] => {
+                ip_map_json = String::from_utf8(ip_map_bytes.to_vec()).expect("invalid utf-8 sequence");
+                ip_map = Some(serde_json::from_str(&ip_map_json).expect("failed to convert from json"));
+                ports_map_json =
+                    String::from_utf8(ports_map_bytes.to_vec()).expect("invalid utf-8 sequence");
+                ports_map =
+                    Some(serde_json::from_str(&ports_map_json).expect("failed to convert from json"));
             }
 
-            _ => warn!("Expected second and third elements of the frame array to be bytes of ip and ports respectively"),
+            _ => warn!("Expected second and third elements of the frame array to be bytes of ip_map and ports_map respectively"),
         },
 
         _ => warn!("Expected the frame to be an array"),
     };
 
-    return (ip_map, port_map);
+    return (ip_map, ports_map);
 }
 
 pub fn decode_json_msg(msg: Frame) -> Option<String> {
@@ -130,7 +130,7 @@ pub fn decode_json_msg(msg: Frame) -> Option<String> {
                 json = Some(String::from_utf8(array_maker).expect("invalid utf-8 sequence"));
             }
 
-            _ => warn!("Expected second and third elements of the frame array to be bytes of ip and ports respectively"),
+            _ => warn!("Expected second element to be a byte array representing the transaction"),
         },
 
         _ => warn!("Expected the frame to be an array"),
@@ -138,7 +138,7 @@ pub fn decode_json_msg(msg: Frame) -> Option<String> {
     return json;
 }
 
-pub fn decode_bd_query(msg: Frame) -> Option<String> {
+pub fn decode_head_hash(msg: Frame) -> Option<String> {
     let mut head_hash: Option<String> = None;
     match msg {
         Frame::Array(x) => match &x[1] {
