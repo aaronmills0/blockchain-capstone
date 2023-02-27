@@ -265,34 +265,6 @@ pub async fn shell(is_miner: bool) {
                     }
                 }
 
-                // We broadcast the transaction
-                let (resp_tx, resp_rx) = oneshot::channel();
-                let (resp_tx_1, resp_rx_1) = oneshot::channel();
-
-                let cmd = Command::Get {
-                    key: String::from("id_query"),
-                    resp: resp_tx,
-                };
-                let cmd1 = Command::Get {
-                    key: String::from("ports_query"),
-                    resp: resp_tx_1,
-                };
-
-                tx_to_manager.send(cmd).await.ok();
-                tx_to_manager.send(cmd1).await.ok();
-
-                let result = resp_rx.await.unwrap().unwrap();
-                let result1 = resp_rx_1.await.unwrap().unwrap();
-
-                if result.is_empty() {
-                    error!("Empty result from peer");
-                    panic!();
-                }
-                if result1.is_empty() {
-                    error!("Empty result from peer");
-                    panic!();
-                }
-
                 let (peerid, _, ip_map, ports_map) = Peer::get_peer_info(&tx_to_manager).await;
                 peer::broadcast(
                     messages::get_transaction_msg,
@@ -302,12 +274,6 @@ pub async fn shell(is_miner: bool) {
                     &ports_map,
                 )
                 .await;
-
-                /*let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
-                let ports: Vec<String> = serde_json::from_str(&result1[0]).unwrap();
-                let local_ip = local_ip().unwrap().to_string();
-                let frame = messages::get_transaction_msg(peerid, peerid, &transaction);
-                peer::send_transaction(frame, local_ip, ports.to_owned()).await;*/
             }
             "tx_test" => {
                 info!("Please enter a receiver id:");
