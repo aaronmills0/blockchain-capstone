@@ -4,7 +4,6 @@ mod performance_tests;
 mod shell;
 mod simulation;
 mod utils;
-mod wallet;
 use crate::{network::server::Server, shell::shell};
 use log::info;
 use std::env::{self};
