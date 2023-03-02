@@ -158,6 +158,24 @@ pub async fn broadcast<T: Clone>(
 
 impl Peer {
     pub fn new() -> Peer {
+        let mut utxo: UTXO = UTXO(HashMap::new());
+        let (private_key0, public_key0) = sign_and_verify::create_keypair();
+
+        let hash_public_key0 = hash::hash_as_string(&public_key0);
+        let outpoint0: Outpoint = Outpoint {
+            txid: "0".repeat(64),
+            index: 0,
+        };
+
+        let tx_out0: TxOut = TxOut {
+            value: 100000,
+            pk_script: PublicKeyScript {
+                public_key_hash: hash_public_key0,
+                verifier: Verifier {},
+            },
+        };
+        utxo.insert(outpoint0, tx_out0);
+
         let mut peer = Peer {
             address: local_ip().expect("Failed to obtain local ip").to_string(),
             peerid: 0,
@@ -174,7 +192,7 @@ impl Peer {
                 transactions: Vec::new(),
             }],
             block_map: HashMap::new(),
-            utxo: UTXO(HashMap::new()),
+            utxo,
         };
         peer.block_map
             .insert(hash_as_string(&peer.blockchain[0]), 0);
