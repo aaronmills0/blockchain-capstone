@@ -8,9 +8,13 @@ use crate::components::transaction::TxOut;
 use crate::components::utxo::UTXO;
 use crate::network::decoder;
 use crate::network::messages;
+use crate::shell::get_example_transaction;
 use crate::utils::hash;
 use crate::utils::hash::hash_as_string;
+use crate::utils::save_and_load::load_object;
+use crate::utils::save_and_load::save_object;
 use crate::utils::sign_and_verify;
+use crate::utils::sign_and_verify::PrivateKey;
 use crate::utils::sign_and_verify::PublicKey;
 use crate::utils::sign_and_verify::Verifier;
 use ed25519_dalek::Keypair;
@@ -22,7 +26,7 @@ use serde_json::{Map, Value};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::Write;
-use std::{env, fs};
+use std::{env, fs, io};
 use std::{fs::File, path::Path};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
@@ -30,9 +34,9 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-pub static SERVER_IP: &str = "192.168.1.81";
+pub static SERVER_IP: &str = "192.168.0.15";
 pub const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
-pub static NUM_PORTS: usize = 20;
+pub static NUM_PORTS: usize = 5;
 pub static BATCH_SIZE: usize = 1024;
 pub static NUM_PARALLEL_TRANSACTIONS: usize = 8192;
 
@@ -154,6 +158,8 @@ pub async fn broadcast<T: Clone>(
         let mut connection = connection_opt.unwrap();
         connection.write_frame(&frame).await.ok();
     }
+
+    info!("Broadcasting transactions was successful!!!");
 }
 
 impl Peer {
@@ -200,6 +206,19 @@ impl Peer {
             peer.peerid = response;
             // Set the id obtained as a response to the peer id
             Peer::save_peer(&peer);
+
+            // We create a new wallet for each peer
+            let (private_key_initial, public_key_initial) = sign_and_verify::create_keypair();
+            let wallet: Vec<(PrivateKey, PublicKey, Outpoint, u32)> = vec![(
+                private_key_initial,
+                public_key_initial,
+                Outpoint {
+                    txid: "0".repeat(64),
+                    index: 0,
+                },
+                500,
+            )];
+            save_object(&wallet, String::from("wallet"), String::from("system"));
         }
 
         info!("IP map: {:?}", peer.ip_map);
@@ -260,6 +279,35 @@ impl Peer {
         return tx.clone();
     }
 
+    pub async fn get_peer_info(
+        tx_to_manager: &Sender<Command>,
+    ) -> (
+        u32,
+        Vec<String>,
+        HashMap<u32, String>,
+        HashMap<String, Vec<String>>,
+    ) {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        let cmd = Command::Get {
+            key: String::from("all"),
+            resp: resp_tx,
+        };
+        tx_to_manager.send(cmd).await.ok();
+
+        let result = resp_rx.await.unwrap().unwrap();
+        if result.is_empty() {
+            error!("Empty result from peer");
+            panic!();
+        }
+
+        let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
+        let ports: Vec<String> = serde_json::from_str(&result[1]).unwrap();
+        let ip_map: HashMap<u32, String> = serde_json::from_str(&result[2]).unwrap();
+        let ports_map: HashMap<String, Vec<String>> = serde_json::from_str(&result[3]).unwrap();
+
+        return (peerid, ports, ip_map, ports_map);
+    }
+
     pub async fn set_new_port(&mut self) -> String {
         let listener = TcpListener::bind(self.address.clone() + ":0")
             .await
@@ -287,35 +335,6 @@ impl Peer {
             let new_port = self.set_new_port().await;
             self.ports.push(new_port);
         }
-    }
-
-    pub async fn get_peer_info(
-        tx_to_manager: &Sender<Command>,
-    ) -> (
-        u32,
-        Vec<String>,
-        HashMap<u32, String>,
-        HashMap<String, Vec<String>>,
-    ) {
-        let (resp_tx, resp_rx) = oneshot::channel();
-        let cmd = Command::Get {
-            key: String::from("all"),
-            resp: resp_tx,
-        };
-        tx_to_manager.send(cmd).await.ok();
-
-        let result = resp_rx.await.unwrap().unwrap();
-        if result.is_empty() {
-            error!("Empty result from peer");
-            panic!();
-        }
-
-        let peerid: u32 = serde_json::from_str(&result[0]).unwrap();
-        let ports: Vec<String> = serde_json::from_str(&result[1]).unwrap();
-        let ip_map: HashMap<u32, String> = serde_json::from_str(&result[2]).unwrap();
-        let port_map: HashMap<String, Vec<String>> = serde_json::from_str(&result[3]).unwrap();
-
-        return (peerid, ports, ip_map, port_map);
     }
 
     pub async fn peer_manager(mut peer: Peer, mut rx: Receiver<Command>) {
