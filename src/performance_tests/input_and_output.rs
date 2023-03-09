@@ -6,6 +6,8 @@ mod tests {
     use crate::components::utxo::UTXO;
     use crate::utils::sign_and_verify::{PrivateKey, PublicKey, Verifier};
     use crate::utils::{hash, sign_and_verify};
+    use csv::Error;
+    use std::cmp::max;
     use std::collections::HashMap;
     use std::time::Instant;
 
@@ -162,21 +164,121 @@ mod tests {
     #[ignore]
     #[test]
     fn test_verif_one_input_diff_outputs() {
-        let base: usize = 10;
-        let mut multiplicative_index: usize;
-        for n in 0..10 {
-            let val = base.pow(n.try_into().unwrap());
-            multiplicative_index = if val > 100000 { 100000 * (n - 4) } else { val };
-            let (transaction, utxo) = one_input_diff_output_transaction_valid(multiplicative_index);
+        for r in 0..5 {
+            let base: usize = 10;
+            let mut multiplicative_index: usize;
 
-            let start = Instant::now();
-            utxo.verify_transaction(&transaction);
-            let duration = start.elapsed();
+            let path = format!("one_input_diff_outputs_batch{}.csv", r);
+            let mut writer = csv::Writer::from_path(path).unwrap();
+            writer.write_record(&["Number of outputs", "Time in ms", "Throughput"]);
+            for n in 0..10 {
+                let val = base.pow(n.try_into().unwrap());
+                multiplicative_index = if val > 100000 { 100000 * (n - 4) } else { val };
+                let (transaction, utxo) =
+                    one_input_diff_output_transaction_valid(multiplicative_index);
 
-            println!(
-                "Time elapsed for {:#} is: {:?}",
-                multiplicative_index, duration
-            );
+                let start = Instant::now();
+                utxo.verify_transaction(&transaction);
+                let duration = start.elapsed();
+
+                println!(
+                    "Time elapsed for {:#} is: {:?}",
+                    multiplicative_index, duration
+                );
+
+                let mut throughput: f32 =
+                    1000000.0 * (multiplicative_index as f32 / duration.as_micros() as f32);
+
+                writer.write_record(&[
+                    multiplicative_index.to_string(),
+                    duration.as_millis().to_string(),
+                    throughput.to_string(),
+                ]);
+                writer.flush();
+            }
+        }
+    }
+
+    #[ignore]
+    #[test]
+    fn test_verif_one_input_diff_outputs_batch_verif() {
+        for r in 0..5 {
+            let base: usize = 10;
+            let mut multiplicative_index: usize;
+            let mut transactions: Vec<Transaction> = Vec::new();
+
+            let path = format!("one_input_diff_outputs_batch{}.csv", r);
+            let mut writer = csv::Writer::from_path(path).unwrap();
+            writer.write_record(&["Number of outputs", "Time in ms", "Throughput"]);
+            for n in 0..10 {
+                let val = base.pow(n.try_into().unwrap());
+                multiplicative_index = if val > 100000 { 100000 * (n - 4) } else { val };
+                let (transaction, utxo) =
+                    one_input_diff_output_transaction_valid(multiplicative_index);
+                transactions.push(transaction);
+
+                let start = Instant::now();
+                utxo.batch_verify_and_update(&transactions);
+                let duration = start.elapsed();
+
+                println!(
+                    "Time elapsed for {:#} is: {:?}",
+                    multiplicative_index, duration
+                );
+
+                let mut throughput: f32 =
+                    1000000.0 * (multiplicative_index as f32 / duration.as_micros() as f32);
+
+                writer.write_record(&[
+                    multiplicative_index.to_string(),
+                    duration.as_millis().to_string(),
+                    throughput.to_string(),
+                ]);
+                writer.flush();
+            }
+        }
+    }
+
+    #[ignore]
+    #[test]
+    fn test_verif_one_input_diff_outputs_batch_verif_parallelized() {
+        for r in 0..5 {
+            let base: usize = 10;
+            let mut multiplicative_index: usize;
+            let mut transactions: Vec<Transaction> = Vec::new();
+
+            let path = format!("one_input_diff_outputs_batch_parallelized{}.csv", r);
+            let mut writer = csv::Writer::from_path(path).unwrap();
+            writer.write_record(&["Number of outputs", "Time in ms", "Throughput"]);
+            for n in 0..14 {
+                let val = base.pow(n.try_into().unwrap());
+                multiplicative_index = if val > 100000 { 100000 * (n - 4) } else { val };
+                let (transaction, utxo) =
+                    one_input_diff_output_transaction_valid(multiplicative_index);
+                transactions.push(transaction);
+
+                let start = Instant::now();
+                utxo.parallel_batch_verify_and_update(
+                    &transactions,
+                    max(multiplicative_index, num_cpus::get()) / num_cpus::get(),
+                );
+                let duration = start.elapsed();
+
+                println!(
+                    "Time elapsed for {:#} is: {:?}",
+                    multiplicative_index, duration
+                );
+
+                let mut throughput: f32 =
+                    1000000.0 * (multiplicative_index as f32 / duration.as_micros() as f32);
+
+                writer.write_record(&[
+                    multiplicative_index.to_string(),
+                    duration.as_millis().to_string(),
+                    throughput.to_string(),
+                ]);
+                writer.flush();
+            }
         }
     }
 
