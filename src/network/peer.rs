@@ -34,7 +34,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-pub static SERVER_IP: &str = "192.168.0.15";
+pub static SERVER_IP: &str = "192.168.0.10";
 pub const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
 pub static NUM_PORTS: usize = 5;
 pub static BATCH_SIZE: usize = 1024;
@@ -138,6 +138,30 @@ pub async fn send_maps_query(
     return (ip_map.unwrap(), ports_map.unwrap());
 }
 
+pub async fn broadcast_mempool(
+    transactions: &Vec<Transaction>,
+    peerid: u32,
+    senderip: String,
+    ip_map: &HashMap<u32, String>,
+    port_map: &HashMap<String, Vec<String>>,
+) {
+    for (id, ip) in ip_map {
+        if *id == peerid || *ip == senderip {
+            continue;
+        }
+        let ports: Vec<&str> = port_map[ip].iter().map(AsRef::as_ref).collect();
+        let connection_opt = get_connection(ip, ports.as_slice()).await;
+        if connection_opt.is_none() {
+            panic!("Cannot connect to the server");
+        }
+        let mut connection = connection_opt.unwrap();
+        for transaction in transactions {
+            let frame = messages::get_transaction_msg(peerid, *id, transaction);
+            connection.write_frame(&frame).await.ok();
+        }
+    }
+}
+
 pub async fn broadcast<T: Clone>(
     msg_fn: fn(u32, u32, T) -> Frame,
     payload: T,
@@ -158,8 +182,6 @@ pub async fn broadcast<T: Clone>(
         let mut connection = connection_opt.unwrap();
         connection.write_frame(&frame).await.ok();
     }
-
-    info!("Broadcasting transactions was successful!!!");
 }
 
 impl Peer {
@@ -404,13 +426,16 @@ impl Peer {
                         }
 
                         let payload_vec = payload.unwrap();
-                        if payload_vec.len() != 1 {
+                        if payload_vec.len() != 2 {
                             error!("Invalid command: payload is of unexpected size");
                             panic!();
                         }
                         let tx: Transaction = serde_json::from_str(&payload_vec[0])
                             .expect("Could not deserialize string to transaction.");
 
+                        let sending_socket = payload_vec[1].to_owned();
+                        let ip_socket: Vec<&str> = sending_socket.split(":").collect();
+                        let senderip = ip_socket[0].to_owned();
                         if mempool.transactions.len() < NUM_PARALLEL_TRANSACTIONS
                             && mempool.hashes.insert(hash_as_string(&tx))
                         {
@@ -427,6 +452,16 @@ impl Peer {
                             utxo = updated_utxo.unwrap();
 
                             verified_mempool.hashes.extend(mempool.hashes);
+                            // Broadcast all the transactions in the mempool (Include or exclude for testing?)
+                            broadcast_mempool(
+                                &mempool.transactions,
+                                peer.peerid,
+                                senderip,
+                                &peer.ip_map,
+                                &peer.ports_map,
+                            )
+                            .await;
+
                             verified_mempool
                                 .transactions
                                 .append(&mut mempool.transactions); // Removes all elements from mempool
@@ -618,7 +653,7 @@ impl Peer {
                             cmd = Command::Set {
                                 key: command,
                                 resp: resp_tx,
-                                payload: Some(vec![json.unwrap()]),
+                                payload: Some(vec![json.unwrap(), socket.clone()]),
                             };
                             tx.send(cmd).await.ok();
                         } else if command == "maps_query" {
