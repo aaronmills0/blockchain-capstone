@@ -3,7 +3,7 @@ use crate::utils::hash::hash_as_string;
 use crate::utils::sign_and_verify::{PublicKey, Signature, Verifier};
 use ed25519_dalek::{PublicKey as DalekPublicKey, Signature as DalekSignature};
 use itertools::izip;
-use log::warn;
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::collections::{HashMap, HashSet};
@@ -11,6 +11,7 @@ use std::ops::{Deref, DerefMut};
 use std::sync::mpsc::Receiver;
 use std::sync::{mpsc, Arc};
 use std::thread::{self};
+use std::time::Instant;
 
 /**
  * The Utxo is a map containing the Unspent Transaction (X) Outputs.
@@ -130,9 +131,12 @@ impl UTXO {
         let mut tx_out: TxOut;
         let mut utxo: UTXO = self.clone();
         let sorted: Vec<Transaction> = self.topological_sort(transactions);
+        let startFull = Instant::now();
+        let startOuterForLoop = Instant::now();
         for transaction in sorted {
             incoming_balance = 0;
             outgoing_balance = 0;
+            let startInnerForLoopTxInput = Instant::now();
             for tx_in in transaction.tx_inputs.iter() {
                 // If the uxto doesn't contain the output associated with this input: invalid transaction
                 if !utxo.contains_key(&tx_in.outpoint) {
@@ -161,10 +165,13 @@ impl UTXO {
                 utxo.remove(&tx_in.outpoint);
                 in_out_pairs.push((tx_in.clone(), tx_out));
             }
+            let durationInnerForLoopTxInput = startInnerForLoopTxInput.elapsed();
 
+            let startInnerForLoopTxOutput = Instant::now();
             for new_tx_out in transaction.tx_outputs.iter() {
                 outgoing_balance += new_tx_out.value;
             }
+            let durationInnerForLoopTxOutput = startInnerForLoopTxOutput.elapsed();
 
             if outgoing_balance > incoming_balance {
                 warn!(
@@ -173,15 +180,22 @@ impl UTXO {
                 return (false, None);
             }
 
+            let startUpdateUtxo = Instant::now();
             // Update the utxo copy even though signature has not been checked yet
             utxo.update(&transaction);
+            let durationUpdateUtxo = startUpdateUtxo.elapsed();
         }
+        let durationOuterForLoop = startOuterForLoop.elapsed();
 
+        let startSignatureVerification = Instant::now();
         let msg_bytes: Vec<&[u8]> = msg_vec.iter().map(|x| &x[..]).collect();
         let sig_status = Verifier::verify_batch(&msg_bytes, &sig_vec, &pk_vec);
+        let durationSignatureVerification = startSignatureVerification.elapsed();
         if sig_status {
+            let durationFull = startFull.elapsed();
             return (true, Some(utxo));
         } else {
+            let durationFull = startFull.elapsed();
             return (false, None);
         }
     }
