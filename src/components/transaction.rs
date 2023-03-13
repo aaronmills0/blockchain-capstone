@@ -227,10 +227,10 @@ impl Transaction {
             });
         }
 
-        // info!(
-        //     "Transaction created with {} inputs and {} outputs.",
-        //     num_inputs, num_outputs
-        // );
+        info!(
+            "Transaction created with {} inputs and {} outputs.",
+            num_inputs, num_outputs
+        );
 
         let transaction = Transaction {
             tx_inputs,

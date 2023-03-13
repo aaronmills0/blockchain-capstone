@@ -29,7 +29,6 @@ use std::collections::HashSet;
 use std::io::Write;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::time::Instant;
 use std::{env, fs};
 use std::{fs::File, path::Path};
 use tokio::net::{TcpListener, TcpStream};
@@ -360,14 +359,14 @@ impl Peer {
 
     pub async fn set_ports(&mut self) {
         // Update any set ports that are unavailable
-        // for i in 0..self.ports.len() {
-        //     let socket = self.address.clone() + ":" + &self.ports[i];
-        //     let conn = TcpStream::connect(&socket).await;
-        //     if conn.is_err() {
-        //         info!("Port {} is unavailable. Setting new port...", i);
-        //         self.ports[i] = self.set_new_port().await;
-        //     };
-        // }
+        for i in 0..self.ports.len() {
+            let socket = self.address.clone() + ":" + &self.ports[i];
+            let conn = TcpStream::connect(&socket).await;
+            if conn.is_err() {
+                info!("Port {} is unavailable. Setting new port...", i);
+                self.ports[i] = self.set_new_port().await;
+            };
+        }
 
         // Add new ports until there are `NUM_PORTS` ports
         while self.ports.len() < NUM_PORTS {
@@ -420,8 +419,8 @@ impl Peer {
             32, 92, 248, 176, 200, 83, 98, 207, 118, 47, 231, 60, 75, 4, 65, 208, 174, 11, 82, 239,
             211, 201, 251, 90, 173, 173, 165, 36, 120, 162, 85, 139, 187, 164, 152, 53, 13, 62,
             219, 144, 86, 74, 205, 134, 25,
-            ])
-            .unwrap();
+        ])
+        .unwrap();
         let public_key = PublicKey(keypair.public);
         let outpoint: Outpoint = Outpoint {
             txid: "0".repeat(64),
@@ -659,7 +658,7 @@ impl Peer {
                 Ok(opt_frame) => {
                     if let Some(frame) = opt_frame {
                         let cmd;
-                        // info!("GOT: {:?}", frame);
+                        info!("GOT: {:?}", frame);
                         let (command, sourceid, destid) = decoder::decode_command(&frame);
 
                         let (resp_tx, resp_rx) = oneshot::channel();
