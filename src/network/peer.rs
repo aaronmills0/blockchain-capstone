@@ -23,6 +23,7 @@ use log::{error, info, warn};
 use mini_redis::{Connection, Frame};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use std::cmp::max;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::Write;
@@ -33,13 +34,11 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
-use tokio::time::Instant;
 
 pub static SERVER_IP: &str = "192.168.0.15";
 pub const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
 pub static NUM_PORTS: usize = 5;
-pub static BATCH_SIZE: usize = 1024;
-pub static NUM_PARALLEL_TRANSACTIONS: usize = 8192;
+pub static NUM_PARALLEL_TRANSACTIONS: usize = 1024;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Peer {
@@ -371,7 +370,6 @@ impl Peer {
             transactions: Vec::new(),
         };
         let mut verified_mempool = mempool.clone();
-        let mut time = Instant::now(); // Gets overriden
 
         let mut utxo: UTXO = UTXO(HashMap::new());
         let keypair = Keypair::from_bytes(&[
@@ -393,7 +391,7 @@ impl Peer {
                 verifier: Verifier {},
             },
         };
-        utxo.insert(outpoint, tx_out);
+        utxo.insert(outpoint.clone(), tx_out.clone());
 
         loop {
             let command = rx.recv().await.unwrap();
@@ -413,41 +411,28 @@ impl Peer {
                         let tx: Transaction = serde_json::from_str(&payload_vec[0])
                             .expect("Could not deserialize string to transaction.");
 
-                        // Start the timer when the first transaction is received
-                        if verified_mempool.transactions.is_empty()
-                            && mempool.transactions.is_empty()
-                        {
-                            time = Instant::now();
+                        mempool.hashes.insert(hash_as_string(&tx));
+                        mempool.transactions.push(tx.to_owned());
+                        if mempool.transactions.len() < NUM_PARALLEL_TRANSACTIONS {
+                            continue;
                         }
 
-                        if mempool.transactions.len() < NUM_PARALLEL_TRANSACTIONS
-                            && mempool.hashes.insert(hash_as_string(&tx))
-                        {
-                            mempool.transactions.push(tx.to_owned());
-                        } else {
-                            let (valid, updated_utxo) = utxo.parallel_batch_verify_and_update(
-                                &mempool.transactions,
-                                BATCH_SIZE,
-                            );
-                            if !valid {
-                                error!("Received an invalid transaction!"); // We can update this later
-                                panic!();
-                            }
-                            utxo = updated_utxo.unwrap();
+                        let (valid, updated_utxo) = utxo.parallel_batch_verify_and_update(
+                            &mempool.transactions,
+                            max(mempool.transactions.len(), num_cpus::get()) / num_cpus::get(),
+                        );
 
-                            let time_elapsed = time.elapsed().as_micros();
-                            info!(
-                                "{} transactions received and verified in {} microseconds",
-                                verified_mempool.transactions.len(),
-                                time_elapsed
-                            );
-
-                            verified_mempool.hashes.extend(mempool.hashes);
-                            verified_mempool
-                                .transactions
-                                .append(&mut mempool.transactions); // Removes all elements from mempool
-                            mempool.hashes = HashSet::new();
+                        if !valid {
+                            error!("Received an invalid transaction!"); // We can update this later
+                            panic!();
                         }
+                        utxo = updated_utxo.unwrap();
+
+                        verified_mempool.hashes.extend(mempool.hashes);
+                        verified_mempool
+                            .transactions
+                            .append(&mut mempool.transactions); // Removes all elements from mempool
+                        mempool.hashes = HashSet::new();
                     } else if key.as_str() == "block" {
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
@@ -773,9 +758,10 @@ impl Peer {
             return (false, None);
         }
 
-        let (valid, utxo_option) = self
-            .utxo
-            .parallel_batch_verify_and_update(&block.transactions, BATCH_SIZE);
+        let (valid, utxo_option) = self.utxo.parallel_batch_verify_and_update(
+            &block.transactions,
+            max(block.transactions.len(), num_cpus::get()) / num_cpus::get(),
+        );
         if !valid {
             warn!("Received invalid block");
             return (false, None);
