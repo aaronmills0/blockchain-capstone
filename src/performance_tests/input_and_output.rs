@@ -169,7 +169,7 @@ mod tests {
             let base: usize = 10;
             let mut multiplicative_index: usize;
 
-            let path = format!("one_input_diff_outputs_batch{}.csv", r);
+            let path = format!("one_input_diff_outputs_verify{}.csv", r);
             let mut writer = csv::Writer::from_path(path).unwrap();
             writer.write_record(&["Number of outputs", "Time in ms", "Throughput"]);
             for n in 0..14 {
@@ -210,7 +210,7 @@ mod tests {
             let path = format!("one_input_diff_outputs_batch{}.csv", r);
             let mut writer = csv::Writer::from_path(path).unwrap();
             writer.write_record(&["Number of outputs", "Time in ms", "Throughput"]);
-            for n in 0..10 {
+            for n in 0..14 {
                 let mut transactions: Vec<Transaction> = Vec::new();
                 let val = base.pow(n.try_into().unwrap());
                 multiplicative_index = if val > 100000 { 100000 * (n - 4) } else { val };
@@ -290,7 +290,7 @@ mod tests {
             let base: usize = 10;
             let mut multiplicative_index: usize;
 
-            let path = format!("diff_input_one_output_batch{}.csv", r);
+            let path = format!("diff_input_one_output_verify{}.csv", r);
             let mut writer = csv::Writer::from_path(path).unwrap();
             writer.write_record(&["Number of inputs", "Time in ms", "Throughput"]);
             for n in 0..14 {
