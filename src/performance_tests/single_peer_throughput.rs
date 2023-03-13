@@ -3,8 +3,10 @@ use crate::components::utxo::UTXO;
 use crate::network::messages;
 use crate::network::peer::get_connection;
 use crate::simulation::KeyMap;
-use crate::utils::sign_and_verify::Verifier;
-use crate::utils::{hash, sign_and_verify};
+use crate::utils::hash;
+use crate::utils::sign_and_verify::{PrivateKey, PublicKey, Verifier};
+use ed25519_dalek::Keypair;
+use log::info;
 use rand_1::rngs::ThreadRng;
 use std::collections::HashMap;
 
@@ -27,7 +29,15 @@ pub async fn test_single_peer_tx_throughput_sender(
     let mut utxo: UTXO = UTXO(HashMap::new());
     let mut key_map: KeyMap = KeyMap(HashMap::new());
     let mut transactions: Vec<Transaction> = Vec::new();
-    let (private_key, public_key) = sign_and_verify::create_keypair();
+    let keypair = Keypair::from_bytes(&[
+        9, 75, 189, 163, 133, 148, 28, 198, 139, 3, 56, 182, 118, 26, 250, 201, 129, 109, 104, 32,
+        92, 248, 176, 200, 83, 98, 207, 118, 47, 231, 60, 75, 4, 65, 208, 174, 11, 82, 239, 211,
+        201, 251, 90, 173, 173, 165, 36, 120, 162, 85, 139, 187, 164, 152, 53, 13, 62, 219, 144,
+        86, 74, 205, 134, 25,
+    ])
+    .unwrap();
+    let private_key = PrivateKey(keypair.secret);
+    let public_key = PublicKey(keypair.public);
     let outpoint: Outpoint = Outpoint {
         txid: "0".repeat(64),
         index: 0,
@@ -47,12 +57,19 @@ pub async fn test_single_peer_tx_throughput_sender(
     let mut rng: ThreadRng = rand_1::thread_rng();
     let max_num_outputs = 1;
 
-    for _ in 0..131072 {
+    info!("Creating transactions");
+
+    for i in 0..1048576 {
         let transaction =
             Transaction::create_transaction(&utxo, &mut key_map, &mut rng, max_num_outputs, false);
         utxo.update(&transaction);
         transactions.push(transaction);
+        if i % 1024 == 0 {
+            info!("{}", i);
+        }
     }
+
+    info!("Sending transactions");
 
     for t in transactions.iter() {
         let frame = messages::get_transaction_msg(sender_id, receiver_id, &t.clone());
