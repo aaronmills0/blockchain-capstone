@@ -426,8 +426,8 @@ impl Peer {
             32, 92, 248, 176, 200, 83, 98, 207, 118, 47, 231, 60, 75, 4, 65, 208, 174, 11, 82, 239,
             211, 201, 251, 90, 173, 173, 165, 36, 120, 162, 85, 139, 187, 164, 152, 53, 13, 62,
             219, 144, 86, 74, 205, 134, 25,
-            ])
-            .unwrap();
+        ])
+        .unwrap();
         let public_key = PublicKey(keypair.public);
         let outpoint: Outpoint = Outpoint {
             txid: "0".repeat(64),
