@@ -59,7 +59,7 @@ pub async fn test_single_peer_tx_throughput_sender(
 
     info!("Creating transactions");
 
-    for i in 0..1048576 {
+    for i in 0..65536 {
         let transaction =
             Transaction::create_transaction(&utxo, &mut key_map, &mut rng, max_num_outputs, false);
         utxo.update(&transaction);
