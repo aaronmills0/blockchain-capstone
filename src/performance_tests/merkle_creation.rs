@@ -5,12 +5,11 @@ mod tests {
         time::{Duration, Instant},
     };
 
-    use itertools::izip;
     use rand_1::rngs::ThreadRng;
 
     use crate::{
         components::{
-            merkle::{self, Merkle},
+            merkle::Merkle,
             transaction::{Outpoint, PublicKeyScript, Transaction, TxOut},
             utxo::UTXO,
         },

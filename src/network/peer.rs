@@ -8,10 +8,8 @@ use crate::components::transaction::TxOut;
 use crate::components::utxo::UTXO;
 use crate::network::decoder;
 use crate::network::messages;
-use crate::shell::get_example_transaction;
 use crate::utils::hash;
 use crate::utils::hash::hash_as_string;
-use crate::utils::save_and_load::load_object;
 use crate::utils::save_and_load::save_object;
 use crate::utils::sign_and_verify;
 use crate::utils::sign_and_verify::PrivateKey;
@@ -30,7 +28,7 @@ use std::io::Write;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Instant;
-use std::{env, fs, io};
+use std::{env, fs};
 use std::{fs::File, path::Path};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
@@ -61,7 +59,7 @@ pub struct MemPool {
 }
 
 impl MemPool {
-    pub fn new() -> MemPool{
+    pub fn new() -> MemPool {
         return MemPool {
             hashes: HashSet::new(),
             transactions: Vec::new(),
@@ -151,17 +149,18 @@ pub async fn send_maps_query(
 }
 
 pub async fn broadcast<T: Clone>(
-    msg_fn: fn(u32, u32, T) -> Frame,
-    payload: T,
+    msg_fn: fn(u32, u32, &T) -> Frame,
+    payload: &T,
     peerid: u32,
     ip_map: &HashMap<u32, String>,
     port_map: &HashMap<String, Vec<String>>,
+    to_self: bool,
 ) {
     for (id, ip) in ip_map {
-        if *id == peerid {
+        if !to_self && *id == peerid {
             continue;
         }
-        let frame = msg_fn(peerid, *id, payload.clone());
+        let frame = msg_fn(peerid, *id, payload);
         let ports: Vec<&str> = port_map[ip].iter().map(AsRef::as_ref).collect();
         let connection_opt = get_connection(ip, ports.as_slice()).await;
         if connection_opt.is_none() {
@@ -170,8 +169,6 @@ pub async fn broadcast<T: Clone>(
         let mut connection = connection_opt.unwrap();
         connection.write_frame(&frame).await.ok();
     }
-
-    info!("Broadcasting transactions was successful!!!");
 }
 
 impl Peer {
@@ -375,25 +372,32 @@ impl Peer {
             self.ports.push(new_port);
         }
     }
-    
-    async fn update_mempool(verified_mempool: Arc<Mutex<MemPool>>, proc_mempool: Arc<Mutex<MemPool>>, time: Arc<Mutex<Instant>>) {
+
+    pub async fn update_mempool(
+        verified_mempool: Arc<Mutex<MemPool>>,
+        proc_mempool: Arc<Mutex<MemPool>>,
+    ) {
         let mut verified_mempool_ref = verified_mempool.lock().unwrap();
         let mut proc_mempool_ref = proc_mempool.lock().unwrap();
-        (*verified_mempool_ref).hashes.extend((*proc_mempool_ref).hashes.to_owned());
+        (*verified_mempool_ref)
+            .hashes
+            .extend((*proc_mempool_ref).hashes.to_owned());
         (*verified_mempool_ref)
             .transactions
             .append(&mut (*proc_mempool_ref).transactions); // Removes all elements from mempool
-        if (*verified_mempool_ref).transactions.len() == 65536 {
-            println!("Total time for batch size of {} txs: {}us, ", NUM_PARALLEL_TRANSACTIONS, (*(time.lock().unwrap())).elapsed().as_micros());
-        };
     }
-    
-    async fn verify_mempool(utxo: Arc<Mutex<UTXO>>, proc_mempool: Arc<Mutex<MemPool>>, verified_mempool: Arc<Mutex<MemPool>>, verified: Arc<Mutex<bool>>, time: Arc<Mutex<Instant>>) {
+
+    pub async fn verify_mempool(
+        utxo: Arc<Mutex<UTXO>>,
+        proc_mempool: Arc<Mutex<MemPool>>,
+        verified_mempool: Arc<Mutex<MemPool>>,
+        verified: Arc<Mutex<bool>>,
+    ) {
         let mut utxo_ref = utxo.lock().unwrap();
         let proc_mempool_ref = proc_mempool.lock().unwrap();
         let (valid, updated_utxo) = (*utxo_ref).parallel_batch_verify_and_update(
             &(*proc_mempool_ref).transactions,
-            max((*proc_mempool_ref).transactions.len(), num_cpus::get()) / num_cpus::get()
+            max((*proc_mempool_ref).transactions.len(), num_cpus::get()) / num_cpus::get(),
         );
         if !valid {
             error!("Received an invalid transaction!"); // We can update this later
@@ -402,12 +406,11 @@ impl Peer {
         *utxo_ref = updated_utxo.unwrap();
         let mut verified_ref = verified.lock().unwrap();
         *verified_ref = true;
-             
+
         let proc_mempool_clone = proc_mempool.clone();
         let verified_mempool_clone = verified_mempool.clone();
-        let time_clone = time.clone();
         tokio::spawn(async move {
-            Peer::update_mempool(verified_mempool_clone, proc_mempool_clone, time_clone).await;
+            Peer::update_mempool(verified_mempool_clone, proc_mempool_clone).await;
         });
     }
 
@@ -419,7 +422,7 @@ impl Peer {
         let verified_arc = Arc::new(Mutex::new(true));
 
         let time_arc = Arc::new(Mutex::new(Instant::now()));
-        
+
         let mut utxo: UTXO = UTXO(HashMap::new());
         let keypair = Keypair::from_bytes(&[
             9, 75, 189, 163, 133, 148, 28, 198, 139, 3, 56, 182, 118, 26, 250, 201, 129, 109, 104,
@@ -461,13 +464,13 @@ impl Peer {
                         }
                         let tx: Transaction = serde_json::from_str(&payload_vec[0])
                             .expect("Could not deserialize string to transaction.");
-                        
+
                         if first_tx {
                             println!("Received first tx!");
                             first_tx = false;
                             *(time_arc.lock().unwrap()) = Instant::now();
                         }
-                        
+
                         mempool.hashes.insert(hash_as_string(&tx));
                         mempool.transactions.push(tx.to_owned());
                         let verified_result = verified_arc.try_lock();
@@ -476,12 +479,11 @@ impl Peer {
                         } else {
                             false
                         };
-                        if mempool.transactions.len() < NUM_PARALLEL_TRANSACTIONS || !verified
-                        {
+                        if mempool.transactions.len() < NUM_PARALLEL_TRANSACTIONS || !verified {
                             continue;
                         }
                         *(verified_arc.lock().unwrap()) = false;
-                        
+
                         let mut proc_mempool_ref = proc_mempool_arc.lock().unwrap();
                         *proc_mempool_ref = mempool.to_owned();
                         mempool = MemPool::new();
@@ -490,9 +492,14 @@ impl Peer {
                         let proc_mempool_arc_clone = proc_mempool_arc.clone();
                         let verified_mempool_arc_clone = verified_mempool_arc.clone();
                         let verified_arc_clone = verified_arc.clone();
-                        let time_arc_clone = time_arc.clone();
                         tokio::spawn(async move {
-                            Peer::verify_mempool(utxo_arc_clone, proc_mempool_arc_clone, verified_mempool_arc_clone, verified_arc_clone, time_arc_clone).await;
+                            Peer::verify_mempool(
+                                utxo_arc_clone,
+                                proc_mempool_arc_clone,
+                                verified_mempool_arc_clone,
+                                verified_arc_clone,
+                            )
+                            .await;
                         });
                     } else if key.as_str() == "block" {
                         if payload.is_none() {
@@ -524,6 +531,7 @@ impl Peer {
                             peer.peerid,
                             &peer.ip_map,
                             &peer.ports_map,
+                            false,
                         )
                         .await;
 

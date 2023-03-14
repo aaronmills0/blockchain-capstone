@@ -1,10 +1,11 @@
 use std::{
     cmp::max,
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     env,
     fs::{self, File},
     io::Write,
     path::Path,
+    sync::{Arc, Mutex},
 };
 
 use ed25519_dalek::Keypair;
@@ -26,7 +27,7 @@ use crate::{
     },
     utils::{
         hash::{self, hash_as_string},
-        sign_and_verify::{self, PrivateKey, PublicKey, Verifier},
+        sign_and_verify::{PublicKey, Verifier},
     },
 };
 
@@ -46,13 +47,77 @@ impl Miner {
         return miner;
     }
 
+    pub async fn create_block(
+        tx_peer: Sender<Command>,
+        utxo: Arc<Mutex<UTXO>>,
+        proc_mempool: Arc<Mutex<MemPool>>,
+        verified_mempool: Arc<Mutex<MemPool>>,
+        verified: Arc<Mutex<bool>>,
+    ) {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        let cmd = Command::Get {
+            key: String::from("block_info_query"),
+            resp: resp_tx,
+        };
+
+        tx_peer.send(cmd).await;
+
+        let result = resp_rx.await;
+        let result_vec = result.unwrap().unwrap();
+        let prev_hash = result_vec[0].to_owned();
+        let mut utxo_ref = utxo.lock().unwrap();
+        let proc_mempool_ref = proc_mempool.lock().unwrap();
+        let merkle_tree = Merkle::create_merkle_tree(&(*proc_mempool_ref).transactions);
+        let (valid, updated_utxo) = (*utxo_ref).parallel_batch_verify_and_update(
+            &(*proc_mempool_ref).transactions,
+            max((*proc_mempool_ref).transactions.len(), num_cpus::get()) / num_cpus::get(),
+        );
+        if !valid {
+            error!("Received an invalid transaction!"); // We can update this later
+            panic!();
+        }
+        *utxo_ref = updated_utxo.unwrap();
+        let mut verified_ref = verified.lock().unwrap();
+        *verified_ref = true;
+        let block = Block {
+            header: BlockHeader {
+                previous_hash: prev_hash,
+                merkle_root: merkle_tree.tree.first().unwrap().clone(),
+                nonce: 0,
+            },
+            merkle: merkle_tree,
+            transactions: (*proc_mempool_ref).transactions.clone(),
+        };
+
+        let peer_id: u32 = serde_json::from_str(&result_vec[1]).unwrap();
+        let ip_map: HashMap<u32, String> = serde_json::from_str(&result_vec[2]).unwrap();
+        let port_map: HashMap<String, Vec<String>> = serde_json::from_str(&result_vec[3]).unwrap();
+        tokio::spawn(async move {
+            peer::broadcast(
+                messages::get_block_msg,
+                &block,
+                peer_id,
+                &ip_map,
+                &port_map,
+                true,
+            )
+            .await;
+        });
+
+        let proc_mempool_clone = proc_mempool.clone();
+        let verified_mempool_clone = verified_mempool.clone();
+        tokio::spawn(async move {
+            Peer::update_mempool(verified_mempool_clone, proc_mempool_clone).await;
+        });
+    }
+
     async fn miner_manager(miner: Miner, mut rx: Receiver<Command>) {
         let (tx_peer, rx_peer) = mpsc::channel(32);
-        let mut mempool = MemPool {
-            hashes: HashSet::new(),
-            transactions: Vec::new(),
-        };
-        let mut verified_mempool = mempool.clone();
+        let mut mempool = MemPool::new();
+
+        let proc_mempool_arc = Arc::new(Mutex::new(MemPool::new()));
+        let verified_mempool_arc = Arc::new(Mutex::new(MemPool::new()));
+        let verified_arc = Arc::new(Mutex::new(true));
 
         let mut utxo: UTXO = UTXO(HashMap::new());
         let keypair = Keypair::from_bytes(&[
@@ -75,6 +140,7 @@ impl Miner {
             },
         };
         utxo.insert(outpoint, tx_out);
+        let utxo_arc = Arc::new(Mutex::new(utxo));
 
         tokio::spawn(async move {
             Peer::peer_manager(miner.peer, rx_peer).await;
@@ -100,55 +166,36 @@ impl Miner {
 
                         mempool.hashes.insert(hash_as_string(&tx));
                         mempool.transactions.push(tx.to_owned());
-                        if mempool.transactions.len() < NUM_PARALLEL_TRANSACTIONS {
+                        let verified_result = verified_arc.try_lock();
+                        let verified = if verified_result.is_ok() {
+                            *(verified_result.unwrap())
+                        } else {
+                            false
+                        };
+                        if mempool.transactions.len() < NUM_PARALLEL_TRANSACTIONS || !verified {
                             continue;
                         }
+                        *(verified_arc.lock().unwrap()) = false;
 
-                        // Get block hash from peer_manager
-                        mempool.transactions.push(tx.to_owned());
-                        let (resp_tx, resp_rx) = oneshot::channel();
-                        let cmd = Command::Get {
-                            key: String::from("block_info_query"),
-                            resp: resp_tx,
-                        };
+                        let mut proc_mempool_ref = proc_mempool_arc.lock().unwrap();
+                        *proc_mempool_ref = mempool.to_owned();
+                        mempool = MemPool::new();
 
-                        tx_peer.send(cmd).await;
-
-                        let result = resp_rx.await;
-                        let result_vec = result.unwrap().unwrap();
-                        let prev_hash = result_vec[0].to_owned();
-                        let (block_option, utxo_option) = Miner::create_block(
-                            prev_hash,
-                            mempool.transactions.clone(),
-                            &utxo,
-                            max(mempool.transactions.len(), num_cpus::get()) / num_cpus::get(),
-                        );
-
-                        if block_option.is_some() {
-                            let block = block_option.unwrap();
-                            let peer_id: u32 = serde_json::from_str(&result_vec[1]).unwrap();
-                            let ip_map: HashMap<u32, String> =
-                                serde_json::from_str(&result_vec[2]).unwrap();
-                            let port_map: HashMap<String, Vec<String>> =
-                                serde_json::from_str(&result_vec[3]).unwrap();
-
-                            peer::broadcast(
-                                messages::get_block_msg,
-                                &block,
-                                peer_id,
-                                &ip_map,
-                                &port_map,
+                        let utxo_arc_clone = utxo_arc.clone();
+                        let proc_mempool_arc_clone = proc_mempool_arc.clone();
+                        let verified_mempool_arc_clone = verified_mempool_arc.clone();
+                        let verified_arc_clone = verified_arc.clone();
+                        let tx_peer_clone = tx_peer.clone();
+                        tokio::spawn(async move {
+                            Miner::create_block(
+                                tx_peer_clone,
+                                utxo_arc_clone,
+                                proc_mempool_arc_clone,
+                                verified_mempool_arc_clone,
+                                verified_arc_clone,
                             )
                             .await;
-
-                            utxo = utxo_option.unwrap();
-                        }
-
-                        verified_mempool.hashes.extend(mempool.hashes);
-                        verified_mempool
-                            .transactions
-                            .append(&mut mempool.transactions); // Removes all elements from mempool
-                        mempool.hashes = HashSet::new();
+                        });
                     } else {
                         let (resp_tx, resp_rx) = oneshot::channel();
                         let cmd_peer = Command::Set {
@@ -173,30 +220,6 @@ impl Miner {
                 }
             }
         }
-    }
-
-    pub fn create_block(
-        prev_hash: String,
-        transactions: Vec<Transaction>,
-        utxo: &UTXO,
-        batch_size: usize,
-    ) -> (Option<Block>, Option<UTXO>) {
-        let merkle_tree = Merkle::create_merkle_tree(&transactions);
-        let (valid, utxo_option) = utxo.parallel_batch_verify_and_update(&transactions, batch_size);
-        if !valid {
-            warn!("Validator received invalid transaction(s). Failed to create block");
-            return (None, None);
-        }
-        let block = Block {
-            header: BlockHeader {
-                previous_hash: prev_hash,
-                merkle_root: merkle_tree.tree.first().unwrap().clone(),
-                nonce: 0,
-            },
-            merkle: merkle_tree,
-            transactions: transactions,
-        };
-        return (Some(block), utxo_option);
     }
 
     pub async fn launch() -> Sender<Command> {
