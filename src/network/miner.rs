@@ -89,9 +89,29 @@ impl Miner {
             transactions: (*proc_mempool_ref).transactions.clone(),
         };
 
-        let peer_id: u32 = serde_json::from_str(&result_vec[1]).unwrap();
-        let ip_map: HashMap<u32, String> = serde_json::from_str(&result_vec[2]).unwrap();
-        let port_map: HashMap<String, Vec<String>> = serde_json::from_str(&result_vec[3]).unwrap();
+        let proc_mempool_clone = proc_mempool.clone();
+        let verified_mempool_clone = verified_mempool.clone();
+        tokio::spawn(async move {
+            Miner::update_mempool(
+                verified_mempool_clone,
+                proc_mempool_clone,
+                result_vec,
+                block,
+            )
+            .await;
+        });
+    }
+
+    pub async fn update_mempool(
+        verified_mempool: Arc<Mutex<MemPool>>,
+        proc_mempool: Arc<Mutex<MemPool>>,
+        broadcast_vec: Vec<String>,
+        block: Block,
+    ) {
+        let peer_id: u32 = serde_json::from_str(&broadcast_vec[1]).unwrap();
+        let ip_map: HashMap<u32, String> = serde_json::from_str(&broadcast_vec[2]).unwrap();
+        let port_map: HashMap<String, Vec<String>> =
+            serde_json::from_str(&broadcast_vec[3]).unwrap();
         tokio::spawn(async move {
             peer::broadcast(
                 messages::get_block_msg,
@@ -103,12 +123,14 @@ impl Miner {
             )
             .await;
         });
-
-        let proc_mempool_clone = proc_mempool.clone();
-        let verified_mempool_clone = verified_mempool.clone();
-        tokio::spawn(async move {
-            Peer::update_mempool(verified_mempool_clone, proc_mempool_clone).await;
-        });
+        let mut verified_mempool_ref = verified_mempool.lock().unwrap();
+        let mut proc_mempool_ref = proc_mempool.lock().unwrap();
+        (*verified_mempool_ref)
+            .hashes
+            .extend((*proc_mempool_ref).hashes.to_owned());
+        (*verified_mempool_ref)
+            .transactions
+            .append(&mut (*proc_mempool_ref).transactions); // Removes all elements from mempool
     }
 
     async fn miner_manager(miner: Miner, mut rx: Receiver<Command>) {
