@@ -166,15 +166,15 @@ mod tests {
     #[test]
     fn test_verif_one_input_diff_outputs() {
         for r in 0..5 {
-            let base: usize = 10;
+            let base: usize = 2;
             let mut multiplicative_index: usize;
 
             let path = format!("one_input_diff_outputs_verify{}.csv", r);
             let mut writer = csv::Writer::from_path(path).unwrap();
             writer.write_record(&["Number of outputs", "Time in ms", "Throughput"]);
-            for n in 0..14 {
+            for n in 0..19 {
                 let val = base.pow(n.try_into().unwrap());
-                multiplicative_index = if val > 100000 { 100000 * (n - 4) } else { val };
+                multiplicative_index = val;
                 let (transaction, utxo) =
                     one_input_diff_output_transaction_valid(multiplicative_index);
 
@@ -204,16 +204,16 @@ mod tests {
     #[test]
     fn test_verif_one_input_diff_outputs_batch_verif() {
         for r in 0..5 {
-            let base: usize = 10;
+            let base: usize = 2;
             let mut multiplicative_index: usize;
 
             let path = format!("one_input_diff_outputs_batch{}.csv", r);
             let mut writer = csv::Writer::from_path(path).unwrap();
             writer.write_record(&["Number of outputs", "Time in ms", "Throughput"]);
-            for n in 0..14 {
+            for n in 0..19 {
                 let mut transactions: Vec<Transaction> = Vec::new();
                 let val = base.pow(n.try_into().unwrap());
-                multiplicative_index = if val > 100000 { 100000 * (n - 4) } else { val };
+                multiplicative_index = val;
                 let (transaction, utxo) =
                     one_input_diff_output_transaction_valid(multiplicative_index);
                 transactions.push(transaction);
@@ -244,16 +244,16 @@ mod tests {
     #[test]
     fn test_verif_one_input_diff_outputs_batch_verif_parallelized() {
         for r in 0..5 {
-            let base: usize = 10;
+            let base: usize = 2;
             let mut multiplicative_index: usize;
 
             let path = format!("one_input_diff_outputs_batch_parallelized{}.csv", r);
             let mut writer = csv::Writer::from_path(path).unwrap();
             writer.write_record(&["Number of outputs", "Time in ms", "Throughput"]);
-            for n in 0..14 {
+            for n in 0..19 {
                 let mut transactions: Vec<Transaction> = Vec::new();
                 let val = base.pow(n.try_into().unwrap());
-                multiplicative_index = if val > 100000 { 100000 * (n - 4) } else { val };
+                multiplicative_index = val;
                 let (transaction, utxo) =
                     one_input_diff_output_transaction_valid(multiplicative_index);
                 transactions.push(transaction);
@@ -287,15 +287,15 @@ mod tests {
     #[test]
     fn test_verif_diff_input_one_output() {
         for r in 0..5 {
-            let base: usize = 10;
+            let base: usize = 2;
             let mut multiplicative_index: usize;
 
             let path = format!("diff_input_one_output_verify{}.csv", r);
             let mut writer = csv::Writer::from_path(path).unwrap();
             writer.write_record(&["Number of inputs", "Time in ms", "Throughput"]);
-            for n in 0..14 {
+            for n in 0..19 {
                 let val = base.pow(n.try_into().unwrap());
-                multiplicative_index = if val > 100000 { 100000 * (n - 4) } else { val };
+                multiplicative_index = val;
                 let (transaction, utxo) =
                     diff_input_one_output_transaction_valid(multiplicative_index);
 
@@ -325,16 +325,16 @@ mod tests {
     #[test]
     fn test_verif_diff_input_one_output_batch() {
         for r in 0..5 {
-            let base: usize = 10;
+            let base: usize = 2;
             let mut multiplicative_index: usize;
 
             let path = format!("diff_input_one_output_batch{}.csv", r);
             let mut writer = csv::Writer::from_path(path).unwrap();
             writer.write_record(&["Number of inputs", "Time in ms", "Throughput"]);
-            for n in 0..14 {
+            for n in 0..19 {
                 let mut transactions: Vec<Transaction> = Vec::new();
                 let val = base.pow(n.try_into().unwrap());
-                multiplicative_index = if val > 100000 { 100000 * (n - 4) } else { val };
+                multiplicative_index = val;
                 let (transaction, utxo) =
                     diff_input_one_output_transaction_valid(multiplicative_index);
                 transactions.push(transaction);
@@ -365,16 +365,16 @@ mod tests {
     #[test]
     fn test_verif_diff_input_one_output_batch_parallel() {
         for r in 0..5 {
-            let base: usize = 10;
+            let base: usize = 2;
             let mut multiplicative_index: usize;
 
             let path = format!("diff_input_one_output_parallel_batch{}.csv", r);
             let mut writer = csv::Writer::from_path(path).unwrap();
             writer.write_record(&["Number of inputs", "Time in ms", "Throughput"]);
-            for n in 0..14 {
+            for n in 0..19 {
                 let mut transactions: Vec<Transaction> = Vec::new();
                 let val = base.pow(n.try_into().unwrap());
-                multiplicative_index = if val > 100000 { 100000 * (n - 4) } else { val };
+                multiplicative_index = val;
                 let (transaction, utxo) =
                     diff_input_one_output_transaction_valid(multiplicative_index);
                 transactions.push(transaction);
