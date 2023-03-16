@@ -8,15 +8,14 @@ use crate::components::transaction::TxOut;
 use crate::components::utxo::UTXO;
 use crate::network::decoder;
 use crate::network::messages;
-use crate::shell::get_example_transaction;
 use crate::utils::hash;
 use crate::utils::hash::hash_as_string;
-use crate::utils::save_and_load::load_object;
 use crate::utils::save_and_load::save_object;
 use crate::utils::sign_and_verify;
 use crate::utils::sign_and_verify::PrivateKey;
 use crate::utils::sign_and_verify::PublicKey;
 use crate::utils::sign_and_verify::Verifier;
+use bitcoin::blockdata::transaction;
 use ed25519_dalek::Keypair;
 use local_ip_address::local_ip;
 use log::{error, info, warn};
@@ -28,7 +27,6 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::Write;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::{env, fs};
 use std::{fs::File, path::Path};
 use tokio::net::{TcpListener, TcpStream};
@@ -36,6 +34,7 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
+use tokio::sync::Mutex;
 
 pub static SERVER_IP: &str = "192.168.0.15";
 pub const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
@@ -60,7 +59,7 @@ pub struct MemPool {
 }
 
 impl MemPool {
-    pub fn new() -> MemPool{
+    pub fn new() -> MemPool {
         return MemPool {
             hashes: HashSet::new(),
             transactions: Vec::new(),
@@ -155,9 +154,10 @@ pub async fn broadcast<T: Clone>(
     peerid: u32,
     ip_map: &HashMap<u32, String>,
     port_map: &HashMap<String, Vec<String>>,
+    to_self: bool,
 ) {
     for (id, ip) in ip_map {
-        if *id == peerid {
+        if *id == peerid && !to_self {
             continue;
         }
         let frame = msg_fn(peerid, *id, payload.clone());
@@ -374,45 +374,88 @@ impl Peer {
             self.ports.push(new_port);
         }
     }
-    
-    async fn update_mempool(verified_mempool: Arc<Mutex<MemPool>>, proc_mempool: Arc<Mutex<MemPool>>) {
-        let mut verified_mempool_ref = verified_mempool.lock().unwrap();
-        let mut proc_mempool_ref = proc_mempool.lock().unwrap();
-        (*verified_mempool_ref).hashes.extend((*proc_mempool_ref).hashes.to_owned());
+
+    async fn update_mempool(
+        verified_mempool: Arc<Mutex<MemPool>>,
+        proc_mempool: Arc<Mutex<MemPool>>,
+    ) {
+        let mut verified_mempool_ref = verified_mempool.lock().await;
+        let mut proc_mempool_ref = proc_mempool.lock().await;
+        (*verified_mempool_ref)
+            .hashes
+            .extend((*proc_mempool_ref).hashes.to_owned());
         (*verified_mempool_ref)
             .transactions
             .append(&mut (*proc_mempool_ref).transactions); // Removes all elements from mempool
     }
-    
-    async fn verify_mempool(utxo: Arc<Mutex<UTXO>>, proc_mempool: Arc<Mutex<MemPool>>, verified_mempool: Arc<Mutex<MemPool>>, verified: Arc<Mutex<bool>>) {
-        let mut utxo_ref = utxo.lock().unwrap();
-        let proc_mempool_ref = proc_mempool.lock().unwrap();
+
+    async fn broadcast_mempool(
+        verified_mempool: Arc<Mutex<MemPool>>,
+        proc_mempool: Arc<Mutex<MemPool>>,
+        peer_arc: Arc<Mutex<Peer>>,
+    ) {
+        let proc_mempool_clone = proc_mempool.clone();
+        let proc_mempool_ref = proc_mempool.lock().await;
+        let peer_ref = peer_arc.lock().await;
+        for (id, ip) in &peer_ref.ip_map {
+            if *id == peer_ref.peerid {
+                continue;
+            }
+            let ports: Vec<&str> = peer_ref.ports_map[ip].iter().map(AsRef::as_ref).collect();
+            let connection_opt = get_connection(&ip, ports.as_slice()).await;
+            if connection_opt.is_none() {
+                continue;
+            }
+            let mut connection = connection_opt.unwrap();
+            let mut frame: Frame;
+            for transaction in &proc_mempool_ref.transactions {
+                frame = messages::get_transaction_msg(peer_ref.peerid, *id, transaction);
+                connection.write_frame(&frame).await;
+            }
+        }
+        tokio::spawn(async move {
+            Peer::update_mempool(verified_mempool, proc_mempool_clone).await;
+        });
+    }
+
+    async fn verify_mempool(
+        utxo: Arc<Mutex<UTXO>>,
+        proc_mempool: Arc<Mutex<MemPool>>,
+        verified_mempool: Arc<Mutex<MemPool>>,
+        verified: Arc<Mutex<bool>>,
+        peer_arc: Arc<Mutex<Peer>>,
+    ) {
+        let mut utxo_ref = utxo.lock().await;
+        let proc_mempool_ref = proc_mempool.lock().await;
         let (valid, updated_utxo) = (*utxo_ref).parallel_batch_verify_and_update(
             &(*proc_mempool_ref).transactions,
-            max((*proc_mempool_ref).transactions.len(), num_cpus::get()) / num_cpus::get()
+            max((*proc_mempool_ref).transactions.len(), num_cpus::get()) / num_cpus::get(),
         );
         if !valid {
             error!("Received an invalid transaction!"); // We can update this later
             panic!();
         }
         *utxo_ref = updated_utxo.unwrap();
-        let mut verified_ref = verified.lock().unwrap();
+        let mut verified_ref = verified.lock().await;
         *verified_ref = true;
-             
+
         let proc_mempool_clone = proc_mempool.clone();
         let verified_mempool_clone = verified_mempool.clone();
+        let peer_arc_clone = peer_arc.clone();
         tokio::spawn(async move {
-            Peer::update_mempool(verified_mempool_clone, proc_mempool_clone).await;
+            Peer::broadcast_mempool(verified_mempool_clone, proc_mempool_clone, peer_arc_clone)
+                .await;
         });
     }
 
-    pub async fn peer_manager(mut peer: Peer, mut rx: Receiver<Command>) {
+    pub async fn peer_manager(peer: Peer, mut rx: Receiver<Command>) {
         let mut mempool = MemPool::new();
 
         let proc_mempool_arc = Arc::new(Mutex::new(MemPool::new()));
         let verified_mempool_arc = Arc::new(Mutex::new(MemPool::new()));
         let verified_arc = Arc::new(Mutex::new(true));
-       
+        let peer_arc = Arc::new(Mutex::new(peer));
+
         let mut utxo: UTXO = UTXO(HashMap::new());
         let keypair = Keypair::from_bytes(&[
             9, 75, 189, 163, 133, 148, 28, 198, 139, 3, 56, 182, 118, 26, 250, 201, 129, 109, 104,
@@ -454,12 +497,12 @@ impl Peer {
                         }
                         let tx: Transaction = serde_json::from_str(&payload_vec[0])
                             .expect("Could not deserialize string to transaction.");
-                        
+
                         if first_tx {
                             println!("Received first tx!");
                             first_tx = false;
                         }
-                        
+
                         mempool.hashes.insert(hash_as_string(&tx));
                         mempool.transactions.push(tx.to_owned());
                         let verified_result = verified_arc.try_lock();
@@ -468,13 +511,12 @@ impl Peer {
                         } else {
                             false
                         };
-                        if mempool.transactions.len() < NUM_PARALLEL_TRANSACTIONS || !verified
-                        {
+                        if mempool.transactions.len() < NUM_PARALLEL_TRANSACTIONS || !verified {
                             continue;
                         }
-                        *(verified_arc.lock().unwrap()) = false;
-                        
-                        let mut proc_mempool_ref = proc_mempool_arc.lock().unwrap();
+                        *(verified_arc.lock().await) = false;
+
+                        let mut proc_mempool_ref = proc_mempool_arc.lock().await;
                         *proc_mempool_ref = mempool.to_owned();
                         mempool = MemPool::new();
 
@@ -482,10 +524,19 @@ impl Peer {
                         let proc_mempool_arc_clone = proc_mempool_arc.clone();
                         let verified_mempool_arc_clone = verified_mempool_arc.clone();
                         let verified_arc_clone = verified_arc.clone();
+                        let peer_arc_clone = peer_arc.clone();
                         tokio::spawn(async move {
-                            Peer::verify_mempool(utxo_arc_clone, proc_mempool_arc_clone, verified_mempool_arc_clone, verified_arc_clone).await;
+                            Peer::verify_mempool(
+                                utxo_arc_clone,
+                                proc_mempool_arc_clone,
+                                verified_mempool_arc_clone,
+                                verified_arc_clone,
+                                peer_arc_clone,
+                            )
+                            .await;
                         });
                     } else if key.as_str() == "block" {
+                        let mut peer_ref = peer_arc.lock().await;
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
                             panic!();
@@ -500,10 +551,10 @@ impl Peer {
                             .expect("Could not deserialize string to block.");
                         info!("Block: {:?}", block);
 
-                        if peer.block_map.contains_key(&hash_as_string(&block)) {
+                        if peer_ref.block_map.contains_key(&hash_as_string(&block)) {
                             continue;
                         }
-                        let (valid, utxo_option) = peer.verify_block(&block);
+                        let (valid, utxo_option) = peer_ref.verify_block(&block);
 
                         if !valid {
                             continue;
@@ -512,18 +563,22 @@ impl Peer {
                         broadcast(
                             messages::get_block_msg,
                             &block,
-                            peer.peerid,
-                            &peer.ip_map,
-                            &peer.ports_map,
+                            peer_ref.peerid,
+                            &peer_ref.ip_map,
+                            &peer_ref.ports_map,
+                            false,
                         )
                         .await;
 
-                        peer.block_map
-                            .insert(hash_as_string(&block), peer.blockchain.len());
-                        peer.blockchain.push(block.to_owned());
+                        let blockchain_size = peer_ref.blockchain.len();
+                        peer_ref
+                            .block_map
+                            .insert(hash_as_string(&block), blockchain_size);
+                        peer_ref.blockchain.push(block.to_owned());
 
-                        peer.utxo = utxo_option.unwrap().to_owned();
+                        peer_ref.utxo = utxo_option.unwrap().to_owned();
                     } else if key.as_str() == "maps_query" {
+                        let mut peer_ref = peer_arc.lock().await;
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
                             panic!();
@@ -539,18 +594,21 @@ impl Peer {
                         let ip = payload_vec[1].clone();
 
                         // Update the server ip_map and ports_map
-                        peer.ip_map.insert(sourceid, ip.clone());
-                        peer.ports_map.insert(ip.clone(), payload_vec[2..].to_vec());
+                        peer_ref.ip_map.insert(sourceid, ip.clone());
+                        peer_ref
+                            .ports_map
+                            .insert(ip.clone(), payload_vec[2..].to_vec());
 
                         let response_vector = vec![
-                            serde_json::to_string(&peer.ip_map)
+                            serde_json::to_string(&peer_ref.ip_map)
                                 .expect("Failed to serialize ip map"),
-                            serde_json::to_string(&peer.ports_map)
+                            serde_json::to_string(&peer_ref.ports_map)
                                 .expect("Failed to serialize ports map"),
                         ];
                         resp.send(Ok(response_vector)).ok();
-                        Peer::save_peer(&peer);
+                        Peer::save_peer(&peer_ref);
                     } else if key.as_str() == "BD_query" {
+                        let peer_ref = peer_arc.lock().await;
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
                             panic!();
@@ -563,11 +621,11 @@ impl Peer {
                         }
                         let hash = payload_vec[0].to_owned();
                         let response_vector: Vec<String>;
-                        if !peer.block_map.contains_key(&hash) {
+                        if !peer_ref.block_map.contains_key(&hash) {
                             response_vector = Vec::new();
                         } else {
-                            let index = peer.block_map[&hash];
-                            let blocks_ref = &peer.blockchain[index + 1..];
+                            let index = peer_ref.block_map[&hash];
+                            let blocks_ref = &peer_ref.blockchain[index + 1..];
                             response_vector = vec![serde_json::to_string(blocks_ref).unwrap()];
                         }
                         resp.send(Ok(response_vector)).ok();
@@ -577,43 +635,44 @@ impl Peer {
                     }
                 }
                 Command::Get { key, resp } => {
+                    let peer_ref = peer_arc.lock().await;
                     let response_vector: Vec<String> = match key.as_str() {
                         "id_query" => {
-                            vec![serde_json::to_string(&peer.peerid)
+                            vec![serde_json::to_string(&peer_ref.peerid)
                                 .expect("Failed to serialize id")]
                         }
                         "ports_query" => {
-                            vec![serde_json::to_string(&peer.ports)
+                            vec![serde_json::to_string(&peer_ref.ports)
                                 .expect("Failed to serialize ports")]
                         }
                         "ip_map_query" => {
-                            vec![serde_json::to_string(&peer.ip_map)
+                            vec![serde_json::to_string(&peer_ref.ip_map)
                                 .expect("Failed to serialize ip map")]
                         }
                         "ports_map_query" => {
-                            vec![serde_json::to_string(&peer.ports_map)
+                            vec![serde_json::to_string(&peer_ref.ports_map)
                                 .expect("Failed to serialize ports map")]
                         }
                         "block_info_query" => {
                             vec![
-                                hash_as_string(&peer.blockchain.last().unwrap()),
-                                serde_json::to_string(&peer.peerid)
+                                hash_as_string(&peer_ref.blockchain.last().unwrap()),
+                                serde_json::to_string(&peer_ref.peerid)
                                     .expect("Failed to serialize id"),
-                                serde_json::to_string(&peer.ip_map)
+                                serde_json::to_string(&peer_ref.ip_map)
                                     .expect("Failed to serialize ip map"),
-                                serde_json::to_string(&peer.ports_map)
+                                serde_json::to_string(&peer_ref.ports_map)
                                     .expect("Failed to serialize ports map"),
                             ]
                         }
                         "all" => {
                             vec![
-                                serde_json::to_string(&peer.peerid)
+                                serde_json::to_string(&peer_ref.peerid)
                                     .expect("Failed to serialize id"),
-                                serde_json::to_string(&peer.ports)
+                                serde_json::to_string(&peer_ref.ports)
                                     .expect("Failed to serialize ports"),
-                                serde_json::to_string(&peer.ip_map)
+                                serde_json::to_string(&peer_ref.ip_map)
                                     .expect("Failed to serialize ip map"),
-                                serde_json::to_string(&peer.ports_map)
+                                serde_json::to_string(&peer_ref.ports_map)
                                     .expect("Failed to serialize ports map"),
                             ]
                         }

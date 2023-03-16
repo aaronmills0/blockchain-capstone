@@ -328,6 +328,7 @@ pub async fn shell(is_miner: bool) {
                     peerid,
                     &ip_map,
                     &ports_map,
+                    false,
                 )
                 .await;
             }
