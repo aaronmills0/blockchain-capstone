@@ -118,11 +118,11 @@ mod tests {
         }
     }
 
-    // Use flag 0 for sequential verification and any other flag for batch verification
+    // Use flag 0 for sequential verification, flag 1 for batch verification, flag 2 for batch verification from file, flag 2 for parallel verification from file
     #[ignore]
     #[test]
     fn test_transaction_throughput() {
-        let mut flag: usize = 3;
+        let mut flag: usize = 2;
         test_tx_throughput(flag);
         /* test_tx_throughput(flag);
         flag = 1;
