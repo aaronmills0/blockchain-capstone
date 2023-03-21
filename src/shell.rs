@@ -4,6 +4,7 @@ use crate::components::transaction::{
 use crate::network::messages;
 use crate::network::miner::Miner;
 use crate::network::peer::{self, Command, Peer};
+use crate::performance_tests::send_tx_peer_manager::test_send_tx_peer_manager;
 use crate::performance_tests::single_peer_throughput::test_single_peer_tx_throughput_sender;
 use crate::simulation::start;
 use crate::utils::graph::create_block_graph;
@@ -39,60 +40,6 @@ pub async fn shell(is_miner: bool) {
     }
 
     info!("Successfully launched peer!");
-
-    // Give the peer a chance to see what a transaction.json file looks like
-    loop {
-        info!(
-        "In this system you can include your own transaction.json file under the 'account' folder in the root. Would you like to see what
-        a template transaction.json file looks like? y/n"
-    );
-        let mut choice_display: String = String::new();
-        io::stdin()
-            .read_line(&mut choice_display)
-            .expect("Failed to read line");
-
-        match choice_display.to_lowercase().trim() {
-            "y" => {
-                let dirname = String::from("account");
-                let object_name = String::from("transaction");
-
-                let example_transaction = get_example_transaction();
-                save_object(
-                    &example_transaction,
-                    String::from("transaction"),
-                    String::from("account"),
-                );
-
-                let slash = if env::consts::OS == "windows" {
-                    "\\"
-                } else {
-                    "/"
-                };
-                let mut file = File::open(dirname + slash + &object_name + ".json")
-                    .expect("Failed to open file");
-                let mut contents = String::new();
-                file.read_to_string(&mut contents)
-                    .expect("Failed to read file");
-
-                let json_data: serde_json::Value =
-                    serde_json::from_str(&contents).expect("Failed to parse JSON");
-
-                println!("{}", serde_json::to_string_pretty(&json_data).unwrap());
-                break;
-            }
-
-            "n" => {
-                info!("You selected no.");
-                break;
-            }
-
-            _ => {
-                warn!("Invalid Command. You can only choose y or n.");
-            }
-        }
-    }
-
-    info!("You can now select a command in the shell");
 
     loop {
         let mut command = String::new();
@@ -166,6 +113,57 @@ pub async fn shell(is_miner: bool) {
                 }
             }
             "transaction" | "tx" | "-t" => {
+                // Give the peer a chance to see what a transaction.json file looks like
+                loop {
+                    info!(
+        "In this system you can include your own transaction.json file under the 'account' folder in the root. Would you like to see what
+        a template transaction.json file looks like? y/n"
+    );
+                    let mut choice_display: String = String::new();
+                    io::stdin()
+                        .read_line(&mut choice_display)
+                        .expect("Failed to read line");
+
+                    match choice_display.to_lowercase().trim() {
+                        "y" => {
+                            let dirname = String::from("account");
+                            let object_name = String::from("transaction");
+
+                            let example_transaction = get_example_transaction();
+                            save_object(
+                                &example_transaction,
+                                String::from("transaction"),
+                                String::from("account"),
+                            );
+
+                            let slash = if env::consts::OS == "windows" {
+                                "\\"
+                            } else {
+                                "/"
+                            };
+                            let mut file = File::open(dirname + slash + &object_name + ".json")
+                                .expect("Failed to open file");
+                            let mut contents = String::new();
+                            file.read_to_string(&mut contents)
+                                .expect("Failed to read file");
+
+                            let json_data: serde_json::Value =
+                                serde_json::from_str(&contents).expect("Failed to parse JSON");
+
+                            println!("{}", serde_json::to_string_pretty(&json_data).unwrap());
+                            break;
+                        }
+
+                        "n" => {
+                            info!("You selected no.");
+                            break;
+                        }
+
+                        _ => {
+                            warn!("Invalid Command. You can only choose y or n.");
+                        }
+                    }
+                }
                 let mut transaction = Transaction {
                     tx_inputs: Vec::from([]),
                     tx_outputs: Vec::from([]),
@@ -276,7 +274,7 @@ pub async fn shell(is_miner: bool) {
                             let num_out = match trimmed_out.parse::<u32>() {
                                 Ok(i) => i,
                                 Err(..) => {
-                                    error!("Period needs to be a u64");
+                                    error!("Number of recipients needs to be a u64");
                                     panic!();
                                 }
                             };
@@ -330,6 +328,24 @@ pub async fn shell(is_miner: bool) {
                     &ports_map,
                 )
                 .await;
+            }
+            "peer_manager_tx_test" | "pm_tx_test" => {
+                info!("Please enter a number of transactions:");
+                let mut num_tx_str = String::new();
+                io::stdin()
+                    .read_line(&mut num_tx_str)
+                    .expect("Failed to read line");
+                let trimmed_num_tx = num_tx_str.trim();
+                let receiver_num_tx = match trimmed_num_tx.parse::<u32>() {
+                    Ok(i) => i,
+                    Err(..) => {
+                        error!("Number of transactions needs to be a u32");
+                        panic!();
+                    }
+                };
+
+                let (id, _, _, _) = Peer::get_peer_info(&tx_to_manager).await;
+                test_send_tx_peer_manager(id, &tx_to_manager, receiver_num_tx).await;
             }
             "tx_test" => {
                 info!("Please enter a receiver id:");

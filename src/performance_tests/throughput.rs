@@ -2,9 +2,11 @@
 mod tests {
     use crate::components::transaction::{Outpoint, PublicKeyScript, Transaction, TxOut};
     use crate::components::utxo::UTXO;
+    use crate::network::messages::get_transaction_msg;
     use crate::simulation::KeyMap;
     use crate::utils::sign_and_verify::Verifier;
     use crate::utils::{hash, sign_and_verify};
+    use mini_redis::Frame;
     use rand_1::rngs::ThreadRng;
     use std::collections::HashMap;
     use std::time::Instant;
@@ -63,7 +65,7 @@ mod tests {
                         }
                         utxo_copy.update(tx);
                     }
-                } else {
+                } else if flag == 1 {
                     let (result, _) = utxo_copy.batch_verify_and_update(&transactions);
                     assert!(result);
                 }

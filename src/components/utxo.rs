@@ -3,7 +3,7 @@ use crate::utils::hash::hash_as_string;
 use crate::utils::sign_and_verify::{PublicKey, Signature, Verifier};
 use ed25519_dalek::{PublicKey as DalekPublicKey, Signature as DalekSignature};
 use itertools::izip;
-use log::warn;
+use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::collections::{HashMap, HashSet};
