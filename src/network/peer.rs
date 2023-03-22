@@ -37,7 +37,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-pub static SERVER_IP: &str = "10.122.237.33";
+pub static SERVER_IP: &str = "192.168.0.15";
 pub const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
 pub static NUM_PORTS: usize = 5;
 pub static NUM_PARALLEL_TRANSACTIONS: usize = 1024;
@@ -500,6 +500,7 @@ impl Peer {
                             )
                             .await;
                         });
+                        info!("The transactions were successfully verified.");
                     } else if key.as_str() == "block" {
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
