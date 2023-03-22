@@ -181,7 +181,7 @@ impl Miner {
         utxo: &UTXO,
         batch_size: usize,
     ) -> (Option<Block>, Option<UTXO>) {
-        let merkle_tree = Merkle::create_merkle_tree(&transactions);
+        let merkle_tree = Merkle::create_merkle_tree(&transactions, false, 0);
         let (valid, utxo_option) = utxo.parallel_batch_verify_and_update(&transactions, batch_size);
         if !valid {
             warn!("Validator received invalid transaction(s). Failed to create block");
@@ -190,10 +190,10 @@ impl Miner {
         let block = Block {
             header: BlockHeader {
                 previous_hash: prev_hash,
-                merkle_root: merkle_tree.tree.first().unwrap().clone(),
+                merkle_root: merkle_tree.0.tree.first().unwrap().clone(),
                 nonce: 0,
             },
-            merkle: merkle_tree,
+            merkle: merkle_tree.0,
             transactions: transactions,
         };
         return (Some(block), utxo_option);

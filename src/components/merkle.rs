@@ -2,6 +2,7 @@ use crate::utils::hash::hash_as_string;
 use crate::{components::transaction::Transaction, utils::hash};
 use serde::{Deserialize, Serialize};
 use std::cmp::max;
+use std::time::Instant;
 use std::{
     collections::VecDeque,
     sync::{
@@ -72,16 +73,35 @@ impl Merkle {
      *
      * h_01234444 is the merkle root of this tree
      */
-    pub fn create_merkle_tree(transactions: &Vec<Transaction>) -> Merkle {
+    pub fn create_merkle_tree(
+        transactions: &Vec<Transaction>,
+        is_parallel: bool,
+        num_cpus: usize,
+    ) -> (Merkle, f32) {
+        let mut P: f32 = 0.0;
+        let mut start_timing_merkle = Instant::now();
         let mut merkle_tree: Vec<String> = Vec::new();
         let mut queue: VecDeque<String> = VecDeque::new();
         let mut stack: VecDeque<String> = VecDeque::new();
 
-        let hashes = Merkle::parallel_hash(transactions, num_cpus::get());
-        // Load the hashes into queue1
-        for hash in hashes {
-            queue.push_back(hash);
+        //do boolean to whitch seq ans parallel
+        let mut start_timing_P = Instant::now();
+        if (!is_parallel) {
+            for tx in transactions {
+                queue.push_back(hash_as_string(&tx));
+            }
+        } else {
+            let hashes = Merkle::parallel_hash(transactions, num_cpus);
+            for hash in hashes {
+                queue.push_back(hash);
+            }
         }
+        let mut duration_timing_P = start_timing_P.elapsed();
+
+        // Load the hashes into queue1
+        // for hash in hashes {
+        //     queue.push_back(hash);
+        // }
 
         while queue.len() > 1 {
             // If the queue has an odd number of hashes
@@ -110,7 +130,9 @@ impl Merkle {
 
         merkle_tree.push(queue.pop_front().unwrap());
         merkle_tree.reverse();
-        return Merkle { tree: merkle_tree };
+        let mut duration_timing_merkle = start_timing_merkle.elapsed();
+        P = duration_timing_P.as_micros() as f32 / duration_timing_merkle.as_micros() as f32;
+        return (Merkle { tree: merkle_tree }, P);
     }
 
     pub fn parallel_hash(transactions: &Vec<Transaction>, num_cpus: usize) -> Vec<String> {
@@ -223,7 +245,7 @@ mod tests {
         let h0: String = hash_as_string(&used_transactions.get(0).unwrap());
         let h1: String = hash_as_string(&used_transactions.get(1).unwrap());
         let root_hash: String = hash_as_string(&format!("{}{}", h0, h1));
-        let merkle: Merkle = Merkle::create_merkle_tree(&used_transactions);
+        let (merkle, P) = Merkle::create_merkle_tree(&used_transactions, false, 0);
 
         assert_eq!(3, merkle.tree.len());
         assert_eq!(root_hash, merkle.tree[0]);
@@ -240,7 +262,7 @@ mod tests {
         let h01: String = hash_as_string(&format!("{}{}", h0, h1));
         let h22: String = hash_as_string(&format!("{}{}", h2, h2));
         let root_hash: String = hash_as_string(&format!("{}{}", h01, h22));
-        let merkle: Merkle = Merkle::create_merkle_tree(&transactions);
+        let (merkle, _) = Merkle::create_merkle_tree(&transactions, false, 0);
 
         assert_eq!(7, merkle.tree.len());
         assert_eq!(root_hash, merkle.tree[0]);

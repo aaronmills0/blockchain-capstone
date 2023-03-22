@@ -405,7 +405,7 @@ mod tests {
 
         blockchain.push(genesis_block);
 
-        let merkle1 = Merkle::create_merkle_tree(&transactions1);
+        let (merkle1, _) = Merkle::create_merkle_tree(&transactions1, false, 0);
         let block1 = Block {
             header: BlockHeader {
                 previous_hash: hash::hash_as_string(&blockchain.last().unwrap().header),
@@ -476,7 +476,7 @@ mod tests {
         utxo.update(&transaction2);
         transactions2.push(transaction2);
 
-        let merkle2 = Merkle::create_merkle_tree(&transactions2);
+        let (merkle2, _) = Merkle::create_merkle_tree(&transactions2, false, 0);
         let block2 = Block {
             header: BlockHeader {
                 previous_hash: hash::hash_as_string(&blockchain.last().unwrap().header),

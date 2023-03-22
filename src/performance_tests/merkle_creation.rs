@@ -62,21 +62,60 @@ mod tests {
     #[ignore]
     #[test]
     fn test_merkle_performance() {
-        println!("Num CPUs: {}", num_cpus::get());
-        let mut num_transactions = 1;
-        let mut performance_results: Vec<Duration> = Vec::new();
-        let mut num_transactions_vec: Vec<u32> = Vec::new();
-        for _i in 0..=16 {
-            let transactions = get_transactions(num_transactions);
-            let start = Instant::now();
-            Merkle::create_merkle_tree(&transactions);
-            let duration = start.elapsed();
-            performance_results.push(duration);
-            num_transactions_vec.push(num_transactions);
-            num_transactions = num_transactions * 2;
-        }
+        for r in 0..5 {
+            let path = format!("speedup_data{}.csv", r);
+            let mut writer = csv::Writer::from_path(path).unwrap();
+            writer.write_record(&[
+                "Number of transactions",
+                "Number of threads",
+                "Share of parallelized program in sequential run",
+                "Time in ms",
+                "Expected Amdhal Speedup",
+                "Real Speedup",
+            ]);
 
-        println!("{:?}", num_transactions_vec);
-        println!("{:?}", performance_results);
+            let mut P: f32 = 0.0;
+            let base: u32 = 2;
+            for exp in 2..=10 {
+                let mut is_parallel: bool = false;
+                let mut num_threads: usize = 0;
+                let mut num_transactions = base.pow(exp.try_into().unwrap());
+                let transactions = get_transactions(num_transactions);
+                let start = Instant::now();
+                (_, P) = Merkle::create_merkle_tree(&transactions, is_parallel, num_threads);
+                let sequential_duration = start.elapsed();
+
+                writer.write_record(&[
+                    num_transactions.to_string(),
+                    "1".to_string(),
+                    P.to_string(),
+                    sequential_duration.as_millis().to_string(),
+                    "1".to_string(),
+                    "1".to_string(),
+                ]);
+                writer.flush();
+
+                for count_threads in 2..=num_cpus::get() {
+                    num_threads = count_threads;
+                    is_parallel = true;
+                    let start = Instant::now();
+                    Merkle::create_merkle_tree(&transactions, is_parallel, num_threads);
+                    let duration = start.elapsed();
+                    let current_experimental_speedup =
+                        sequential_duration.as_micros() as f32 / duration.as_micros() as f32;
+                    let current_Amdahl_speedup = 1.0 / ((1.0 - P) + (P / num_threads as f32));
+
+                    writer.write_record(&[
+                        num_transactions.to_string(),
+                        count_threads.to_string(),
+                        P.to_string(),
+                        duration.as_millis().to_string(),
+                        current_Amdahl_speedup.to_string(),
+                        current_experimental_speedup.to_string(),
+                    ]);
+                    writer.flush();
+                }
+            }
+        }
     }
 }

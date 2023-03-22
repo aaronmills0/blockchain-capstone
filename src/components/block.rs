@@ -111,7 +111,7 @@ impl Block {
 
             if rng.gen_range(1..=invalid_block_frequency) == 1 {
                 let invalid_type = rng.gen_range(1..=3);
-                let merkle_copy: Merkle = Merkle::create_merkle_tree(&transactions);
+                let (merkle_copy, _) = Merkle::create_merkle_tree(&transactions, false, 0);
                 let mut merkle_root_copy = merkle_copy.tree.first().unwrap().clone();
                 let mut previous_hash_copy =
                     hash::hash_as_string(&blockchain.last().unwrap().header);
@@ -147,7 +147,7 @@ impl Block {
             }
 
             info!("Creating block with {} transactions", transactions.len());
-            merkle = Merkle::create_merkle_tree(&transactions);
+            (merkle, _) = Merkle::create_merkle_tree(&transactions, false, 0);
             block = Block {
                 header: BlockHeader {
                     previous_hash: hash::hash_as_string(&blockchain.last().unwrap().header),

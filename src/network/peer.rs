@@ -746,7 +746,7 @@ impl Peer {
             return (false, None);
         }
 
-        let merkle_tree = Merkle::create_merkle_tree(&block.transactions);
+        let (merkle_tree, _) = Merkle::create_merkle_tree(&block.transactions, false, 0);
 
         if !merkle_tree
             .tree

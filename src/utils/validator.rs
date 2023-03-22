@@ -16,7 +16,7 @@ pub fn chain_validator(receiver: Receiver<Block>, mut utxo: UTXO, mut chain: Vec
             continue;
         }
 
-        let merkle_tree = Merkle::create_merkle_tree(&incoming_block.transactions);
+        let (merkle_tree, _) = Merkle::create_merkle_tree(&incoming_block.transactions, false, 0);
         if !merkle_tree
             .tree
             .first()

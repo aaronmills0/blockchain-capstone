@@ -69,7 +69,7 @@ mod tests {
                 transactions: Vec::new(),
             };
 
-            let merkle = Merkle::create_merkle_tree(&transactions);
+            let (merkle, _) = Merkle::create_merkle_tree(&transactions, false, 0);
             let block: Block = Block {
                 header: BlockHeader {
                     previous_hash: hash::hash_as_string(&genesis_block.header),
@@ -108,7 +108,7 @@ mod tests {
         print!("{}, ", fork_time_elapsed);
 
         let merkle_time = Instant::now();
-        let merkle_tree = Merkle::create_merkle_tree(&incoming_block.transactions);
+        let (merkle_tree, _) = Merkle::create_merkle_tree(&incoming_block.transactions, false, 0);
         if merkle_tree.tree.first().unwrap() != &incoming_block.header.merkle_root {
             println!("Received a block with an invalid merkle root");
             return false;
