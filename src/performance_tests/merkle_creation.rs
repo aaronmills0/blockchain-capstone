@@ -76,7 +76,8 @@ mod tests {
 
             let mut P: f32 = 0.0;
             let base: u32 = 2;
-            for exp in 2..=10 {
+            let total_number_transactions = 10; // CHANGE THIS. THIS IS FOR 1024 TX (2 power of 10)
+            for exp in 2..=total_number_transactions {
                 let mut is_parallel: bool = false;
                 let mut num_threads: usize = 0;
                 let mut num_transactions = base.pow(exp.try_into().unwrap());
@@ -95,8 +96,8 @@ mod tests {
                 ]);
                 writer.flush();
 
-                for count_threads in 2..=num_cpus::get() {
-                    num_threads = count_threads;
+                for count_threads in 1..=exp {
+                    num_threads = base.pow(count_threads.try_into().unwrap()) as usize;
                     is_parallel = true;
                     let start = Instant::now();
                     Merkle::create_merkle_tree(&transactions, is_parallel, num_threads);
@@ -107,7 +108,7 @@ mod tests {
 
                     writer.write_record(&[
                         num_transactions.to_string(),
-                        count_threads.to_string(),
+                        num_threads.to_string(),
                         P.to_string(),
                         duration.as_millis().to_string(),
                         current_Amdahl_speedup.to_string(),
