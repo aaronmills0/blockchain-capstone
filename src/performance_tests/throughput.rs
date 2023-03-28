@@ -89,15 +89,7 @@ mod tests {
 
                     for b in (0..max_base + 1).rev() {
                         let exponential = new_base.pow(b.try_into().unwrap());
-                        let mut batch_size = 0;
-
-                        if (exponential <= 65536
-                            || exponential == new_base.pow(max_base.try_into().unwrap()))
-                        {
-                            batch_size = exponential;
-                        } else {
-                            continue;
-                        };
+                        let mut batch_size = exponential;
 
                         start = Instant::now();
                         let (result, _, share_parallelized_program, full_duration) = utxo_copy
