@@ -182,7 +182,8 @@ impl Miner {
         batch_size: usize,
     ) -> (Option<Block>, Option<UTXO>) {
         let merkle_tree = Merkle::create_merkle_tree(&transactions);
-        let (valid, utxo_option) = utxo.parallel_batch_verify_and_update(&transactions, batch_size);
+        let (valid, utxo_option, _, _) =
+            utxo.parallel_batch_verify_and_update(&transactions, batch_size);
         if !valid {
             warn!("Validator received invalid transaction(s). Failed to create block");
             return (None, None);

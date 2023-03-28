@@ -416,10 +416,11 @@ impl Peer {
                         {
                             mempool.transactions.push(tx.to_owned());
                         } else {
-                            let (valid, updated_utxo) = utxo.parallel_batch_verify_and_update(
-                                &mempool.transactions,
-                                BATCH_SIZE,
-                            );
+                            let (valid, updated_utxo, _, _) = utxo
+                                .parallel_batch_verify_and_update(
+                                    &mempool.transactions,
+                                    BATCH_SIZE,
+                                );
                             if !valid {
                                 error!("Received an invalid transaction!"); // We can update this later
                                 panic!();
@@ -757,7 +758,7 @@ impl Peer {
             return (false, None);
         }
 
-        let (valid, utxo_option) = self
+        let (valid, utxo_option, _, _) = self
             .utxo
             .parallel_batch_verify_and_update(&block.transactions, BATCH_SIZE);
         if !valid {
