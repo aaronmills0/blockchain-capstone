@@ -1,3 +1,5 @@
+use std::sync::{mpsc::Sender, Arc};
+
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
@@ -13,6 +15,10 @@ pub fn hash<T: Serialize>(obj: &T) -> [u8; 32] {
 
 pub fn hash_as_string<T: Serialize>(obj: &T) -> String {
     return bytes_to_string(&hash(obj));
+}
+
+pub fn hash_parallel_vec<T: Serialize>(sender: Sender<Vec<String>>, vec: &Arc<Vec<T>>) {
+    sender.send(vec.iter().map(|x| hash_as_string(&x)).collect());
 }
 
 pub fn bytes_to_string(bytes: &[u8]) -> String {

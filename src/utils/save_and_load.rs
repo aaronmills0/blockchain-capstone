@@ -5,6 +5,7 @@ use crate::simulation::KeyMap;
 use crate::utils::sign_and_verify::{PrivateKey, PublicKey};
 use chrono::Local;
 use log::{error, warn};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::HashMap;
@@ -199,6 +200,70 @@ pub fn deserialize_json(
         pu_keys.unwrap(),
         utxo.unwrap(),
     );
+}
+
+pub fn save_object<T: Serialize>(obj: &T, object_name: String, dirname: String) {
+    let mut map = Map::new();
+    let json_result = serde_json::to_value(obj);
+
+    if json_result.is_err() {
+        error!("Failed to serialize peer");
+        panic!();
+    }
+
+    let mut json = json_result.unwrap();
+
+    map.insert(String::from(object_name.clone()), json);
+
+    json = serde_json::Value::Object(map);
+
+    let slash = if env::consts::OS == "windows" {
+        "\\"
+    } else {
+        "/"
+    };
+    if fs::create_dir_all(dirname.to_owned() + slash).is_err() {
+        warn!("Failed to create directory! It may already exist, or permissions are needed.");
+    }
+
+    let cwd = std::env::current_dir().unwrap();
+    let mut dirpath = cwd.into_os_string().into_string().unwrap();
+    dirpath.push_str(&(slash.to_owned() + &dirname));
+
+    let dir_path = Path::new(&dirpath);
+
+    let file_name: &str = &format!("{}{}", object_name, String::from(".json"));
+
+    let file_path = dir_path.join(file_name);
+    let file = File::create(file_path);
+    if file.is_err() {
+        error!("Failed to create new file.");
+        panic!();
+    }
+    if file
+        .unwrap()
+        .write_all(serde_json::to_string_pretty(&json).unwrap().as_bytes())
+        .is_err()
+    {
+        error!("Failed to write to file.");
+        panic!();
+    }
+}
+
+pub fn load_object<T: DeserializeOwned>(object_name: String, dirname: String) -> T {
+    let slash = if env::consts::OS == "windows" {
+        "\\"
+    } else {
+        "/"
+    };
+    let data = fs::read_to_string(dirname.to_owned() + slash + &object_name + ".json");
+    if data.is_err() {
+        error!("Failed to load file. {:?}", data.err());
+        panic!();
+    }
+    let json: Value = serde_json::from_str(&data.unwrap()).unwrap();
+    let object = serde_json::from_value(json.get(object_name).unwrap().to_owned());
+    return object.unwrap();
 }
 
 #[derive(Clone, Serialize, Deserialize)]

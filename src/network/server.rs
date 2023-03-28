@@ -1,4 +1,12 @@
-use crate::network::{decoder, messages};
+use crate::{
+    components::{
+        block::{Block, BlockHeader},
+        merkle::Merkle,
+        utxo::UTXO,
+    },
+    network::{decoder, messages},
+    utils::hash::hash_as_string,
+};
 use local_ip_address::local_ip;
 use log::{error, info, warn};
 use mini_redis::Connection;
@@ -31,7 +39,7 @@ pub struct Server {
 enum Command {
     Get {
         key: String,
-        resp: Responder<Option<String>>,
+        resp: Responder<Vec<String>>,
         payload: Option<Vec<String>>,
     },
 }
@@ -40,17 +48,40 @@ type Responder<T> = oneshot::Sender<mini_redis::Result<T>>;
 
 impl Server {
     pub fn new() -> Server {
-        return Server {
+        let mut server = Server {
             peer: Peer {
-                peerid: 1,
-                socketmap: HashMap::new(),
                 address: local_ip()
                     .expect("Failed to obtain local ip address")
                     .to_string(),
-                port: Some(String::from("6780")),
+                peerid: 1,
+                ports: vec![
+                    String::from("57643"),
+                    String::from("34565"),
+                    String::from("32578"),
+                    String::from("23564"),
+                    String::from("13435"),
+                ],
+                ip_map: HashMap::new(),
+                ports_map: HashMap::new(),
+                blockchain: vec![Block {
+                    header: BlockHeader {
+                        previous_hash: "0".repeat(32),
+                        merkle_root: "0".repeat(32),
+                        nonce: 0,
+                    },
+                    merkle: Merkle { tree: Vec::new() },
+                    transactions: Vec::new(),
+                }],
+                block_map: HashMap::new(),
+                utxo: UTXO(HashMap::new()),
             },
             next_peerid: 2,
         };
+        server
+            .peer
+            .block_map
+            .insert(hash_as_string(&server.peer.blockchain[0]), 0);
+        return server;
     }
 
     async fn server_manager(mut server: Server, mut rx: Receiver<Command>) {
@@ -61,34 +92,46 @@ impl Server {
                     if key.as_str() == "id_query" {
                         if payload.is_none() {
                             error!("Invalid command: missing payload");
-                        } else {
-                            let payload_vec = payload.unwrap();
-                            if payload_vec.len() != 1 {
-                                error!("Invalid command: payload is of unexpected size");
-                            }
-                            resp.send(Ok(Some(String::from(server.next_peerid.to_string()))))
-                                .ok();
-                            server.next_peerid += 1;
-                            Server::save_server(&server);
+                            panic!();
                         }
-                    } else if key.as_str() == "sockets_query" {
-                        if payload.is_none() {
-                            error!("Invalid command: missing payload");
-                        } else {
-                            let payload_vec = payload.unwrap();
-                            if payload_vec.len() != 2 {
-                                error!("Invalid command: payload is of unexpected size");
-                            }
-                            let sourceid: u32 = payload_vec[0].parse().unwrap();
-                            let socket = payload_vec[1].clone();
-                            // Update the server socketmap
-                            server.peer.socketmap.insert(sourceid, socket);
-                            resp.send(Ok(Some(
-                                serde_json::to_string(&server.peer.socketmap).unwrap(),
-                            )))
+
+                        let payload_vec = payload.unwrap();
+                        if payload_vec.len() != 1 {
+                            error!("Invalid command: payload is of unexpected size");
+                            panic!();
+                        }
+
+                        resp.send(Ok(Vec::from([server.next_peerid.to_string()])))
                             .ok();
-                            Server::save_server(&server);
+                        server.next_peerid += 1;
+                        Server::save_server(&server);
+                    } else if key.as_str() == "maps_query" {
+                        let payload_vec = payload.unwrap();
+                        if payload_vec.len() <= 2 {
+                            error!("Invalid command: payload is of unexpected size");
                         }
+
+                        let sourceid: u32 = payload_vec[0].parse().unwrap();
+                        let ip = payload_vec[1].clone();
+
+                        // Update the server ip_map and ports_map
+                        server.peer.ip_map.insert(sourceid, ip.clone());
+                        server
+                            .peer
+                            .ports_map
+                            .insert(ip.clone(), payload_vec[2..].to_vec());
+
+                        let response_vector = vec![
+                            serde_json::to_string(&server.peer.ip_map)
+                                .expect("Failed to serialize ip map"),
+                            serde_json::to_string(&server.peer.ports_map)
+                                .expect("Failed to serialize ports map"),
+                        ];
+                        resp.send(Ok(response_vector)).ok();
+                        Server::save_server(&server);
+                    } else {
+                        warn!("invalid command for server");
+                        return;
                     }
                 }
             }
@@ -112,13 +155,21 @@ impl Server {
         }
 
         let (tx, rx) = mpsc::channel(32);
-        tokio::spawn(async move {
-            Server::server_manager(server, rx).await;
-        });
 
         let local_ip = local_ip().unwrap();
         let address = local_ip.to_string();
-        let socket = address + ":6780";
+        for p in &server.peer.ports {
+            let ip = address.clone();
+            let port = p.clone();
+            let tx_copy = tx.clone();
+            tokio::spawn(async move { Server::listen(ip, port, tx_copy).await });
+        }
+
+        Server::server_manager(server, rx).await;
+    }
+
+    async fn listen(ip: String, port: String, tx: Sender<Command>) {
+        let socket = ip + ":" + &port;
 
         let listener = TcpListener::bind(&socket).await.unwrap();
         info!("Successfully setup listener at {}", socket);
@@ -141,6 +192,7 @@ impl Server {
     }
 
     async fn process_connection(stream: TcpStream, socket: String, tx: Sender<Command>) {
+        let ip = stream.peer_addr().unwrap().ip().to_string();
         let mut connection = Connection::new(stream);
         loop {
             match connection.read_frame().await {
@@ -165,31 +217,42 @@ impl Server {
                             };
                             tx.send(cmd).await.ok();
                             let result = resp_rx.await;
-                            let peerid = result.unwrap().unwrap().unwrap().parse().unwrap();
+                            let peerid = result.unwrap().unwrap()[0].parse().unwrap();
                             let response = messages::get_peerid_response(peerid);
                             connection.write_frame(&response).await.ok();
-                        } else if command == "sockets_query" {
-                            let listening_socket = decoder::decode_sockets_query(&frame)
-                                .expect("Failed to decode sockets response");
+                        } else if command == "maps_query" {
+                            let mut ports = decoder::decode_ports(&frame);
+                            if ports.is_empty() {
+                                error!("No ports found when decoding ports for maps query");
+                                panic!();
+                            }
+
                             payload_vec.push(sourceid.to_string());
-                            payload_vec.push(listening_socket);
+                            payload_vec.push(ip.clone());
+                            payload_vec.append(&mut ports);
                             cmd = Command::Get {
                                 key: command,
                                 resp: resp_tx,
                                 payload: Some(payload_vec),
                             };
                             tx.send(cmd).await.ok();
-                            let result = resp_rx.await;
-                            let result_unwraped = result.unwrap();
-                            let result_unwrapped_unwrapped = result_unwraped.unwrap();
-                            if result_unwrapped_unwrapped.is_none() {
+
+                            let result = resp_rx.await.unwrap().unwrap();
+                            if result.is_empty() {
                                 error!("Empty result from server manager");
+                                panic!();
                             }
-                            let socketmap_json = result_unwrapped_unwrapped.unwrap();
-                            info!("Sending socketmap: {:?}", socketmap_json);
-                            let socketmap: HashMap<u32, String> =
-                                serde_json::from_str(&socketmap_json).unwrap();
-                            let response = messages::get_sockets_response(socketmap, sourceid);
+                            let ip_map_json = result[0].to_owned();
+                            let ports_map_json = result[1].to_owned();
+                            info!("Sending ip_map: {:?}", ip_map_json);
+                            info!("Sending ports_map: {:?}", ports_map_json);
+
+                            let response = messages::get_maps_response(
+                                destid,
+                                sourceid,
+                                ip_map_json,
+                                ports_map_json,
+                            );
                             connection.write_frame(&response).await.ok();
                         } else {
                             warn!("invalid command for server");
@@ -199,7 +262,7 @@ impl Server {
                 }
                 Err(e) => {
                     warn!("{}", e);
-                    break;
+                    return;
                 }
             }
         }
