@@ -22,6 +22,7 @@ use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 use std::process::exit;
+use std::sync::mpsc;
 use std::thread;
 use std::{env, fs, io};
 use tokio::sync::mpsc::Sender;
@@ -30,7 +31,7 @@ use tokio::sync::oneshot;
 static mut SIM_STATUS: bool = false;
 
 pub async fn shell(is_miner: bool) {
-    let mut tx_sim_option: Option<Sender<String>> = None;
+    let mut tx_sim_option: Option<std::sync::mpsc::Sender<String>> = None;
     let tx_to_manager: Sender<Command>;
     if is_miner {
         tx_to_manager = Miner::launch().await;
@@ -47,50 +48,50 @@ pub async fn shell(is_miner: bool) {
             .expect("Failed to read line");
 
         match command.to_lowercase().trim() {
-            // "help" => {
-            //     info!("The user selected help");
-            //     display_commands();
-            // }
+            "help" => {
+                info!("The user selected help");
+                display_commands();
+            }
 
-            // "sim start" => unsafe {
-            //     if !SIM_STATUS {
-            //         let (tx_sim_temp, rx_sim) = mpsc::channel();
-            //         tx_sim_option = Some(tx_sim_temp);
-            //         let _sim_handle = thread::spawn(|| start(rx_sim));
-            //         SIM_STATUS = true;
-            //     } else {
-            //         info!("\nSimulation has already begun!\n");
-            //     }
-            // },
+            "sim start" => unsafe {
+                if !SIM_STATUS {
+                    let (tx_sim_temp, rx_sim): (std::sync::mpsc::Sender<String>, std::sync::mpsc::Receiver<String>) = mpsc::channel();
+                    tx_sim_option = Some(tx_sim_temp);
+                    let _sim_handle = thread::spawn(|| start(rx_sim));
+                    SIM_STATUS = true;
+                } else {
+                    info!("\nSimulation has already begun!\n");
+                }
+            },
 
-            // "save" => unsafe {
-            //     if SIM_STATUS && tx_sim_option.is_some() {
-            //         let tx_sim = tx_sim_option.unwrap();
-            //         if tx_sim.send(String::from("save")).is_err() {
-            //             warn!("Failed to send command to the simulation");
-            //         }
-            //         tx_sim_option = Some(tx_sim);
-            //     } else {
-            //         warn!("Simulation has not started");
-            //     }
-            // },
+            "save" => unsafe {
+                if SIM_STATUS && tx_sim_option.is_some() {
+                    let tx_sim = tx_sim_option.unwrap();
+                    if tx_sim.send(String::from("save")).is_err() {
+                        warn!("Failed to send command to the simulation");
+                    }
+                    tx_sim_option = Some(tx_sim);
+                } else {
+                    warn!("Simulation has not started");
+                }
+            },
 
-            // "graph" => {
-            //     info!("Please enter a file path");
-            //     let mut filepath = String::new();
-            //     io::stdin()
-            //         .read_line(&mut filepath)
-            //         .expect("Failed to read line");
+            "graph" => {
+                info!("Please enter a file path");
+                let mut filepath = String::new();
+                io::stdin()
+                    .read_line(&mut filepath)
+                    .expect("Failed to read line");
 
-            //     let f = filepath.trim();
-            //     if !Path::new(f).exists() {
-            //         warn!("The filepath {} doesn't exist. Going back to shell", f);
-            //         continue;
-            //     }
+                let f = filepath.trim();
+                if !Path::new(f).exists() {
+                    warn!("The filepath {} doesn't exist. Going back to shell", f);
+                    continue;
+                }
 
-            //     let (blockchain, _, initial_tx_outs, _, _, _, _) = deserialize_json(f);
-            //     create_block_graph(initial_tx_outs, blockchain);
-            // }
+                let (blockchain, _, initial_tx_outs, _, _, _, _) = deserialize_json(f);
+                create_block_graph(initial_tx_outs, blockchain);
+            }
             "neighbors" | "neighbours" | "-n" => {
                 info!("Neighbors:");
                 let (resp_tx, resp_rx) = oneshot::channel();

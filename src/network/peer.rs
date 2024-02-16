@@ -34,7 +34,7 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use tokio::sync::oneshot;
 
-pub static SERVER_IP: &str = "192.168.0.15";
+pub static SERVER_IP: &str = "192.168.0.103";
 pub const SERVER_PORTS: &[&str] = &["57643", "34565", "32578", "23564", "13435"];
 pub static NUM_PORTS: usize = 5;
 pub static BATCH_SIZE: usize = 1024;
