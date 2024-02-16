@@ -3,6 +3,8 @@
 ### Project Abstract
 The goal of the ‘Minimalist blockchain system for scalability study’ project is to create a simplified blockchain system from scratch and test the scalability of such technology with respect to a specific metric. The blockchain system will be based on the design of the bitcoin blockchain. The motivation for this project stems from the increasing popularity of blockchain systems. The scalability of such systems is of utmost importance in order to ensure their maintainability and reliability.
 
+#### Read our paper [here](https://github.com/aaronmills0/notes/blob/main/ECSE458_Final_Report_DP_09.pdf)
+
 ### Team Members
 | Name | Year | Major |
 |------|------|-------|
